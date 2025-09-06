@@ -241,12 +241,12 @@
     const toggle = document.getElementById('themeToggle');
     function setLabel() { if (toggle) toggle.textContent = html.getAttribute('data-theme') === 'dark' ? 'Light' : 'Dark'; }
     const stored = localStorage.getItem('bf-theme');
-    if (stored) { if (stored === 'dark') html.setAttribute('data-theme', 'dark'); }
+    if (stored) { if (stored === 'dark') html.setAttribute('data-theme', 'dark'); else if (stored === 'light') html.setAttribute('data-theme','light'); }
     else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) { html.setAttribute('data-theme', 'dark'); }
     setLabel();
     if (toggle) toggle.addEventListener('click', () => {
       const isDark = html.getAttribute('data-theme') === 'dark';
-      if (isDark) { html.removeAttribute('data-theme'); localStorage.setItem('bf-theme', 'light'); }
+      if (isDark) { html.setAttribute('data-theme','light'); localStorage.setItem('bf-theme','light'); }
       else { html.setAttribute('data-theme', 'dark'); localStorage.setItem('bf-theme', 'dark'); }
       setLabel();
     });
