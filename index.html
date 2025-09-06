@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1" name="viewport"/>
-<title>Byte Force Robotics — Team 10312</title>
-<meta content="Byte Force Robotics — Team 10312" name="description"/>
-<style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Byte Force Robotics — Team 10312</title>
+  <meta name="description" content="Byte Force Robotics — Team 10312" />
+  <style>
 
     /* ===== COLOR SYSTEM & THEME ===== */
     :root {
@@ -86,6 +85,7 @@
     .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; }
     
   </style>
+
 <!-- Liquid Glass Header & Lightbox CSS (injected) -->
 <style>
 /* ===== Liquid Glass Header ===== */
@@ -146,183 +146,84 @@
   cursor: pointer;
 }
 </style>
-
-<!-- Sticky Glass Header (rebuilt) -->
-<style id="sticky-glass-rebuild">
-  .sticky-glass{
-    position: sticky;
-    top: 0;
-    z-index: 2147483000;
-    isolation: isolate; /* ensure ::before is bounded */
-  }
-  /* glass layer */
-  .sticky-glass::before{
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: rgba(255,255,255,0.55);
-    border-bottom: 1px solid rgba(0,0,0,0.08);
-  }
-  /* blur where supported */
-  @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-    .sticky-glass::before{
-      -webkit-backdrop-filter: saturate(180%) blur(18px);
-      backdrop-filter: saturate(180%) blur(18px);
-      background: rgba(255,255,255,0.28);
-    }
-  }
-  .sticky-glass > *{ position: relative; }
-  .sticky-glass.scrolled{ box-shadow: 0 1px 0 rgba(0,0,0,0.06); }
-
-  /* Dark mode */
-  @media (prefers-color-scheme: dark){
-    .sticky-glass::before{
-      background: rgba(20,20,20,0.40);
-      border-bottom-color: rgba(255,255,255,0.08);
-    }
-    @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-      .sticky-glass::before{
-        background: rgba(20,20,20,0.22);
-      }
-    }
-  }
-
-  /* Avoid layout shift if site had a fixed header before */
-  body.has-fixed-header-padding{
-    padding-top: var(--header-height, 0px);
-  }
-</style>
-
-<!-- Sticky Glass Header Script (rebuilt) -->
-<script id="sticky-glass-rebuild-script">
-(function(){
-  try {
-    var root = document;
-    var header = root.querySelector('header');
-    if(!header){
-      // Fallback to first nav near top
-      var all = root.querySelectorAll('nav,[role="navigation"],.navbar,.topbar,.site-header,[role="banner"]');
-      if(all && all.length){
-        // choose the element that appears highest in the page
-        header = Array.prototype.slice.call(all).sort(function(a,b){
-          return a.getBoundingClientRect().top - b.getBoundingClientRect().top;
-        })[0];
-      }
-    }
-    if(!header){ return; }
-
-    // Clean conflicting classes inline
-    header.classList.remove('glass-header');
-
-    // Apply our class
-    if(!header.classList.contains('sticky-glass')) header.classList.add('sticky-glass');
-
-    // Ensure sticky takes effect
-    var cs = getComputedStyle(header);
-    if (cs.position === 'static') header.style.position = 'sticky';
-    header.style.top = '0';
-    if (!(parseInt(cs.zIndex||'0',10) > 2147482999)) header.style.zIndex = 2147483000;
-
-    // Ensure children render above ::before
-    Array.from(header.children).forEach(function(ch){ ch.style.position = ch.style.position || 'relative'; });
-
-    // Add scrolled class when moving
-    var onScroll = function(){
-      var scrolled = (window.scrollY || document.documentElement.scrollTop) > 2;
-      header.classList.toggle('scrolled', scrolled);
-    };
-    window.addEventListener('scroll', onScroll, {passive:true});
-    onScroll();
-
-    // If site previously had fixed header, add body padding to avoid overlap
-    var rect = header.getBoundingClientRect();
-    var height = Math.round(rect.height || header.offsetHeight || 0);
-    if(height){
-      document.documentElement.style.setProperty('--header-height', height+'px');
-      // Only add padding if content overlaps at load (heuristic)
-      var firstContent = document.body && document.body.children[0];
-      if(firstContent && firstContent !== header){
-        var cRect = firstContent.getBoundingClientRect();
-        if (cRect.top < height/2) {
-          document.body.classList.add('has-fixed-header-padding');
-        }
-      }
-    }
-  } catch(e){
-    console.warn('Sticky Glass rebuild error:', e);
-  }
-})();
-</script>
 </head>
 <body>
-<div aria-hidden="true" class="liquid-bg"></div>
-<header class="sticky-glass"><div class="container nav"><div class="nav-left"><a class="logo" data-link="home" href="/"><img alt="Team 10312 Logo" src="image.png"/><span></span></a><nav class="nav-links"><a data-link="about" href="/about/">About</a><a data-link="team" href="/team/">Team</a><a data-link="robots" href="/robots/">Robots</a><a data-link="sponsors" href="/sponsors/">Sponsors</a><a data-link="media" href="/media/">Media</a><a data-link="contact" href="/contact/">Contact</a></nav></div><div class="nav-cta"><button aria-label="Toggle theme" class="toggle-theme" id="themeToggle">Dark</button><a class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor" id="link-get-involved">Get Involved</a></div></div></header>
-<section class="hero">
-<div class="container" style="display:grid;gap:2rem;grid-template-columns:1.2fr 1fr;align-items:center">
-<div>
-<span class="muted" style="text-transform:uppercase;font-size:.8rem;letter-spacing:.1em">FIRST Robotics Competition</span>
-<h1 class="headline">Team 10312 — Byte Force</h1>
-<p class="muted" style="max-width:60ch">McKinney, Texas • We design, build, and program competitive FRC robots while mentoring the next generation of engineers and innovators.</p>
-<div style="margin-top:1.2rem; display:flex; gap:.6rem; flex-wrap:wrap;">
-<a class="btn glass-button" data-link="media" href="/media/">Watch Highlights</a>
-<a class="btn secondary" data-link="sponsors" href="/sponsors/">Become a Sponsor</a>
-</div>
-</div>
-<div class="card">
-<div style="display:flex; align-items:center; gap:.6rem;">
-<img alt="Team Logo small" src="image.png" style="height:42px;width:auto;"/>
-<strong>2025 Season</strong>
-</div>
-<p class="muted" style="margin:.6rem 0 1rem">Follow our build, competitions, and outreach all season long.</p>
-<div style="display:grid; gap:.6rem;">
-<a class="btn glass-button" data-link="media" href="/media/" style="justify-content:center;">View Robot Reveal</a>
-<a class="btn secondary" data-link="team" href="/team/" style="justify-content:center;">Meet the Team</a>
-</div>
-</div>
-</div>
-</section>
-<section class="section">
-<div class="container" style="text-align:center">
-<div class="muted" style="text-transform:uppercase; font-size:.8rem; letter-spacing:.1em;">What we value</div>
-<h2 class="h2">Innovation • Teamwork • Community</h2>
-<p class="muted" style="max-width:70ch; margin: 0 auto;">We iterate fast, learn constantly, and support each other—on and off the field.</p>
-<div class="grid-3" style="margin-top:1.2rem;">
-<div class="card"><h3>Software Excellence</h3><p class="muted">Autonomous, vision, and controls—built with modern tooling and rigorous testing.</p></div>
-<div class="card"><h3>Mechanical Craft</h3><p class="muted">Robust, serviceable designs that balance speed, precision, and reliability.</p></div>
-<div class="card"><h3>STEM Outreach</h3><p class="muted">Workshops, demos, and mentoring to spark curiosity across our community.</p></div>
-</div>
-</div>
-</section>
-<footer>
-<div class="container foot-grid">
-<div>
-<div class="logo"><img alt="Team 10312 Logo" src="image.png" style="height:28px"/></div>
-<p class="muted" style="margin-top:.6rem;max-width:46ch">Orange • White • Black.</p>
-</div>
-<div>
-<h4>Explore</h4>
-<a class="muted" data-link="team" href="/team/">Team</a><br/>
-<a class="muted" data-link="robots" href="/robots/">Robots</a><br/>
-<a class="muted" data-link="media" href="/media/">Media</a>
-</div>
-<div>
-<h4>Support</h4>
-<a class="muted" data-link="sponsors" href="/sponsors/">Sponsors</a><br/>
-<a class="muted" data-link="contact" href="/contact/">Contact</a>
-</div>
-<div>
-<h4>Follow</h4>
-<a class="muted" href="#">YouTube</a><br/>
-<a class="muted" href="#">Instagram</a>
-</div>
-</div>
-<div class="container" style="margin-top:1.4rem;display:flex;justify-content:space-between;gap:.8rem;flex-wrap:wrap">
-<span class="muted">© <span id="year"></span> Byte Force Robotics — Team 10312</span>
-<div style="display:flex;gap:1rem"><a class="muted" href="#">Privacy</a><a class="muted" href="#">Terms</a></div>
-</div>
-</footer>
-<script>
+  
+  <div class="liquid-bg" aria-hidden="true"></div>
+  <header><div class="container nav"><div class="nav-left"><a class="logo" data-link="home" href="/"><img src="/resources/blacklogo.png" alt="Team 10312 Logo"><span></span></a><nav class="nav-links"><a data-link="about" href="/about/">About</a><a data-link="team" href="/team/">Team</a><a data-link="robots" href="/robots/">Robots</a><a data-link="sponsors" href="/sponsors/">Sponsors</a><a data-link="media" href="/media/">Media</a><a data-link="contact" href="/contact/">Contact</a></nav></div><div class="nav-cta"><button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button><a id="link-get-involved" class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor">Get Involved</a></div></div></header>
+    
+  
+  <section class="hero">
+    <div class="container" style="display:grid;gap:2rem;grid-template-columns:1.2fr 1fr;align-items:center">
+      <div>
+        <span class="muted" style="text-transform:uppercase;font-size:.8rem;letter-spacing:.1em">FIRST Robotics Competition</span>
+        <h1 class="headline">Team 10312 — Byte Force</h1>
+        <p class="muted" style="max-width:60ch">McKinney, Texas • We design, build, and program competitive FRC robots while mentoring the next generation of engineers and innovators.</p>
+        <div style="margin-top:1.2rem; display:flex; gap:.6rem; flex-wrap:wrap;">
+          <a class="btn glass-button" data-link="media" href="/media/">Watch Highlights</a>
+          <a class="btn secondary" data-link="sponsors" href="/sponsors/">Become a Sponsor</a>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex; align-items:center; gap:.6rem;">
+          <img src="/resources/blacklogo.png" alt="Team Logo small" style="height:42px;width:auto;">
+          <strong>2025 Season</strong>
+        </div>
+        <p class="muted" style="margin:.6rem 0 1rem">Follow our build, competitions, and outreach all season long.</p>
+        <div style="display:grid; gap:.6rem;">
+          <a class="btn glass-button" data-link="media" href="/media/" style="justify-content:center;">View Robot Reveal</a>
+          <a class="btn secondary" data-link="team" href="/team/" style="justify-content:center;">Meet the Team</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  
+  <section class="section">
+    <div class="container" style="text-align:center">
+      <div class="muted" style="text-transform:uppercase; font-size:.8rem; letter-spacing:.1em;">What we value</div>
+      <h2 class="h2">Innovation • Teamwork • Community</h2>
+      <p class="muted" style="max-width:70ch; margin: 0 auto;">We iterate fast, learn constantly, and support each other—on and off the field.</p>
+      <div class="grid-3" style="margin-top:1.2rem;">
+        <div class="card"><h3>Software Excellence</h3><p class="muted">Autonomous, vision, and controls—built with modern tooling and rigorous testing.</p></div>
+        <div class="card"><h3>Mechanical Craft</h3><p class="muted">Robust, serviceable designs that balance speed, precision, and reliability.</p></div>
+        <div class="card"><h3>STEM Outreach</h3><p class="muted">Workshops, demos, and mentoring to spark curiosity across our community.</p></div>
+      </div>
+    </div>
+  </section>
+
+  
+  <footer>
+    <div class="container foot-grid">
+      <div>
+        <div class="logo"><img src="/resources/blacklogo.png" alt="Team 10312 Logo" style="height:28px"></div>
+        <p class="muted" style="margin-top:.6rem;max-width:46ch">Orange • White • Black.</p>
+      </div>
+      <div>
+        <h4>Explore</h4>
+        <a class="muted" data-link="team" href="/team/">Team</a><br>
+        <a class="muted" data-link="robots" href="/robots/">Robots</a><br>
+        <a class="muted" data-link="media" href="/media/">Media</a>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <a class="muted" data-link="sponsors" href="/sponsors/">Sponsors</a><br>
+        <a class="muted" data-link="contact" href="/contact/">Contact</a>
+      </div>
+      <div>
+        <h4>Follow</h4>
+        <a class="muted" href="#">YouTube</a><br>
+        <a class="muted" href="#">Instagram</a>
+      </div>
+    </div>
+    <div class="container" style="margin-top:1.4rem;display:flex;justify-content:space-between;gap:.8rem;flex-wrap:wrap">
+      <span class="muted">© <span id="year"></span> Byte Force Robotics — Team 10312</span>
+      <div style="display:flex;gap:1rem"><a class="muted" href="#">Privacy</a><a class="muted" href="#">Terms</a></div>
+    </div>
+  </footer>
+    
+
+  <script>
     // ----- CONFIG: Set these to your WordPress page slugs/URLs -----
     const LINKS = {
       home: '/', about: '/about/', team: '/team/', robots: '/robots/',
@@ -380,6 +281,8 @@
     wireLinks();
     setActive();
   </script>
+    
+
 <!-- Liquid Glass Header & Lightbox JS (injected) -->
 <script>
 (function(){
@@ -465,5 +368,47 @@
   }
 })();
 </script>
+
+<!-- Logo swap script injected: swaps blacklogo/whitelogo on theme changes -->
+<script>
+(function() {
+  function forEachLogo(fn){
+    var imgs = document.querySelectorAll('img[src$="/resources/blacklogo.png"], img[src$="/resources/whitelogo.png"]');
+    imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn);
+  }
+  function isDarkMode() {
+    var html = document.documentElement;
+    var dt = (html.getAttribute('data-theme') || '').toLowerCase();
+    if (dt === 'dark') return true;
+    if (dt === 'light') return false;
+    if (html.classList && (html.classList.contains('dark') || html.classList.contains('theme-dark'))) return true;
+    if (html.classList && (html.classList.contains('light') || html.classList.contains('theme-light'))) return false;
+    if (window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  }
+  function setLogoByTheme() {
+    var dark = isDarkMode();
+    forEachLogo(function(img){
+      var current = img.getAttribute('src') || '';
+      var desired = current.replace(/(white|black)logo\.png$/i, dark ? '/resources/blacklogo.png' : '/resources/whitelogo.png');
+      if (desired !== current) img.setAttribute('src', desired);
+    });
+  }
+  setLogoByTheme();
+  try {
+    var obs = new MutationObserver(setLogoByTheme);
+    obs.observe(document.documentElement, {attributes: true, attributeFilter: ['class','data-theme']});
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setLogoByTheme);
+    }
+    window.addEventListener('storage', setLogoByTheme);
+  } catch (e) {
+    // MutationObserver not supported; ignore
+  }
+})();
+</script>
+
 </body>
 </html>
