@@ -382,7 +382,7 @@
     var dark = isDarkMode();
     forEachLogo(function(img){
       var current = img.getAttribute('src') || '';
-      var desired = current.replace(/(white|black)logo\.png$/i, dark ? 'blacklogo.png' : 'whitelogo.png');
+      var desired = current.replace(/(white|black)logo\.png$/i, dark ? 'whitelogo.png' : 'blacklogo.png');
       if (desired !== current) img.setAttribute('src', desired);
     });
   }
