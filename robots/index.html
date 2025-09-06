@@ -85,6 +85,67 @@
     .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; }
     
   </style>
+
+<!-- Liquid Glass Header & Lightbox CSS (injected) -->
+<style>
+/* ===== Liquid Glass Header ===== */
+.liquid-glass-header{
+  position: sticky;
+  top: 0;
+  z-index: 9999;
+  background: rgba(255,255,255,0.55);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  transition: background-color .3s ease, border-color .3s ease, box-shadow .3s ease;
+}
+.liquid-glass-header.scrolled{
+  background: rgba(255,255,255,0.72);
+  box-shadow: 0 2px 20px rgba(0,0,0,0.12);
+}
+
+/* Dark theme support if site uses a data-theme root or prefers-color-scheme */
+:root[data-theme="dark"] .liquid-glass-header{
+  background: rgba(17,25,40,0.45);
+  border-color: rgba(255,255,255,0.08);
+}
+:root[data-theme="dark"] .liquid-glass-header.scrolled{
+  background: rgba(17,25,40,0.62);
+}
+
+/* ===== Simple Lightbox (only activates on media gallery pages) ===== */
+#lightbox-overlay{
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.6);
+  z-index: 2147483645;
+  padding: 4vw;
+}
+#lightbox-overlay.show{ display: flex; }
+#lightbox-image{
+  max-width: 100%;
+  max-height: 100%;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  border-radius: 12px;
+}
+#lightbox-close{
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: rgba(0,0,0,0.45);
+  color: #fff;
+  border: 0;
+  font-size: 32px;
+  line-height: 1;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+</style>
 </head>
 <body>
   
@@ -211,5 +272,91 @@
     setActive();
   </script>
     
+
+<!-- Liquid Glass Header & Lightbox JS (injected) -->
+<script>
+(function(){
+  // ===== Liquid Glass Header enhancer =====
+  function enhanceHeader(){
+    var candidates = document.querySelectorAll('header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]');
+    if(candidates.length){
+      var el = candidates[0];
+      if(!el.classList.contains('liquid-glass-header')){
+        el.classList.add('liquid-glass-header');
+      }
+    }
+    var headerEl = document.querySelector('.liquid-glass-header');
+    if(headerEl){
+      var onScroll = function(){
+        var y = (window.scrollY || document.documentElement.scrollTop || 0);
+        if(y > 8){ headerEl.classList.add('scrolled'); }
+        else{ headerEl.classList.remove('scrolled'); }
+      };
+      onScroll();
+      window.addEventListener('scroll', onScroll, {passive:true});
+    }
+  }
+
+  // ===== Lightweight Lightbox (activates on media/gallery pages only) =====
+  function setupLightbox(){
+    // Look for common gallery selectors
+    var galleryRoot =
+      document.querySelector('[data-gallery], .gallery, #gallery, .photo-gallery, .media-gallery');
+    if(!galleryRoot) return; // Only enable where a gallery exists
+
+    // Build overlay markup once
+    var overlay = document.createElement('div');
+    overlay.id = 'lightbox-overlay';
+    overlay.innerHTML = '<button id="lightbox-close" aria-label="Close">×</button><img id="lightbox-image" alt="">';
+    document.body.appendChild(overlay);
+
+    var imgEl = overlay.querySelector('#lightbox-image');
+    var closeBtn = overlay.querySelector('#lightbox-close');
+
+    function openLightbox(src, alt){
+      imgEl.src = src;
+      imgEl.alt = alt || '';
+      overlay.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox(){
+      overlay.classList.remove('show');
+      document.body.style.overflow = '';
+      // Defer clearing src to allow smooth fade on some browsers
+      setTimeout(function(){ imgEl.src = ''; }, 200);
+    }
+
+    overlay.addEventListener('click', function(e){
+      if(e.target === overlay || e.target.id === 'lightbox-close'){ closeLightbox(); }
+    });
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape'){ closeLightbox(); }
+    });
+
+    // Delegate click on any IMG inside the gallery root
+    galleryRoot.addEventListener('click', function(e){
+      var t = e.target;
+      if(t && t.tagName === 'IMG'){
+        e.preventDefault();
+        var anchor = t.closest('a');
+        var src = (anchor && anchor.getAttribute('href')) || t.getAttribute('data-full') || t.src;
+        openLightbox(src, t.getAttribute('alt') || '');
+      }
+    });
+  }
+
+  // Initialize after DOM ready
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', function(){
+      enhanceHeader();
+      setupLightbox();
+    });
+  } else {
+    enhanceHeader();
+    setupLightbox();
+  }
+})();
+</script>
 </body>
 </html>
