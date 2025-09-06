@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <base href=\"/\">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Byte Force Robotics — Team 10312</title>
@@ -151,7 +150,7 @@
 <body>
   
   <div class="liquid-bg" aria-hidden="true"></div>
-  <header><div class="container nav"><div class="nav-left"><a class="logo" data-link="home" href="/"><img src="/resources/blacklogo.png" alt="Team 10312 Logo"><span></span></a><nav class="nav-links"><a data-link="about" href="/about/">About</a><a data-link="team" href="/team/">Team</a><a data-link="robots" href="/robots/">Robots</a><a data-link="sponsors" href="/sponsors/">Sponsors</a><a data-link="media" href="/media/">Media</a><a data-link="contact" href="/contact/">Contact</a></nav></div><div class="nav-cta"><button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button><a id="link-get-involved" class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor">Get Involved</a></div></div></header>
+  <header><div class="container nav"><div class="nav-left"><a class="logo" data-link="home" href="/"><img src="blacklogo.png" alt="Team 10312 Logo"><span></span></a><nav class="nav-links"><a data-link="about" href="/about/">About</a><a data-link="team" href="/team/">Team</a><a data-link="robots" href="/robots/">Robots</a><a data-link="sponsors" href="/sponsors/">Sponsors</a><a data-link="media" href="/media/">Media</a><a data-link="contact" href="/contact/">Contact</a></nav></div><div class="nav-cta"><button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button><a id="link-get-involved" class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor">Get Involved</a></div></div></header>
     
   
   <section class="hero">
@@ -167,7 +166,7 @@
       </div>
       <div class="card">
         <div style="display:flex; align-items:center; gap:.6rem;">
-          <img src="/resources/blacklogo.png" alt="Team Logo small" style="height:42px;width:auto;">
+          <img src="blacklogo.png" alt="Team Logo small" style="height:42px;width:auto;">
           <strong>2025 Season</strong>
         </div>
         <p class="muted" style="margin:.6rem 0 1rem">Follow our build, competitions, and outreach all season long.</p>
@@ -197,7 +196,7 @@
   <footer>
     <div class="container foot-grid">
       <div>
-        <div class="logo"><img src="/resources/blacklogo.png" alt="Team 10312 Logo" style="height:28px"></div>
+        <div class="logo"><img src="blacklogo.png" alt="Team 10312 Logo" style="height:28px"></div>
         <p class="muted" style="margin-top:.6rem;max-width:46ch">Orange • White • Black.</p>
       </div>
       <div>
@@ -374,7 +373,7 @@
 <script>
 (function() {
   function forEachLogo(fn){
-    var imgs = document.querySelectorAll('img[src$="/resources/blacklogo.png"], img[src$="/resources/whitelogo.png"]');
+    var imgs = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
     imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn);
   }
   function isDarkMode() {
@@ -393,7 +392,7 @@
     var dark = isDarkMode();
     forEachLogo(function(img){
       var current = img.getAttribute('src') || '';
-      var desired = current.replace(/(white|black)logo\.png$/i, dark ? '/resources/blacklogo.png' : '/resources/whitelogo.png');
+      var desired = current.replace(/(white|black)logo\.png$/i, dark ? 'blacklogo.png' : 'whitelogo.png');
       if (desired !== current) img.setAttribute('src', desired);
     });
   }
