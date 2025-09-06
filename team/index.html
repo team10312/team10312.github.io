@@ -73,6 +73,11 @@
     @media (max-width:1100px){ .grid-4{ grid-template-columns: 1fr 1fr 1fr; } }
     @media (max-width:740px){ .grid-4{ grid-template-columns: 1fr 1fr; } }
     @media (max-width:520px){ .grid-4{ grid-template-columns: 1fr; } }
+
+    /* ADDED: 2-column grid for Coaches */
+    .grid-2{ display:grid; gap:1rem; grid-template-columns: 1fr 1fr; }
+    @media (max-width:700px){ .grid-2{ grid-template-columns: 1fr; } }
+
     .card{ background: var(--panel); border:1px solid var(--panel-border); border-radius: var(--radius); box-shadow: var(--shadow); padding:1.1rem; }
     footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px solid var(--panel-border); }
     .foot-grid{ display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:1rem; }
@@ -111,6 +116,28 @@
       </div>
     </div>
   </section>
+
+  <!-- ADDED: Coaches section -->
+  <section class="section">
+    <div class="container">
+      <h2 class="h2">Coaches</h2>
+      <div class="grid-2">
+        <div class="card">
+          <img src="coach_1.jpg" alt="Coach One" style="border-radius:12px">
+          <h3>Coach One</h3>
+          <span style="display:inline-block;padding:.2rem .55rem;border-radius:999px;background:rgba(255,127,0,.12);color:var(--brand);font-size:.75rem;font-weight:700">Coach</span>
+          <p class="muted">Strategy, mentorship, safety.</p>
+        </div>
+        <div class="card">
+          <img src="coach_2.jpg" alt="Coach Two" style="border-radius:12px">
+          <h3>Coach Two</h3>
+          <span style="display:inline-block;padding:.2rem .55rem;border-radius:999px;background:rgba(255,127,0,.12);color:var(--brand);font-size:.75rem;font-weight:700">Coach</span>
+          <p class="muted">Development, outreach, competition prep.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="section">
     <div class="container">
       <h2 class="h2">Subteams</h2>
