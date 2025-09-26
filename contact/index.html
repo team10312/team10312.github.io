@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact — Byte Force Robotics · Team 10312</title>
   <meta name="description" content="Contact — Byte Force Robotics · Team 10312" />
-  <style>
 
+  <!-- ===== reCAPTCHA v3 (replace SITE_KEY_HERE with your site key) ===== -->
+  <script src="https://www.google.com/recaptcha/api.js?render=6Ldob9UrAAAAANmSp-eLGm-ts8gn12B8-5aee3rR"></script>
+
+  <style>
     /* ===== COLOR SYSTEM & THEME ===== */
     :root {
       --bg:#ffffff; --bg-soft:rgba(255,255,255,.55); --panel:rgba(255,255,255,.28); --panel-border:rgba(0,0,0,.08);
@@ -83,76 +86,90 @@
     @media (max-width:1000px){.gallery{grid-template-columns:repeat(4,1fr)}} 
     @media (max-width:640px){.gallery{grid-template-columns:repeat(2,1fr)}}
     .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; }
-    
   </style>
 
-<!-- Liquid Glass Header & Lightbox CSS (injected) -->
-<style>
-/* ===== Liquid Glass Header ===== */
-.liquid-glass-header{
-  position: sticky;
-  top: 0;
-  z-index: 9999;
-  background: rgba(255,255,255,0.55);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-  backdrop-filter: blur(12px) saturate(160%);
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-  transition: background-color .3s ease, border-color .3s ease, box-shadow .3s ease;
-}
-.liquid-glass-header.scrolled{
-  background: rgba(255,255,255,0.72);
-  box-shadow: 0 2px 20px rgba(0,0,0,0.12);
-}
+  <!-- Liquid Glass Header & Lightbox CSS (injected) -->
+  <style>
+  /* ===== Liquid Glass Header ===== */
+  .liquid-glass-header{
+    position: sticky;
+    top: 0;
+    z-index: 9999;
+    background: rgba(255,255,255,0.55);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    backdrop-filter: blur(12px) saturate(160%);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    transition: background-color .3s ease, border-color .3s ease, box-shadow .3s ease;
+  }
+  .liquid-glass-header.scrolled{
+    background: rgba(255,255,255,0.72);
+    box-shadow: 0 2px 20px rgba(0,0,0,0.12);
+  }
+  :root[data-theme="dark"] .liquid-glass-header{
+    background: rgba(17,25,40,0.45);
+    border-color: rgba(255,255,255,0.08);
+  }
+  :root[data-theme="dark"] .liquid-glass-header.scrolled{
+    background: rgba(17,25,40,0.62);
+  }
 
-/* Dark theme support if site uses a data-theme root or prefers-color-scheme */
-:root[data-theme="dark"] .liquid-glass-header{
-  background: rgba(17,25,40,0.45);
-  border-color: rgba(255,255,255,0.08);
-}
-:root[data-theme="dark"] .liquid-glass-header.scrolled{
-  background: rgba(17,25,40,0.62);
-}
-
-/* ===== Simple Lightbox (only activates on media gallery pages) ===== */
-#lightbox-overlay{
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.6);
-  z-index: 2147483645;
-  padding: 4vw;
-}
-#lightbox-overlay.show{ display: flex; }
-#lightbox-image{
-  max-width: 100%;
-  max-height: 100%;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-  border-radius: 12px;
-}
-#lightbox-close{
-  position: absolute;
-  top: 16px;
-  right: 20px;
-  background: rgba(0,0,0,0.45);
-  color: #fff;
-  border: 0;
-  font-size: 32px;
-  line-height: 1;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-</style>
+  /* ===== Simple Lightbox (only activates on media gallery pages) ===== */
+  #lightbox-overlay{
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.6);
+    z-index: 2147483645;
+    padding: 4vw;
+  }
+  #lightbox-overlay.show{ display: flex; }
+  #lightbox-image{
+    max-width: 100%;
+    max-height: 100%;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    border-radius: 12px;
+  }
+  #lightbox-close{
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    border: 0;
+    font-size: 32px;
+    line-height: 1;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  </style>
 </head>
 <body>
-  
   <div class="liquid-bg" aria-hidden="true"></div>
-  <header><div class="container nav"><div class="nav-left"><a class="logo" data-link="home" href="/"><img src="blacklogo.png" alt="Team 10312 Logo"><span></span></a><nav class="nav-links"><a data-link="about" href="/about/">About</a><a data-link="team" href="/team/">Team</a><a data-link="robots" href="/robots/">Robots</a><a data-link="sponsors" href="/sponsors/">Sponsors</a><a data-link="media" href="/media/">Media</a><a data-link="contact" href="/contact/">Contact</a></nav></div><div class="nav-cta"><button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button><a id="link-get-involved" class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor">Get Involved</a></div></div></header>
-    
-  
+
+  <header>
+    <div class="container nav">
+      <div class="nav-left">
+        <a class="logo" data-link="home" href="/"><img src="blacklogo.png" alt="Team 10312 Logo"><span></span></a>
+        <nav class="nav-links">
+          <a data-link="about" href="/about/">About</a>
+          <a data-link="team" href="/team/">Team</a>
+          <a data-link="robots" href="/robots/">Robots</a>
+          <a data-link="sponsors" href="/sponsors/">Sponsors</a>
+          <a data-link="media" href="/media/">Media</a>
+          <a data-link="contact" href="/contact/">Contact</a>
+        </nav>
+      </div>
+      <div class="nav-cta">
+        <button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button>
+        <a id="link-get-involved" class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor">Get Involved</a>
+      </div>
+    </div>
+  </header>
+
   <section class="hero">
     <div class="container">
       <h1 class="headline">Contact Us</h1>
@@ -160,19 +177,34 @@
     </div>
   </section>
 
-  
   <section class="section">
     <div class="container" style="display:grid;gap:1rem;grid-template-columns:1.1fr 1fr">
       <div class="card">
         <h2 class="h2">Send a Message</h2>
-        <!-- Replace with your WP form shortcode or embed -->
-        <form onsubmit="event.preventDefault(); alert('Submitted! (replace with WP form)');" style="display:grid;gap:.6rem">
-          <input type="text" placeholder="Your Name" required style="padding:.8rem;border-radius:10px;border:1px solid var(--panel-border);background:var(--panel);color:var(--text)">
-          <input type="email" placeholder="Email" required style="padding:.8rem;border-radius:10px;border:1px solid var(--panel-border);background:var(--panel);color:var(--text)">
-          <textarea placeholder="How can we help?" rows="6" required style="padding:.8rem;border-radius:10px;border:1px solid var(--panel-border);background:var(--panel);color:var(--text)"></textarea>
+
+        <!-- Contact Form (reCAPTCHA v3 + honeypot + optional phone) -->
+        <form id="contactForm" style="display:grid;gap:.6rem">
+          <input type="text" name="name" placeholder="Your Name" required
+                 style="padding:.8rem;border-radius:10px;border:1px solid var(--panel-border);background:var(--panel);color:var(--text)">
+          <input type="email" name="email" placeholder="Email" required
+                 style="padding:.8rem;border-radius:10px;border:1px solid var(--panel-border);background:var(--panel);color:var(--text)">
+          <input type="tel" name="phone" placeholder="Phone (optional)"
+                 style="padding:.8rem;border-radius:10px;border:1px solid var(--panel-border);background:var(--panel);color:var(--text)">
+          <textarea name="message" placeholder="How can we help?" rows="6" required
+                    style="padding:.8rem;border-radius:10px;border:1px solid var(--panel-border);background:var(--panel);color:var(--text)"></textarea>
+
+          <!-- Honeypot: should remain empty -->
+          <input type="text" name="website" autocomplete="off" tabindex="-1" aria-hidden="true"
+                 style="position:absolute;left:-10000px;opacity:0">
+
+          <!-- reCAPTCHA token (filled on submit) -->
+          <input type="hidden" name="token" id="recaptchaToken">
+
           <button class="btn glass-button" type="submit" style="justify-content:center">Send</button>
+          <div id="formStatus" class="muted" style="min-height:1.2rem;"></div>
         </form>
       </div>
+
       <div class="card">
         <h2 class="h2">Other Ways</h2>
         <p class="muted">Email: <a href="mailto:byteforce@frc10312.org">byteforce@frc10312.org</a></p>
@@ -183,7 +215,6 @@
     </div>
   </section>
 
-  
   <footer>
     <div class="container foot-grid">
       <div>
@@ -212,7 +243,6 @@
       <div style="display:flex;gap:1rem"><a class="muted" href="#">Privacy</a><a class="muted" href="#">Terms</a></div>
     </div>
   </footer>
-    
 
   <script>
     // ----- CONFIG: Set these to your WordPress page slugs/URLs -----
@@ -272,134 +302,198 @@
     wireLinks();
     setActive();
   </script>
-    
 
-<!-- Liquid Glass Header & Lightbox JS (injected) -->
-<script>
-(function(){
-  // ===== Liquid Glass Header enhancer =====
-  function enhanceHeader(){
-    var candidates = document.querySelectorAll('header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]');
-    if(candidates.length){
-      var el = candidates[0];
-      if(!el.classList.contains('liquid-glass-header')){
-        el.classList.add('liquid-glass-header');
+  <!-- Liquid Glass Header & Lightbox JS (injected) -->
+  <script>
+  (function(){
+    // ===== Liquid Glass Header enhancer =====
+    function enhanceHeader(){
+      var candidates = document.querySelectorAll('header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]');
+      if(candidates.length){
+        var el = candidates[0];
+        if(!el.classList.contains('liquid-glass-header')){
+          el.classList.add('liquid-glass-header');
+        }
+      }
+      var headerEl = document.querySelector('.liquid-glass-header');
+      if(headerEl){
+        var onScroll = function(){
+          var y = (window.scrollY || document.documentElement.scrollTop || 0);
+          if(y > 8){ headerEl.classList.add('scrolled'); }
+          else{ headerEl.classList.remove('scrolled'); }
+        };
+        onScroll();
+        window.addEventListener('scroll', onScroll, {passive:true});
       }
     }
-    var headerEl = document.querySelector('.liquid-glass-header');
-    if(headerEl){
-      var onScroll = function(){
-        var y = (window.scrollY || document.documentElement.scrollTop || 0);
-        if(y > 8){ headerEl.classList.add('scrolled'); }
-        else{ headerEl.classList.remove('scrolled'); }
-      };
-      onScroll();
-      window.addEventListener('scroll', onScroll, {passive:true});
-    }
-  }
 
-  // ===== Lightweight Lightbox (activates on media/gallery pages only) =====
-  function setupLightbox(){
-    // Look for common gallery selectors
-    var galleryRoot =
-      document.querySelector('[data-gallery], .gallery, #gallery, .photo-gallery, .media-gallery');
-    if(!galleryRoot) return; // Only enable where a gallery exists
+    // ===== Lightweight Lightbox (activates on media/gallery pages only) =====
+    function setupLightbox(){
+      var galleryRoot =
+        document.querySelector('[data-gallery], .gallery, #gallery, .photo-gallery, .media-gallery');
+      if(!galleryRoot) return;
 
-    // Build overlay markup once
-    var overlay = document.createElement('div');
-    overlay.id = 'lightbox-overlay';
-    overlay.innerHTML = '<button id="lightbox-close" aria-label="Close">×</button><img id="lightbox-image" alt="">';
-    document.body.appendChild(overlay);
+      var overlay = document.createElement('div');
+      overlay.id = 'lightbox-overlay';
+      overlay.innerHTML = '<button id="lightbox-close" aria-label="Close">×</button><img id="lightbox-image" alt="">';
+      document.body.appendChild(overlay);
 
-    var imgEl = overlay.querySelector('#lightbox-image');
-    var closeBtn = overlay.querySelector('#lightbox-close');
+      var imgEl = overlay.querySelector('#lightbox-image');
+      var closeBtn = overlay.querySelector('#lightbox-close');
 
-    function openLightbox(src, alt){
-      imgEl.src = src;
-      imgEl.alt = alt || '';
-      overlay.classList.add('show');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeLightbox(){
-      overlay.classList.remove('show');
-      document.body.style.overflow = '';
-      // Defer clearing src to allow smooth fade on some browsers
-      setTimeout(function(){ imgEl.src = ''; }, 200);
-    }
-
-    overlay.addEventListener('click', function(e){
-      if(e.target === overlay || e.target.id === 'lightbox-close'){ closeLightbox(); }
-    });
-    document.addEventListener('keydown', function(e){
-      if(e.key === 'Escape'){ closeLightbox(); }
-    });
-
-    // Delegate click on any IMG inside the gallery root
-    galleryRoot.addEventListener('click', function(e){
-      var t = e.target;
-      if(t && t.tagName === 'IMG'){
-        e.preventDefault();
-        var anchor = t.closest('a');
-        var src = (anchor && anchor.getAttribute('href')) || t.getAttribute('data-full') || t.src;
-        openLightbox(src, t.getAttribute('alt') || '');
+      function openLightbox(src, alt){
+        imgEl.src = src;
+        imgEl.alt = alt || '';
+        overlay.classList.add('show');
+        document.body.style.overflow = 'hidden';
       }
-    });
-  }
+      function closeLightbox(){
+        overlay.classList.remove('show');
+        document.body.style.overflow = '';
+        setTimeout(function(){ imgEl.src = ''; }, 200);
+      }
 
-  // Initialize after DOM ready
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){
+      overlay.addEventListener('click', function(e){
+        if(e.target === overlay || e.target.id === 'lightbox-close'){ closeLightbox(); }
+      });
+      document.addEventListener('keydown', function(e){
+        if(e.key === 'Escape'){ closeLightbox(); }
+      });
+
+      galleryRoot.addEventListener('click', function(e){
+        var t = e.target;
+        if(t && t.tagName === 'IMG'){
+          e.preventDefault();
+          var anchor = t.closest('a');
+          var src = (anchor && anchor.getAttribute('href')) || t.getAttribute('data-full') || t.src;
+          openLightbox(src, t.getAttribute('alt') || '');
+        }
+      });
+    }
+
+    if(document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', function(){
+        enhanceHeader();
+        setupLightbox();
+      });
+    } else {
       enhanceHeader();
       setupLightbox();
-    });
-  } else {
-    enhanceHeader();
-    setupLightbox();
-  }
-})();
-</script>
-
-<!-- Logo swap script injected: swaps blacklogo/whitelogo on theme changes -->
-<script>
-(function() {
-  function forEachLogo(fn){
-    var imgs = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
-    imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn);
-  }
-  function isDarkMode() {
-    var html = document.documentElement;
-    var dt = (html.getAttribute('data-theme') || '').toLowerCase();
-    if (dt === 'dark') return true;
-    if (dt === 'light') return false;
-    if (html.classList && (html.classList.contains('dark') || html.classList.contains('theme-dark'))) return true;
-    if (html.classList && (html.classList.contains('light') || html.classList.contains('theme-light'))) return false;
-    if (window.matchMedia) {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
-    return false;
-  }
-  function setLogoByTheme() {
-    var dark = isDarkMode();
-    forEachLogo(function(img){
-      var current = img.getAttribute('src') || '';
-      var desired = current.replace(/(white|black)logo\.png$/i, dark ? 'whitelogo.png' : 'blacklogo.png');
-      if (desired !== current) img.setAttribute('src', desired);
-    });
-  }
-  setLogoByTheme();
-  try {
-    var obs = new MutationObserver(setLogoByTheme);
-    obs.observe(document.documentElement, {attributes: true, attributeFilter: ['class','data-theme']});
-    if (window.matchMedia) {
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setLogoByTheme);
-    }
-    window.addEventListener('storage', setLogoByTheme);
-  } catch (e) {
-    // MutationObserver not supported; ignore
-  }
-})();
-</script>
+  })();
+  </script>
 
+  <!-- Logo swap script injected: swaps blacklogo/whitelogo on theme changes -->
+  <script>
+  (function() {
+    function forEachLogo(fn){
+      var imgs = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
+      imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn);
+    }
+    function isDarkMode() {
+      var html = document.documentElement;
+      var dt = (html.getAttribute('data-theme') || '').toLowerCase();
+      if (dt === 'dark') return true;
+      if (dt === 'light') return false;
+      if (html.classList && (html.classList.contains('dark') || html.classList.contains('theme-dark'))) return true;
+      if (html.classList && (html.classList.contains('light') || html.classList.contains('theme-light'))) return false;
+      if (window.matchMedia) { return window.matchMedia('(prefers-color-scheme: dark)').matches; }
+      return false;
+    }
+    function setLogoByTheme() {
+      var dark = isDarkMode();
+      forEachLogo(function(img){
+        var current = img.getAttribute('src') || '';
+        var desired = current.replace(/(white|black)logo\.png$/i, dark ? 'whitelogo.png' : 'blacklogo.png');
+        if (desired !== current) img.setAttribute('src', desired);
+      });
+    }
+    setLogoByTheme();
+    try {
+      var obs = new MutationObserver(setLogoByTheme);
+      obs.observe(document.documentElement, {attributes: true, attributeFilter: ['class','data-theme']});
+      if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setLogoByTheme);
+      }
+      window.addEventListener('storage', setLogoByTheme);
+    } catch (e) {}
+  })();
+  </script>
+
+  <!-- ===== Contact form submit handler (reCAPTCHA v3 + Apps Script) ===== -->
+  <script>
+    // Replace with your keys/URLs:
+    const RECAPTCHA_SITE_KEY = '6Ldob9UrAAAAANmSp-eLGm-ts8gn12B8-5aee3rR';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzDo5XFkntqeNwz1D8BOEsEshz8GyxFtMqEk3ZwCczEM7RAnEqBJ33_2jXrclTzKKZ-/exec';
+
+    // Helper: get a v3 token for an action
+    function getRecaptchaToken(siteKey, action) {
+      return new Promise((resolve, reject) => {
+        if (!window.grecaptcha) return reject(new Error('reCAPTCHA not loaded'));
+        grecaptcha.ready(() => {
+          grecaptcha.execute(siteKey, { action }).then(resolve).catch(reject);
+        });
+      });
+    }
+
+    (function(){
+      const form = document.getElementById('contactForm');
+      const statusEl = document.getElementById('formStatus');
+      const tokenEl = document.getElementById('recaptchaToken');
+
+      if (!form) return;
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (statusEl) statusEl.textContent = 'Sending...';
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+
+        try {
+          // Get reCAPTCHA v3 token
+          const token = await getRecaptchaToken(RECAPTCHA_SITE_KEY, 'contact');
+          if (tokenEl) tokenEl.value = token;
+
+          const fd = new FormData(form);
+          fd.append('origin', window.location.origin); // optional, for server logs
+
+          // Attempt normal CORS request first
+          let ok = false;
+          try {
+            const res = await fetch(SCRIPT_URL, { method: 'POST', body: fd, credentials: 'omit' });
+            if (res.ok) {
+              // If server returns readable JSON and CORS allows it
+              try {
+                const data = await res.json();
+                ok = !!data.ok;
+              } catch {
+                // Response unreadable (CORS) but status ok—assume success
+                ok = true;
+              }
+            }
+          } catch {
+            // Ignore, try no-cors fallback below
+          }
+
+          // Fallback: no-cors (opaque response, but reliably posts)
+          if (!ok) {
+            await fetch(SCRIPT_URL, { method: 'POST', body: fd, mode: 'no-cors', credentials: 'omit' });
+            ok = true;
+          }
+
+          if (ok) {
+            form.reset();
+            if (statusEl) statusEl.textContent = 'Thanks! We received your message.';
+          } else {
+            if (statusEl) statusEl.textContent = 'Something went wrong. Please email us directly.';
+          }
+        } catch {
+          if (statusEl) statusEl.textContent = 'Network error. Please try again.';
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
