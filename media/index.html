@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Media — Byte Force Robotics · Team 10312</title>
   <meta name="description" content="Media — Byte Force Robotics · Team 10312" />
-
   <style>
     /* ===== COLOR SYSTEM & THEME ===== */
     :root {
@@ -79,11 +78,13 @@
     .gallery{display:grid; gap:.6rem; grid-template-columns: repeat(6,1fr)}
     @media (max-width:1000px){.gallery{grid-template-columns:repeat(4,1fr)}} 
     @media (max-width:640px){.gallery{grid-template-columns:repeat(2,1fr)}}
-    .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; cursor:pointer; }
-    .thumb img{ width:100%; height:100%; object-fit:cover; border-radius:10px }
+    .thumb{ aspect-ratio:1; border-radius:10px; overflow:hidden; cursor:pointer;
+      background: linear-gradient(135deg, rgba(255,255,255,.3), rgba(255,255,255,.15));
+      position:relative;
+    }
+    .thumb img{ width:100%; height:100%; object-fit:cover; border-radius:10px; display:block; }
 
     /* Video tiles show play badge (images never get one) */
-    .thumb.is-video{ position:relative; display:block; }
     .thumb.is-video .play-badge{
       position:absolute; inset:0; display:grid; place-items:center;
       font-size:38px; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.55);
@@ -178,10 +179,8 @@
     <div class="container">
       <h2 class="h2">Photo & Video Gallery</h2>
 
-      <div class="gallery" data-gallery>
-        <!-- You can point ANY slot to an image OR a video OR YouTube/Vimeo.
-             The script will auto-detect and handle it. -->
-
+      <div class="gallery" id="mediaGallery">
+        <!-- Put image OR video OR YouTube/Vimeo in ANY slot; script detects. -->
         <a href="media1.jpg"  class="thumb"><img src="media1.jpg"  alt="Media 1"></a>
         <a href="media2.jpg"  class="thumb"><img src="media2.jpg"  alt="Media 2"></a>
         <a href="media3.mp4"  class="thumb" aria-label="Media 3 video"></a>
@@ -190,9 +189,9 @@
         <a href="media6.jpg"  class="thumb"><img src="media6.jpg"  alt="Media 6"></a>
         <a href="media7.mp4"  class="thumb" aria-label="Media 7 video"></a>
         <a href="media8.jpg"  class="thumb"><img src="media8.jpg"  alt="Media 8"></a>
-        <a href="media9.mp4"  class="thumb" aria-label="Media 9 video"></a> <!-- your original working slot -->
+        <a href="media9.mp4"  class="thumb" aria-label="Media 9 video"></a>
         <a href="media10.jpg" class="thumb"><img src="media10.jpg" alt="Media 10"></a>
-        <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" class="thumb" aria-label="Media 11 YouTube"></a>
+        <a href="media11.ogg" class="thumb" aria-label="Media 11 video"></a>
         <a href="media12.jpg" class="thumb"><img src="media12.jpg" alt="Media 12"></a>
       </div>
     </div>
@@ -230,309 +229,280 @@
   <script>
     // ----- CONFIG: Set these to your WordPress page slugs/URLs -----
     const LINKS = { home: '/', about: '/about/', team: '/team/', robots: '/robots/', sponsors: '/sponsors/', media: '/media/', contact: '/contact/' };
-    const PAGE = 'media'; // current page key
+    const PAGE = 'media';
 
-    // Apply year
     document.addEventListener('DOMContentLoaded', () => {
       const y = document.getElementById('year'); if (y) y.textContent = new Date().getFullYear();
+      setActive();
+      setupLightbox();
+      classifyAndDecorateTiles();
+      generateVideoThumbnails(); // only runs on actual videos w/o posters
     });
 
-    // Wire nav/cta links based on LINKS config
-    function wireLinks() {
-      document.querySelectorAll('[data-link]').forEach(a => {
-        const key = a.getAttribute('data-link');
-        if (LINKS[key]) {
-          const href = a.getAttribute('href') || '';
-          const hash = href.includes('#') ? href.substring(href.indexOf('#')) : '';
-          a.setAttribute('href', LINKS[key] + hash);
-        }
-      });
-    }
-
-    // Theme persistence & label
-    const html = document.documentElement;
-    const toggle = document.getElementById('themeToggle');
-    function setLabel() { if (toggle) toggle.textContent = html.getAttribute('data-theme') === 'dark' ? 'Light' : 'Dark'; }
-    const stored = localStorage.getItem('bf-theme');
-    if (stored) { if (stored === 'dark') html.setAttribute('data-theme', 'dark'); else if (stored === 'light') html.setAttribute('data-theme','light'); }
-    else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) { html.setAttribute('data-theme', 'dark'); }
-    setLabel();
-    if (toggle) toggle.addEventListener('click', () => {
-      const isDark = html.getAttribute('data-theme') === 'dark';
-      if (isDark) { html.setAttribute('data-theme','light'); localStorage.setItem('bf-theme','light'); }
-      else { html.setAttribute('data-theme', 'dark'); localStorage.setItem('bf-theme', 'dark'); }
-      setLabel();
-    });
-
-    // Button ripple follows pointer
-    document.querySelectorAll('.btn, .glass-button').forEach(btn => {
-      btn.addEventListener('mousemove', (e) => {
-        const r = btn.getBoundingClientRect();
-        btn.style.setProperty('--mx', `${e.clientX - r.left}px`);
-        btn.style.setProperty('--my', `${e.clientY - r.top}px`);
-      });
-    });
-
-    // Active nav
     function setActive() {
-      document.querySelectorAll(`.nav-links a[data-link="${PAGE}"]`).forEach(a=>a.classList.add('active'));
+      document.querySelectorAll(\`.nav-links a[data-link="\${PAGE}"]\`).forEach(a=>a.classList.add('active'));
     }
-
-    wireLinks();
-    setActive();
   </script>
 
-  <!-- Lightbox (images + mp4/webm + YouTube/Vimeo) -->
+  <!-- Lightbox + Gallery logic -->
   <script>
-  (function(){
-    function setupLightbox(){
-      var galleryRoot = document.querySelector('[data-gallery], .gallery, #gallery, .photo-gallery, .media-gallery');
-      if(!galleryRoot) return;
+  // ---- Type detection helpers
+  const IMG_EXT = /\.(jpe?g|png|gif|webp|avif)(\?.*)?$/i;
+  const VID_EXT = /\.(mp4|webm|ogv|ogg)(\?.*)?$/i;
 
-      // Overlay with IMG + VIDEO + IFRAME
-      var overlay = document.createElement('div');
-      overlay.id = 'lightbox-overlay';
-      overlay.innerHTML = `
-        <button id="lightbox-close" aria-label="Close">×</button>
-        <img id="lightbox-image" alt="">
-        <video id="lightbox-video" playsinline controls></video>
-        <iframe id="lightbox-embed" allow="autoplay; fullscreen"></iframe>
-      `;
-      document.body.appendChild(overlay);
+  function youtubeId(u){
+    try{
+      const url = new URL(u, window.location.href);
+      if (/youtu\.be$/i.test(url.hostname)) return url.pathname.replace('/','');
+      if (/youtube\.com$/i.test(url.hostname)) return url.searchParams.get('v') || url.pathname.split('/').pop();
+    }catch(e){}
+    return null;
+  }
+  function vimeoId(u){
+    try{
+      const url = new URL(u, window.location.href);
+      if (/vimeo\.com$/i.test(url.hostname)) return url.pathname.split('/').filter(Boolean).pop();
+    }catch(e){}
+    return null;
+  }
+  function toEmbed(u){
+    const y = youtubeId(u);
+    if (y) return \`https://www.youtube.com/embed/\${y}?autoplay=1&rel=0\`;
+    const v = vimeoId(u);
+    if (v) return \`https://player.vimeo.com/video/\${v}?autoplay=1\`;
+    return null;
+  }
 
-      var imgEl = overlay.querySelector('#lightbox-image');
-      var vidEl = overlay.querySelector('#lightbox-video');
-      var ifrEl = overlay.querySelector('#lightbox-embed');
+  // ---- Lightbox
+  let overlay, imgEl, vidEl, ifrEl;
+  function setupLightbox(){
+    overlay = document.createElement('div');
+    overlay.id = 'lightbox-overlay';
+    overlay.innerHTML = \`
+      <button id="lightbox-close" aria-label="Close">×</button>
+      <img id="lightbox-image" alt="">
+      <video id="lightbox-video" playsinline controls></video>
+      <iframe id="lightbox-embed" allow="autoplay; fullscreen"></iframe>
+    \`;
+    document.body.appendChild(overlay);
+    imgEl = overlay.querySelector('#lightbox-image');
+    vidEl = overlay.querySelector('#lightbox-video');
+    ifrEl = overlay.querySelector('#lightbox-embed');
 
-      function hideAll(){
-        imgEl.style.display = 'none';
-        vidEl.style.display = 'none';
-        ifrEl.style.display = 'none';
-        try { vidEl.pause(); } catch(e){}
-        vidEl.removeAttribute('src');
-        ifrEl.removeAttribute('src');
-        imgEl.removeAttribute('src');
-      }
-      function openMedia(kind, src, alt){
-        hideAll();
-        if (kind === 'image'){
-          imgEl.src = src; imgEl.alt = alt || '';
-          imgEl.style.display = 'block';
-        } else if (kind === 'video'){
-          vidEl.src = src;
-          vidEl.style.display = 'block';
-          setTimeout(function(){ try { vidEl.play(); } catch(e){} }, 0);
-        } else if (kind === 'embed'){
-          ifrEl.src = src;
-          ifrEl.style.display = 'block';
-        }
-        overlay.classList.add('show');
-        document.body.style.overflow = 'hidden';
-      }
-      function closeLightbox(){
-        overlay.classList.remove('show');
-        document.body.style.overflow = '';
-        hideAll();
-      }
+    overlay.addEventListener('click', (e)=>{
+      if (e.target === overlay || e.target.id === 'lightbox-close') closeLightbox();
+    });
+    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeLightbox(); });
+  }
+  function hideAll(){
+    imgEl.style.display = 'none';
+    vidEl.style.display = 'none';
+    ifrEl.style.display = 'none';
+    try{ vidEl.pause(); }catch(e){}
+    vidEl.removeAttribute('src');
+    ifrEl.removeAttribute('src');
+    imgEl.removeAttribute('src');
+  }
+  function openLightbox(kind, src, alt){
+    hideAll();
+    if (kind === 'image'){
+      imgEl.src = src; imgEl.alt = alt || '';
+      imgEl.style.display = 'block';
+    } else if (kind === 'video'){
+      vidEl.src = src;
+      vidEl.style.display = 'block';
+      setTimeout(()=>{ try{ vidEl.play(); }catch(e){} }, 0);
+    } else if (kind === 'embed'){
+      ifrEl.src = src;
+      ifrEl.style.display = 'block';
+    }
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLightbox(){
+    overlay.classList.remove('show');
+    document.body.style.overflow = '';
+    hideAll();
+  }
 
-      overlay.addEventListener('click', function(e){
-        if(e.target === overlay || e.target.id === 'lightbox-close'){ closeLightbox(); }
-      });
-      document.addEventListener('keydown', function(e){
-        if(e.key === 'Escape'){ closeLightbox(); }
-      });
+  // ---- Classification & decoration (runs once)
+  function classifyAndDecorateTiles(){
+    const gallery = document.getElementById('mediaGallery');
+    const tiles = Array.from(gallery.querySelectorAll('a.thumb'));
 
-      // ===== Auto-detect types for EVERY slot =====
-      var videoExtRe = /\.(mp4|webm|ogv|ogg)(\?.*)?$/i;
+    tiles.forEach((a)=>{
+      const href = a.getAttribute('href') || '';
+      const isImg  = IMG_EXT.test(href);
+      const isVid  = VID_EXT.test(href);
+      const embed  = toEmbed(href);
 
-      function toEmbed(url){
-        try{
-          var u = new URL(url, window.location.href);
-          if (/youtu\.be/.test(u.hostname)) {
-            var id = u.pathname.slice(1);
-            return 'https://www.youtube.com/embed/' + id + '?autoplay=1&rel=0';
-          }
-          if (/youtube\.com/.test(u.hostname)) {
-            var id = u.searchParams.get('v') || (u.pathname.split('/').pop());
-            return id ? 'https://www.youtube.com/embed/' + id + '?autoplay=1&rel=0' : url;
-          }
-          if (/vimeo\.com/.test(u.hostname)) {
-            var id = u.pathname.split('/').filter(Boolean).pop();
-            return 'https://player.vimeo.com/video/' + id + '?autoplay=1';
-          }
-        } catch(e){}
-        return null;
-      }
+      // reset state & ensure no duplicate badges
+      a.classList.remove('is-video');
+      a.removeAttribute('data-kind');
+      const oldBadge = a.querySelector('.play-badge'); if (oldBadge) oldBadge.remove();
 
-      // Classify each anchor once (image | video | embed)
-      function classifyThumb(a){
-        var href = a.getAttribute('href') || '';
-        var isVideo = videoExtRe.test(href);
-        var embed = toEmbed(href);
-
-        // Reset state
-        a.classList.remove('is-video');
-        a.removeAttribute('data-kind');
-        var badge = a.querySelector('.play-badge');
-        if (badge) badge.remove();
-
-        if (embed){
-          a.dataset.kind = 'embed';
-          a.classList.add('is-video');
-          var pb = document.createElement('span'); pb.className='play-badge'; pb.textContent='▶';
-          a.appendChild(pb);
-        } else if (isVideo){
-          a.dataset.kind = 'video';
-          a.classList.add('is-video');
-          var pb2 = document.createElement('span'); pb2.className='play-badge'; pb2.textContent='▶';
-          a.appendChild(pb2);
-        } else {
-          a.dataset.kind = 'image';
-          // images: no play badge
-          // if no <img>, inject one using href as src
-          if (!a.querySelector('img')) {
-            var img = new Image();
-            img.src = href;
-            img.alt = a.getAttribute('aria-label') || 'Image';
+      if (embed){
+        a.dataset.kind = 'embed';
+        a.classList.add('is-video');
+        ensurePosterForEmbed(a, href);
+        addPlayBadge(a);
+      } else if (isVid){
+        a.dataset.kind = 'video';
+        a.classList.add('is-video');
+        // if author supplied poster <img> or data-poster, use it; else auto-generate later
+        if (!a.querySelector('img')){
+          const poster = a.getAttribute('data-poster');
+          if (poster){
+            const img = new Image();
+            img.src = poster; img.alt = a.getAttribute('aria-label') || 'Video';
             img.loading = 'lazy';
             a.appendChild(img);
           }
         }
+        addPlayBadge(a);
+      } else if (isImg){
+        a.dataset.kind = 'image';
+        if (!a.querySelector('img')){
+          const img = new Image();
+          img.src = href; img.alt = a.getAttribute('aria-label') || 'Image';
+          img.loading = 'lazy';
+          a.appendChild(img);
+        }
+      } else {
+        // Unknown: treat as image fallback (won't break layout)
+        a.dataset.kind = 'image';
       }
+    });
 
-      // Initial classification for all slots
-      var tiles = Array.from(galleryRoot.querySelectorAll('a.thumb'));
-      tiles.forEach(classifyThumb);
+    // Single click handler for all 12 slots
+    gallery.addEventListener('click', (e)=>{
+      const a = e.target.closest('a.thumb');
+      if (!a) return;
+      const kind = a.dataset.kind;
+      if (!kind) return;
 
-      // Lightbox click handling for all slots
-      galleryRoot.addEventListener('click', function(e){
-        var t = e.target;
-        var a = t.closest('a.thumb');
-        if(!a) return;
+      e.preventDefault();
+      if (kind === 'image'){
+        const img = a.querySelector('img');
+        openLightbox('image', a.href, img ? img.alt : '');
+      } else if (kind === 'video'){
+        openLightbox('video', a.href, a.getAttribute('aria-label') || '');
+      } else if (kind === 'embed'){
+        openLightbox('embed', toEmbed(a.href), a.getAttribute('aria-label') || '');
+      }
+    });
+  }
 
-        var kind = a.dataset.kind;
-        if (kind === 'embed'){
-          e.preventDefault();
-          var embedUrl = toEmbed(a.href);
-          openMedia('embed', embedUrl, (t.getAttribute && t.getAttribute('alt')) || a.getAttribute('aria-label') || '');
-          return;
-        }
-        if (kind === 'video'){
-          e.preventDefault();
-          openMedia('video', a.href, (t.getAttribute && t.getAttribute('alt')) || a.getAttribute('aria-label') || '');
-          return;
-        }
-        if (kind === 'image'){
-          e.preventDefault();
-          var alt = (a.querySelector('img') && a.querySelector('img').getAttribute('alt')) || '';
-          openMedia('image', a.href, alt);
-          return;
-        }
-      });
-
-      // Expose for thumbnail generator (so it can re-run if needed)
-      window.__bfClassifyThumbs = function(){ tiles.forEach(classifyThumb); };
+  function addPlayBadge(a){
+    if (!a.querySelector('.play-badge')){
+      const pb = document.createElement('span');
+      pb.className = 'play-badge';
+      pb.textContent = '▶';
+      a.appendChild(pb);
     }
+  }
 
-    if(document.readyState === 'loading'){
-      document.addEventListener('DOMContentLoaded', setupLightbox);
-    } else {
-      setupLightbox();
+  function ensurePosterForEmbed(a, href){
+    // Lightweight: YouTube thumbnails only (public), Vimeo needs API → skip auto.
+    const id = youtubeId(href);
+    if (id && !a.querySelector('img')){
+      const img = new Image();
+      img.src = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+      img.alt = a.getAttribute('aria-label') || 'Video';
+      img.loading = 'lazy';
+      a.appendChild(img);
     }
-  })();
-  </script>
+  }
 
-  <!-- Auto-generate thumbnails from the first frame of ANY video tile -->
-  <script>
-  (function () {
-    function makeVideoThumb(a) {
-      if (a.dataset.kind !== 'video') return;   // only videos
-      if (a.querySelector('img')) return;       // already has a poster <img>
+  // ---- Video thumbnail generation (first frame), safe with timeout & CORS fallback
+  function generateVideoThumbnails(){
+    const tiles = Array.from(document.querySelectorAll('a.thumb[data-kind="video"]'));
+    tiles.forEach((a)=>{
+      // Already has poster? (author-supplied or previous run)
+      if (a.querySelector('img')) return;
 
-      var src  = a.getAttribute('href');
-      var time = parseFloat(a.getAttribute('data-thumbtime') || '0.15'); // avoid black frames
-      var vid  = document.createElement('video');
-      var cv   = document.createElement('canvas');
-      var ctx  = cv.getContext('2d');
+      const src  = a.getAttribute('href');
+      const time = parseFloat(a.getAttribute('data-thumbtime') || '0.15'); // avoid black frame
 
-      // Same-origin or CORS-enabled only; otherwise canvas is tainted.
+      const vid  = document.createElement('video');
+      const cv   = document.createElement('canvas');
+      const ctx  = cv.getContext('2d');
+
+      // Same-origin or CORS-enabled files only; otherwise canvas is tainted → we gracefully skip.
       vid.crossOrigin = 'anonymous';
       vid.preload = 'auto';
       vid.playsInline = true;
       vid.muted = true;
       vid.src = src;
 
-      function insertThumb() {
-        if (!vid.videoWidth || !vid.videoHeight) return fail();
+      let done = false;
+      const cleanup = ()=>{
+        if (done) return;
+        done = true;
+        try { vid.pause(); } catch(e){}
+        vid.removeAttribute('src'); vid.load(); vid.remove();
+      };
+      const fallback = ()=>{
+        // Leave tile as-is with gradient + play badge (no black boxes)
+        cleanup();
+      };
+
+      const timeoutId = setTimeout(fallback, 2000); // 2s safety
+
+      vid.addEventListener('loadedmetadata', ()=>{
+        try { const p = vid.play(); (p && p.catch ? p.catch(()=>{}) : null); vid.pause(); } catch(e){}
+        try { vid.currentTime = Math.max(0, time); } catch(e){}
+      });
+
+      function capture(){
+        if (!vid.videoWidth || !vid.videoHeight) return fallback();
         cv.width  = vid.videoWidth;
         cv.height = vid.videoHeight;
         ctx.drawImage(vid, 0, 0, cv.width, cv.height);
-        var url = cv.toDataURL('image/jpeg', 0.85);
-        var img = new Image();
-        img.alt = a.getAttribute('aria-label') || 'Video thumbnail';
-        img.style = 'width:100%;height:100%;object-fit:cover;border-radius:10px';
+        const url = cv.toDataURL('image/jpeg', 0.85);
+        const img = new Image();
+        img.alt = a.getAttribute('aria-label') || 'Video';
+        img.loading = 'lazy';
         img.src = url;
         a.insertBefore(img, a.firstChild);
+        clearTimeout(timeoutId);
         cleanup();
       }
 
-      function fail() { cleanup(); }
-      function cleanup() {
-        try { vid.pause(); } catch(e){}
-        vid.removeAttribute('src'); vid.load(); vid.remove();
-        cv = null;
-      }
-
-      vid.addEventListener('loadedmetadata', function () {
-        try { var p = vid.play(); (p && p.catch ? p.catch(function(){}) : null); vid.pause(); } catch(e){}
-        try { vid.currentTime = Math.max(0, time); } catch (e) {}
+      vid.addEventListener('seeked', capture);
+      vid.addEventListener('loadeddata', ()=>{
+        // Some browsers fire loadeddata with frame 0 already available
+        if (!done && (vid.currentTime === 0 || !isFinite(vid.currentTime))) capture();
       });
-      vid.addEventListener('seeked', insertThumb);
-      vid.addEventListener('loadeddata', function(){
-        if (vid.currentTime === 0 || !vid.currentTime) insertThumb();
+      vid.addEventListener('error', ()=>{
+        clearTimeout(timeoutId);
+        fallback();
       });
-      vid.addEventListener('error', fail);
-    }
-
-    function initVideoThumbs() {
-      // Ensure classification ran
-      if (window.__bfClassifyThumbs) window.__bfClassifyThumbs();
-      document.querySelectorAll('a.thumb').forEach(makeVideoThumb);
-    }
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initVideoThumbs);
-    } else {
-      initVideoThumbs();
-    }
-  })();
+    });
+  }
   </script>
 
   <!-- Liquid Glass Header enhancer -->
   <script>
   (function(){
     function enhanceHeader(){
-      var candidates = document.querySelectorAll('header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]');
+      const candidates = document.querySelectorAll('header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]');
       if(candidates.length){
-        var el = candidates[0];
-        if(!el.classList.contains('liquid-glass-header')){ el.classList.add('liquid-glass-header'); }
+        const el = candidates[0];
+        if(!el.classList.contains('liquid-glass-header')) el.classList.add('liquid-glass-header');
       }
-      var headerEl = document.querySelector('.liquid-glass-header');
+      const headerEl = document.querySelector('.liquid-glass-header');
       if(headerEl){
-        var onScroll = function(){
-          var y = (window.scrollY || document.documentElement.scrollTop || 0);
-          if(y > 8){ headerEl.classList.add('scrolled'); }
-          else{ headerEl.classList.remove('scrolled'); }
+        const onScroll = ()=>{
+          const y = (window.scrollY || document.documentElement.scrollTop || 0);
+          if(y > 8) headerEl.classList.add('scrolled'); else headerEl.classList.remove('scrolled');
         };
         onScroll();
         window.addEventListener('scroll', onScroll, {passive:true});
       }
     }
-    if(document.readyState === 'loading'){
-      document.addEventListener('DOMContentLoaded', enhanceHeader);
-    } else {
-      enhanceHeader();
-    }
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', enhanceHeader);
+    else enhanceHeader();
   })();
   </script>
 
@@ -540,34 +510,32 @@
   <script>
   (function() {
     function forEachLogo(fn){
-      var imgs = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
-      imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn);
+      const imgs = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
+      (imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn));
     }
     function isDarkMode() {
-      var html = document.documentElement;
-      var dt = (html.getAttribute('data-theme') || '').toLowerCase();
+      const html = document.documentElement;
+      const dt = (html.getAttribute('data-theme') || '').toLowerCase();
       if (dt === 'dark') return true;
       if (dt === 'light') return false;
-      if (html.classList && (html.classList.contains('dark') || html.classList.contains('theme-dark'))) return true;
-      if (html.classList && (html.classList.contains('light') || html.classList.contains('theme-light'))) return false;
-      if (window.matchMedia) { return window.matchMedia('(prefers-color-scheme: dark)').matches; }
+      if (html.classList.contains('dark') || html.classList.contains('theme-dark')) return true;
+      if (html.classList.contains('light') || html.classList.contains('theme-light')) return false;
+      if (window.matchMedia) return window.matchMedia('(prefers-color-scheme: dark)').matches;
       return false;
     }
     function setLogoByTheme() {
-      var dark = isDarkMode();
-      forEachLogo(function(img){
-        var current = img.getAttribute('src') || '';
-        var desired = current.replace(/(white|black)logo\.png$/i, dark ? 'whitelogo.png' : 'blacklogo.png');
+      const dark = isDarkMode();
+      forEachLogo((img)=>{
+        const current = img.getAttribute('src') || '';
+        const desired = current.replace(/(white|black)logo\.png$/i, dark ? 'whitelogo.png' : 'blacklogo.png');
         if (desired !== current) img.setAttribute('src', desired);
       });
     }
     setLogoByTheme();
     try {
-      var obs = new MutationObserver(setLogoByTheme);
+      const obs = new MutationObserver(setLogoByTheme);
       obs.observe(document.documentElement, {attributes: true, attributeFilter: ['class','data-theme']});
-      if (window.matchMedia) {
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setLogoByTheme);
-      }
+      if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setLogoByTheme);
       window.addEventListener('storage', setLogoByTheme);
     } catch (e) {}
   })();
