@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Media — Byte Force Robotics · Team 10312</title>
   <meta name="description" content="Media — Byte Force Robotics · Team 10312" />
-  <style>
 
+  <style>
     /* ===== COLOR SYSTEM & THEME ===== */
     :root {
       --bg:#ffffff; --bg-soft:rgba(255,255,255,.55); --panel:rgba(255,255,255,.28); --panel-border:rgba(0,0,0,.08);
@@ -34,6 +34,8 @@
         radial-gradient(900px 500px at -10% 10%, var(--rg2), transparent 60%);
     }
     body > *:not(.liquid-bg){ position:relative; z-index:1; }
+
+    /* Header */
     header{position:sticky; top:0; z-index:50; backdrop-filter:saturate(140%) blur(8px);
       background:var(--bg-soft); border-bottom:1px solid var(--panel-border); isolation:isolate;}
     .nav{display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.8rem 0}
@@ -46,6 +48,8 @@
     .nav-links a.active{ color:var(--brand); font-weight:700; }
     .toggle-theme{ background:transparent; border:1px solid var(--panel-border); color:var(--text);
       border-radius:999px; padding:.45rem .9rem; font-weight:700; cursor:pointer;}
+
+    /* Buttons */
     .btn, .glass-button{
       position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.55rem;
       padding:.9rem 1.1rem; border-radius:calc(var(--radius) - 4px);
@@ -61,98 +65,99 @@
       mix-blend-mode:screen; pointer-events:none; transition: opacity .12s ease; opacity:0;
     }
     .glass-button:hover::before, .btn:hover::before{ opacity:.8; }
+
+    /* Sections */
     .hero{ padding: 4.8rem 0 1.6rem; }
     .headline{ font-size: clamp(2rem, 4.8vw, 3.4rem); line-height: 1.05; margin:0 0 .6rem; color:var(--brand); }
     .muted{ color: var(--muted); }
     .section{ padding: 2.8rem 0; }
     .h2{ font-size: clamp(1.6rem, 3.4vw, 2.2rem); margin:.3rem 0 1rem; color: var(--accent); }
-    .grid-3{ display:grid; gap:1rem; grid-template-columns: repeat(3, 1fr); }
-    @media (max-width:1000px){ .grid-3{ grid-template-columns: 1fr 1fr; } }
-    @media (max-width:680px){ .grid-3{ grid-template-columns: 1fr; } }
-    .grid-4{ display:grid; gap:1rem; grid-template-columns: repeat(4, 1fr); }
-    @media (max-width:1100px){ .grid-4{ grid-template-columns: 1fr 1fr 1fr; } }
-    @media (max-width:740px){ .grid-4{ grid-template-columns: 1fr 1fr; } }
-    @media (max-width:520px){ .grid-4{ grid-template-columns: 1fr; } }
     .card{ background: var(--panel); border:1px solid var(--panel-border); border-radius: var(--radius); box-shadow: var(--shadow); padding:1.1rem; }
-    footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px solid var(--panel-border); }
-    .foot-grid{ display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:1rem; }
-    @media (max-width:900px){ .foot-grid{ grid-template-columns: 1fr 1fr; } }
-    @media (max-width:600px){ .foot-grid{ grid-template-columns: 1fr; } }
+
+    /* Media blocks */
     .video{aspect-ratio:16/9; border-radius:12px; overflow:hidden; background:#000}
     .gallery{display:grid; gap:.6rem; grid-template-columns: repeat(6,1fr)}
     @media (max-width:1000px){.gallery{grid-template-columns:repeat(4,1fr)}} 
     @media (max-width:640px){.gallery{grid-template-columns:repeat(2,1fr)}}
     .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; }
-    
+    .thumb img{ width:100%; height:100%; object-fit:cover; border-radius:10px }
+
+    /* Video tiles show play badge */
+    .thumb.is-video{ position:relative; display:block; }
+    .thumb.is-video .play-badge{
+      position:absolute; inset:0; display:grid; place-items:center;
+      font-size:38px; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.55);
+      pointer-events:none;
+    }
+
+    /* Footer */
+    footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px solid var(--panel-border); }
+    .foot-grid{ display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:1rem; }
+    @media (max-width:900px){ .foot-grid{ grid-template-columns: 1fr 1fr; } }
+    @media (max-width:600px){ .foot-grid{ grid-template-columns: 1fr; } }
+
+    /* ===== Lightbox (images + mp4/webm + YouTube/Vimeo) ===== */
+    #lightbox-overlay{
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.6);
+      z-index: 2147483645;
+      padding: 4vw;
+    }
+    #lightbox-overlay.show{ display: flex; }
+    #lightbox-close{
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      background: rgba(0,0,0,0.45);
+      color: #fff;
+      border: 0;
+      font-size: 32px;
+      line-height: 1;
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #lightbox-image,
+    #lightbox-video,
+    #lightbox-embed{
+      display: none; /* toggled per media type */
+      max-width: 100%;
+      max-height: 100%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+      border-radius: 12px;
+      background:#000;
+    }
+    #lightbox-embed{ border:0; aspect-ratio:16/9; width:min(90vw,1100px); height:auto; }
   </style>
-
-<!-- Liquid Glass Header & Lightbox CSS (injected) -->
-<style>
-/* ===== Liquid Glass Header ===== */
-.liquid-glass-header{
-  position: sticky;
-  top: 0;
-  z-index: 9999;
-  background: rgba(255,255,255,0.55);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-  backdrop-filter: blur(12px) saturate(160%);
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-  transition: background-color .3s ease, border-color .3s ease, box-shadow .3s ease;
-}
-.liquid-glass-header.scrolled{
-  background: rgba(255,255,255,0.72);
-  box-shadow: 0 2px 20px rgba(0,0,0,0.12);
-}
-
-/* Dark theme support if site uses a data-theme root or prefers-color-scheme */
-:root[data-theme="dark"] .liquid-glass-header{
-  background: rgba(17,25,40,0.45);
-  border-color: rgba(255,255,255,0.08);
-}
-:root[data-theme="dark"] .liquid-glass-header.scrolled{
-  background: rgba(17,25,40,0.62);
-}
-
-/* ===== Simple Lightbox (only activates on media gallery pages) ===== */
-#lightbox-overlay{
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.6);
-  z-index: 2147483645;
-  padding: 4vw;
-}
-#lightbox-overlay.show{ display: flex; }
-#lightbox-image{
-  max-width: 100%;
-  max-height: 100%;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-  border-radius: 12px;
-}
-#lightbox-close{
-  position: absolute;
-  top: 16px;
-  right: 20px;
-  background: rgba(0,0,0,0.45);
-  color: #fff;
-  border: 0;
-  font-size: 32px;
-  line-height: 1;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-</style>
 </head>
 <body>
-  
   <div class="liquid-bg" aria-hidden="true"></div>
-  <header><div class="container nav"><div class="nav-left"><a class="logo" data-link="home" href="/"><img src="blacklogo.png" alt="Team 10312 Logo"><span></span></a><nav class="nav-links"><a data-link="about" href="/about/">About</a><a data-link="team" href="/team/">Team</a><a data-link="robots" href="/robots/">Robots</a><a data-link="sponsors" href="/sponsors/">Sponsors</a><a data-link="media" href="/media/">Media</a><a data-link="contact" href="/contact/">Contact</a></nav></div><div class="nav-cta"><button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button><a id="link-get-involved" class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor">Get Involved</a></div></div></header>
-    
-  
+
+  <header>
+    <div class="container nav">
+      <div class="nav-left">
+        <a class="logo" data-link="home" href="/"><img src="blacklogo.png" alt="Team 10312 Logo"><span></span></a>
+        <nav class="nav-links">
+          <a data-link="about" href="/about/">About</a>
+          <a data-link="team" href="/team/">Team</a>
+          <a data-link="robots" href="/robots/">Robots</a>
+          <a data-link="sponsors" href="/sponsors/">Sponsors</a>
+          <a data-link="media" href="/media/">Media</a>
+          <a data-link="contact" href="/contact/">Contact</a>
+        </nav>
+      </div>
+      <div class="nav-cta">
+        <button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button>
+        <a id="link-get-involved" class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor">Get Involved</a>
+      </div>
+    </div>
+  </header>
+
   <section class="hero">
     <div class="container">
       <h1 class="headline">Media</h1>
@@ -160,7 +165,6 @@
     </div>
   </section>
 
-  
   <section class="section">
     <div class="container">
       <h2 class="h2">Robot Reveal</h2>
@@ -169,27 +173,49 @@
       </div>
     </div>
   </section>
+
   <section class="section">
     <div class="container">
-      <h2 class="h2">Photo Gallery</h2>
-      <div class="gallery">
-        <div class="thumb"><img src="media1.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media2.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media3.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media4.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media5.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media6.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media7.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media8.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media9.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media10.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media11.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
-<div class="thumb"><img src="media12.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"></div>
+      <h2 class="h2">Photo & Video Gallery</h2>
+
+      <div class="gallery" data-gallery>
+        <!-- Examples: images -->
+        <div class="thumb"><img src="media1.jpg" alt="Media 1"></div>
+        <div class="thumb"><img src="media2.jpg" alt="Media 2"></div>
+        <div class="thumb"><img src="media3.jpg" alt="Media 3"></div>
+        <div class="thumb"><img src="media4.jpg" alt="Media 4"></div>
+        <div class="thumb"><img src="media5.jpg" alt="Media 5"></div>
+        <div class="thumb"><img src="media6.jpg" alt="Media 6"></div>
+
+        <!-- Example: self-hosted MP4 in same slot (auto thumbnail from first frame) -->
+        <a href="media7.mp4" data-video class="thumb is-video" aria-label="Media 7 video">
+          <!-- No <img> required; script will generate from first frame -->
+          <span class="play-badge">▶</span>
+        </a>
+
+        <!-- More images -->
+        <div class="thumb"><img src="media8.jpg" alt="Media 8"></div>
+
+        <!-- Another MP4 (explicit capture time 0.25s to avoid black frame) -->
+        <a href="media9.mp4" data-video data-thumbtime="0.25" class="thumb is-video" aria-label="Media 9 video">
+          <span class="play-badge">▶</span>
+        </a>
+
+        <div class="thumb"><img src="media10.jpg" alt="Media 10"></div>
+        <div class="thumb"><img src="media11.jpg" alt="Media 11"></div>
+        <div class="thumb"><img src="media12.jpg" alt="Media 12"></div>
+
+        <!-- Example: YouTube/Vimeo embed (optional) -->
+        <!--
+        <a href="https://www.youtube.com/watch?v=VIDEO_ID" data-embed class="thumb is-video" aria-label="YouTube clip">
+          <img src="yt-thumb.jpg" alt="YouTube clip">
+          <span class="play-badge">▶</span>
+        </a>
+        -->
       </div>
     </div>
   </section>
 
-  
   <footer>
     <div class="container foot-grid">
       <div>
@@ -218,14 +244,10 @@
       <div style="display:flex;gap:1rem"><a class="muted" href="#">Privacy</a><a class="muted" href="#">Terms</a></div>
     </div>
   </footer>
-    
 
   <script>
     // ----- CONFIG: Set these to your WordPress page slugs/URLs -----
-    const LINKS = {
-      home: '/', about: '/about/', team: '/team/', robots: '/robots/',
-      sponsors: '/sponsors/', media: '/media/', contact: '/contact/'
-    };
+    const LINKS = { home: '/', about: '/about/', team: '/team/', robots: '/robots/', sponsors: '/sponsors/', media: '/media/', contact: '/contact/' };
     const PAGE = 'media'; // current page key
 
     // Apply year
@@ -238,7 +260,6 @@
       document.querySelectorAll('[data-link]').forEach(a => {
         const key = a.getAttribute('data-link');
         if (LINKS[key]) {
-          // Preserve anchor fragments if present in href template
           const href = a.getAttribute('href') || '';
           const hash = href.includes('#') ? href.substring(href.indexOf('#')) : '';
           a.setAttribute('href', LINKS[key] + hash);
@@ -278,134 +299,279 @@
     wireLinks();
     setActive();
   </script>
-    
 
-<!-- Liquid Glass Header & Lightbox JS (injected) -->
-<script>
-(function(){
-  // ===== Liquid Glass Header enhancer =====
-  function enhanceHeader(){
-    var candidates = document.querySelectorAll('header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]');
-    if(candidates.length){
-      var el = candidates[0];
-      if(!el.classList.contains('liquid-glass-header')){
-        el.classList.add('liquid-glass-header');
+  <!-- Lightbox (images + mp4/webm + YouTube/Vimeo) -->
+  <script>
+  (function(){
+    function setupLightbox(){
+      var galleryRoot = document.querySelector('[data-gallery], .gallery, #gallery, .photo-gallery, .media-gallery');
+      if(!galleryRoot) return;
+
+      // Overlay with IMG + VIDEO + IFRAME
+      var overlay = document.createElement('div');
+      overlay.id = 'lightbox-overlay';
+      overlay.innerHTML = `
+        <button id="lightbox-close" aria-label="Close">×</button>
+        <img id="lightbox-image" alt="">
+        <video id="lightbox-video" playsinline controls></video>
+        <iframe id="lightbox-embed" allow="autoplay; fullscreen"></iframe>
+      `;
+      document.body.appendChild(overlay);
+
+      var imgEl = overlay.querySelector('#lightbox-image');
+      var vidEl = overlay.querySelector('#lightbox-video');
+      var ifrEl = overlay.querySelector('#lightbox-embed');
+
+      function hideAll(){
+        imgEl.style.display = 'none';
+        vidEl.style.display = 'none';
+        ifrEl.style.display = 'none';
+        try { vidEl.pause(); } catch(e){}
+        vidEl.removeAttribute('src');
+        ifrEl.removeAttribute('src');
+        imgEl.removeAttribute('src');
       }
-    }
-    var headerEl = document.querySelector('.liquid-glass-header');
-    if(headerEl){
-      var onScroll = function(){
-        var y = (window.scrollY || document.documentElement.scrollTop || 0);
-        if(y > 8){ headerEl.classList.add('scrolled'); }
-        else{ headerEl.classList.remove('scrolled'); }
-      };
-      onScroll();
-      window.addEventListener('scroll', onScroll, {passive:true});
-    }
-  }
-
-  // ===== Lightweight Lightbox (activates on media/gallery pages only) =====
-  function setupLightbox(){
-    // Look for common gallery selectors
-    var galleryRoot =
-      document.querySelector('[data-gallery], .gallery, #gallery, .photo-gallery, .media-gallery');
-    if(!galleryRoot) return; // Only enable where a gallery exists
-
-    // Build overlay markup once
-    var overlay = document.createElement('div');
-    overlay.id = 'lightbox-overlay';
-    overlay.innerHTML = '<button id="lightbox-close" aria-label="Close">×</button><img id="lightbox-image" alt="">';
-    document.body.appendChild(overlay);
-
-    var imgEl = overlay.querySelector('#lightbox-image');
-    var closeBtn = overlay.querySelector('#lightbox-close');
-
-    function openLightbox(src, alt){
-      imgEl.src = src;
-      imgEl.alt = alt || '';
-      overlay.classList.add('show');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeLightbox(){
-      overlay.classList.remove('show');
-      document.body.style.overflow = '';
-      // Defer clearing src to allow smooth fade on some browsers
-      setTimeout(function(){ imgEl.src = ''; }, 200);
-    }
-
-    overlay.addEventListener('click', function(e){
-      if(e.target === overlay || e.target.id === 'lightbox-close'){ closeLightbox(); }
-    });
-    document.addEventListener('keydown', function(e){
-      if(e.key === 'Escape'){ closeLightbox(); }
-    });
-
-    // Delegate click on any IMG inside the gallery root
-    galleryRoot.addEventListener('click', function(e){
-      var t = e.target;
-      if(t && t.tagName === 'IMG'){
-        e.preventDefault();
-        var anchor = t.closest('a');
-        var src = (anchor && anchor.getAttribute('href')) || t.getAttribute('data-full') || t.src;
-        openLightbox(src, t.getAttribute('alt') || '');
+      function openMedia(kind, src, alt){
+        hideAll();
+        if (kind === 'image'){
+          imgEl.src = src; imgEl.alt = alt || '';
+          imgEl.style.display = 'block';
+        } else if (kind === 'video'){
+          vidEl.src = src;
+          vidEl.style.display = 'block';
+          setTimeout(function(){ try { vidEl.play(); } catch(e){} }, 0);
+        } else if (kind === 'embed'){
+          ifrEl.src = src;
+          ifrEl.style.display = 'block';
+        }
+        overlay.classList.add('show');
+        document.body.style.overflow = 'hidden';
       }
-    });
-  }
+      function closeLightbox(){
+        overlay.classList.remove('show');
+        document.body.style.overflow = '';
+        hideAll();
+      }
 
-  // Initialize after DOM ready
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){
-      enhanceHeader();
+      overlay.addEventListener('click', function(e){
+        if(e.target === overlay || e.target.id === 'lightbox-close'){ closeLightbox(); }
+      });
+      document.addEventListener('keydown', function(e){
+        if(e.key === 'Escape'){ closeLightbox(); }
+      });
+
+      var videoExtRe = /\.(mp4|webm|ogv|ogg)(\?.*)?$/i;
+      function toEmbed(url){
+        try{
+          var u = new URL(url, window.location.href);
+          if (/youtu\.be/.test(u.hostname)) {
+            var id = u.pathname.slice(1);
+            return 'https://www.youtube.com/embed/' + id + '?autoplay=1&rel=0';
+          }
+          if (/youtube\.com/.test(u.hostname)) {
+            var id = u.searchParams.get('v') || (u.pathname.split('/').pop());
+            return id ? 'https://www.youtube.com/embed/' + id + '?autoplay=1&rel=0' : url;
+          }
+          if (/vimeo\.com/.test(u.hostname)) {
+            var id = u.pathname.split('/').filter(Boolean).pop();
+            return 'https://player.vimeo.com/video/' + id + '?autoplay=1';
+          }
+        } catch(e){}
+        return url;
+      }
+
+      galleryRoot.addEventListener('click', function(e){
+        var t = e.target;
+        var a = t.closest('a'); // if a thumb is wrapped in a link
+
+        // YouTube/Vimeo links or explicit data-embed
+        if (a && (a.dataset.embed || /youtu\.be|youtube\.com|vimeo\.com/.test(a.href))) {
+          e.preventDefault();
+          openMedia('embed', toEmbed(a.href), t.getAttribute('alt') || '');
+          return;
+        }
+
+        // Self-hosted video by extension or data-video
+        if (a && (a.dataset.video || videoExtRe.test(a.href))) {
+          e.preventDefault();
+          openMedia('video', a.href, t.getAttribute('alt') || '');
+          return;
+        }
+
+        // Default: clicked an IMG → open image (supports both linked and unlinked images)
+        if (t && t.tagName === 'IMG'){
+          e.preventDefault();
+          var src = (a && a.getAttribute('href')) || t.getAttribute('data-full') || t.src;
+          openMedia('image', src, t.getAttribute('alt') || '');
+        }
+      });
+    }
+
+    if(document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', setupLightbox);
+    } else {
       setupLightbox();
-    });
-  } else {
-    enhanceHeader();
-    setupLightbox();
-  }
-})();
-</script>
-
-<!-- Logo swap script injected: swaps blacklogo/whitelogo on theme changes -->
-<script>
-(function() {
-  function forEachLogo(fn){
-    var imgs = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
-    imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn);
-  }
-  function isDarkMode() {
-    var html = document.documentElement;
-    var dt = (html.getAttribute('data-theme') || '').toLowerCase();
-    if (dt === 'dark') return true;
-    if (dt === 'light') return false;
-    if (html.classList && (html.classList.contains('dark') || html.classList.contains('theme-dark'))) return true;
-    if (html.classList && (html.classList.contains('light') || html.classList.contains('theme-light'))) return false;
-    if (window.matchMedia) {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
-    return false;
-  }
-  function setLogoByTheme() {
-    var dark = isDarkMode();
-    forEachLogo(function(img){
-      var current = img.getAttribute('src') || '';
-      var desired = current.replace(/(white|black)logo\.png$/i, dark ? 'whitelogo.png' : 'blacklogo.png');
-      if (desired !== current) img.setAttribute('src', desired);
-    });
-  }
-  setLogoByTheme();
-  try {
-    var obs = new MutationObserver(setLogoByTheme);
-    obs.observe(document.documentElement, {attributes: true, attributeFilter: ['class','data-theme']});
-    if (window.matchMedia) {
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setLogoByTheme);
-    }
-    window.addEventListener('storage', setLogoByTheme);
-  } catch (e) {
-    // MutationObserver not supported; ignore
-  }
-})();
-</script>
+  })();
+  </script>
 
+  <!-- Auto-generate thumbnails from the first frame of MP4/WebM tiles -->
+  <script>
+  (function () {
+    function makeVideoThumb(a) {
+      if (a.querySelector('img')) return; // already has a thumbnail
+
+      var src  = a.getAttribute('href');
+      var time = parseFloat(a.getAttribute('data-thumbtime') || '0.1'); // small offset avoids black frame
+      var vid  = document.createElement('video');
+      var cv   = document.createElement('canvas');
+      var ctx  = cv.getContext('2d');
+
+      // Same-origin or CORS-enabled files only; otherwise canvas is tainted.
+      vid.crossOrigin = 'anonymous';
+      vid.preload = 'auto';
+      vid.playsInline = true;
+      vid.muted = true;
+      vid.src = src;
+
+      function insertThumb() {
+        if (!vid.videoWidth || !vid.videoHeight) return fail();
+        cv.width  = vid.videoWidth;
+        cv.height = vid.videoHeight;
+        ctx.drawImage(vid, 0, 0, cv.width, cv.height);
+        var url = cv.toDataURL('image/jpeg', 0.85);
+        var img = new Image();
+        img.alt = a.getAttribute('aria-label') || 'Video thumbnail';
+        img.style = 'width:100%;height:100%;object-fit:cover;border-radius:10px';
+        img.src = url;
+        a.insertBefore(img, a.firstChild);
+        cleanup();
+      }
+
+      function fail() {
+        // Graceful: keep the play badge; optionally add a manual poster <img> in HTML if needed
+        cleanup();
+      }
+
+      function cleanup() {
+        try { vid.pause(); } catch(e){}
+        vid.removeAttribute('src'); vid.load();
+        vid.remove();
+        cv = null;
+      }
+
+      vid.addEventListener('loadedmetadata', function () {
+        try { var p = vid.play(); (p && p.catch ? p.catch(function(){}) : null); vid.pause(); } catch(e){}
+        try { vid.currentTime = Math.max(0, time); } catch (e) {}
+      });
+
+      vid.addEventListener('seeked', insertThumb);
+      vid.addEventListener('loadeddata', function(){
+        if (vid.currentTime === 0 || !vid.currentTime) insertThumb();
+      });
+      vid.addEventListener('error', fail);
+    }
+
+    function initVideoThumbs() {
+      document.querySelectorAll('a.thumb.is-video[data-video]').forEach(makeVideoThumb);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initVideoThumbs);
+    } else {
+      initVideoThumbs();
+    }
+  })();
+  </script>
+
+  <!-- Liquid Glass Header enhancer -->
+  <script>
+  (function(){
+    function enhanceHeader(){
+      var candidates = document.querySelectorAll('header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]');
+      if(candidates.length){
+        var el = candidates[0];
+        if(!el.classList.contains('liquid-glass-header')){ el.classList.add('liquid-glass-header'); }
+      }
+      var headerEl = document.querySelector('.liquid-glass-header');
+      if(headerEl){
+        var onScroll = function(){
+          var y = (window.scrollY || document.documentElement.scrollTop || 0);
+          if(y > 8){ headerEl.classList.add('scrolled'); }
+          else{ headerEl.classList.remove('scrolled'); }
+        };
+        onScroll();
+        window.addEventListener('scroll', onScroll, {passive:true});
+      }
+    }
+    if(document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', enhanceHeader);
+    } else {
+      enhanceHeader();
+    }
+  })();
+  </script>
+
+  <!-- Logo swap script -->
+  <script>
+  (function() {
+    function forEachLogo(fn){
+      var imgs = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
+      imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn);
+    }
+    function isDarkMode() {
+      var html = document.documentElement;
+      var dt = (html.getAttribute('data-theme') || '').toLowerCase();
+      if (dt === 'dark') return true;
+      if (dt === 'light') return false;
+      if (html.classList && (html.classList.contains('dark') || html.classList.contains('theme-dark'))) return true;
+      if (html.classList && (html.classList.contains('light') || html.classList.contains('theme-light'))) return false;
+      if (window.matchMedia) { return window.matchMedia('(prefers-color-scheme: dark)').matches; }
+      return false;
+    }
+    function setLogoByTheme() {
+      var dark = isDarkMode();
+      forEachLogo(function(img){
+        var current = img.getAttribute('src') || '';
+        var desired = current.replace(/(white|black)logo\.png$/i, dark ? 'whitelogo.png' : 'blacklogo.png');
+        if (desired !== current) img.setAttribute('src', desired);
+      });
+    }
+    setLogoByTheme();
+    try {
+      var obs = new MutationObserver(setLogoByTheme);
+      obs.observe(document.documentElement, {attributes: true, attributeFilter: ['class','data-theme']});
+      if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setLogoByTheme);
+      }
+      window.addEventListener('storage', setLogoByTheme);
+    } catch (e) {}
+  })();
+  </script>
+
+  <!-- Minimal CSS for the sticky glass header state -->
+  <style>
+    .liquid-glass-header{
+      position: sticky;
+      top: 0;
+      z-index: 9999;
+      background: rgba(255,255,255,0.55);
+      -webkit-backdrop-filter: blur(12px) saturate(160%);
+      backdrop-filter: blur(12px) saturate(160%);
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+      transition: background-color .3s ease, border-color .3s ease, box-shadow .3s ease;
+    }
+    .liquid-glass-header.scrolled{
+      background: rgba(255,255,255,0.72);
+      box-shadow: 0 2px 20px rgba(0,0,0,0.12);
+    }
+    :root[data-theme="dark"] .liquid-glass-header{
+      background: rgba(17,25,40,0.45);
+      border-color: rgba(255,255,255,0.08);
+    }
+    :root[data-theme="dark"] .liquid-glass-header.scrolled{
+      background: rgba(17,25,40,0.62);
+    }
+  </style>
 </body>
 </html>
