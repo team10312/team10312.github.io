@@ -79,10 +79,10 @@
     .gallery{display:grid; gap:.6rem; grid-template-columns: repeat(6,1fr)}
     @media (max-width:1000px){.gallery{grid-template-columns:repeat(4,1fr)}} 
     @media (max-width:640px){.gallery{grid-template-columns:repeat(2,1fr)}}
-    .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; }
+    .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; cursor:pointer; }
     .thumb img{ width:100%; height:100%; object-fit:cover; border-radius:10px }
 
-    /* Video tiles show play badge */
+    /* Video tiles show play badge (images never get one) */
     .thumb.is-video{ position:relative; display:block; }
     .thumb.is-video .play-badge{
       position:absolute; inset:0; display:grid; place-items:center;
@@ -179,39 +179,21 @@
       <h2 class="h2">Photo & Video Gallery</h2>
 
       <div class="gallery" data-gallery>
-        <!-- Examples: images -->
-        <div class="thumb"><img src="media1.jpg" alt="Media 1"></div>
-        <div class="thumb"><img src="media2.jpg" alt="Media 2"></div>
-        <div class="thumb"><img src="media3.jpg" alt="Media 3"></div>
-        <div class="thumb"><img src="media4.jpg" alt="Media 4"></div>
-        <div class="thumb"><img src="media5.jpg" alt="Media 5"></div>
-        <div class="thumb"><img src="media6.jpg" alt="Media 6"></div>
+        <!-- You can point ANY slot to an image OR a video OR YouTube/Vimeo.
+             The script will auto-detect and handle it. -->
 
-        <!-- Example: self-hosted MP4 in same slot (auto thumbnail from first frame) -->
-        <a href="media7.mp4" data-video class="thumb is-video" aria-label="Media 7 video">
-          <!-- No <img> required; script will generate from first frame -->
-          <span class="play-badge">▶</span>
-        </a>
-
-        <!-- More images -->
-        <div class="thumb"><img src="media8.jpg" alt="Media 8"></div>
-
-        <!-- Another MP4 (explicit capture time 0.25s to avoid black frame) -->
-        <a href="media9.mp4" data-video data-thumbtime="0.25" class="thumb is-video" aria-label="Media 9 video">
-          <span class="play-badge">▶</span>
-        </a>
-
-        <div class="thumb"><img src="media10.jpg" alt="Media 10"></div>
-        <div class="thumb"><img src="media11.jpg" alt="Media 11"></div>
-        <div class="thumb"><img src="media12.jpg" alt="Media 12"></div>
-
-        <!-- Example: YouTube/Vimeo embed (optional) -->
-        <!--
-        <a href="https://www.youtube.com/watch?v=VIDEO_ID" data-embed class="thumb is-video" aria-label="YouTube clip">
-          <img src="yt-thumb.jpg" alt="YouTube clip">
-          <span class="play-badge">▶</span>
-        </a>
-        -->
+        <a href="media1.jpg"  class="thumb"><img src="media1.jpg"  alt="Media 1"></a>
+        <a href="media2.jpg"  class="thumb"><img src="media2.jpg"  alt="Media 2"></a>
+        <a href="media3.mp4"  class="thumb" aria-label="Media 3 video"></a>
+        <a href="media4.jpg"  class="thumb"><img src="media4.jpg"  alt="Media 4"></a>
+        <a href="media5.webm" class="thumb" aria-label="Media 5 video"></a>
+        <a href="media6.jpg"  class="thumb"><img src="media6.jpg"  alt="Media 6"></a>
+        <a href="media7.mp4"  class="thumb" aria-label="Media 7 video"></a>
+        <a href="media8.jpg"  class="thumb"><img src="media8.jpg"  alt="Media 8"></a>
+        <a href="media9.mp4"  class="thumb" aria-label="Media 9 video"></a> <!-- your original working slot -->
+        <a href="media10.jpg" class="thumb"><img src="media10.jpg" alt="Media 10"></a>
+        <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" class="thumb" aria-label="Media 11 YouTube"></a>
+        <a href="media12.jpg" class="thumb"><img src="media12.jpg" alt="Media 12"></a>
       </div>
     </div>
   </section>
@@ -360,7 +342,9 @@
         if(e.key === 'Escape'){ closeLightbox(); }
       });
 
+      // ===== Auto-detect types for EVERY slot =====
       var videoExtRe = /\.(mp4|webm|ogv|ogg)(\?.*)?$/i;
+
       function toEmbed(url){
         try{
           var u = new URL(url, window.location.href);
@@ -377,34 +361,77 @@
             return 'https://player.vimeo.com/video/' + id + '?autoplay=1';
           }
         } catch(e){}
-        return url;
+        return null;
       }
 
+      // Classify each anchor once (image | video | embed)
+      function classifyThumb(a){
+        var href = a.getAttribute('href') || '';
+        var isVideo = videoExtRe.test(href);
+        var embed = toEmbed(href);
+
+        // Reset state
+        a.classList.remove('is-video');
+        a.removeAttribute('data-kind');
+        var badge = a.querySelector('.play-badge');
+        if (badge) badge.remove();
+
+        if (embed){
+          a.dataset.kind = 'embed';
+          a.classList.add('is-video');
+          var pb = document.createElement('span'); pb.className='play-badge'; pb.textContent='▶';
+          a.appendChild(pb);
+        } else if (isVideo){
+          a.dataset.kind = 'video';
+          a.classList.add('is-video');
+          var pb2 = document.createElement('span'); pb2.className='play-badge'; pb2.textContent='▶';
+          a.appendChild(pb2);
+        } else {
+          a.dataset.kind = 'image';
+          // images: no play badge
+          // if no <img>, inject one using href as src
+          if (!a.querySelector('img')) {
+            var img = new Image();
+            img.src = href;
+            img.alt = a.getAttribute('aria-label') || 'Image';
+            img.loading = 'lazy';
+            a.appendChild(img);
+          }
+        }
+      }
+
+      // Initial classification for all slots
+      var tiles = Array.from(galleryRoot.querySelectorAll('a.thumb'));
+      tiles.forEach(classifyThumb);
+
+      // Lightbox click handling for all slots
       galleryRoot.addEventListener('click', function(e){
         var t = e.target;
-        var a = t.closest('a'); // if a thumb is wrapped in a link
+        var a = t.closest('a.thumb');
+        if(!a) return;
 
-        // YouTube/Vimeo links or explicit data-embed
-        if (a && (a.dataset.embed || /youtu\.be|youtube\.com|vimeo\.com/.test(a.href))) {
+        var kind = a.dataset.kind;
+        if (kind === 'embed'){
           e.preventDefault();
-          openMedia('embed', toEmbed(a.href), t.getAttribute('alt') || '');
+          var embedUrl = toEmbed(a.href);
+          openMedia('embed', embedUrl, (t.getAttribute && t.getAttribute('alt')) || a.getAttribute('aria-label') || '');
           return;
         }
-
-        // Self-hosted video by extension or data-video
-        if (a && (a.dataset.video || videoExtRe.test(a.href))) {
+        if (kind === 'video'){
           e.preventDefault();
-          openMedia('video', a.href, t.getAttribute('alt') || '');
+          openMedia('video', a.href, (t.getAttribute && t.getAttribute('alt')) || a.getAttribute('aria-label') || '');
           return;
         }
-
-        // Default: clicked an IMG → open image (supports both linked and unlinked images)
-        if (t && t.tagName === 'IMG'){
+        if (kind === 'image'){
           e.preventDefault();
-          var src = (a && a.getAttribute('href')) || t.getAttribute('data-full') || t.src;
-          openMedia('image', src, t.getAttribute('alt') || '');
+          var alt = (a.querySelector('img') && a.querySelector('img').getAttribute('alt')) || '';
+          openMedia('image', a.href, alt);
+          return;
         }
       });
+
+      // Expose for thumbnail generator (so it can re-run if needed)
+      window.__bfClassifyThumbs = function(){ tiles.forEach(classifyThumb); };
     }
 
     if(document.readyState === 'loading'){
@@ -415,19 +442,20 @@
   })();
   </script>
 
-  <!-- Auto-generate thumbnails from the first frame of MP4/WebM tiles -->
+  <!-- Auto-generate thumbnails from the first frame of ANY video tile -->
   <script>
   (function () {
     function makeVideoThumb(a) {
-      if (a.querySelector('img')) return; // already has a thumbnail
+      if (a.dataset.kind !== 'video') return;   // only videos
+      if (a.querySelector('img')) return;       // already has a poster <img>
 
       var src  = a.getAttribute('href');
-      var time = parseFloat(a.getAttribute('data-thumbtime') || '0.1'); // small offset avoids black frame
+      var time = parseFloat(a.getAttribute('data-thumbtime') || '0.15'); // avoid black frames
       var vid  = document.createElement('video');
       var cv   = document.createElement('canvas');
       var ctx  = cv.getContext('2d');
 
-      // Same-origin or CORS-enabled files only; otherwise canvas is tainted.
+      // Same-origin or CORS-enabled only; otherwise canvas is tainted.
       vid.crossOrigin = 'anonymous';
       vid.preload = 'auto';
       vid.playsInline = true;
@@ -448,15 +476,10 @@
         cleanup();
       }
 
-      function fail() {
-        // Graceful: keep the play badge; optionally add a manual poster <img> in HTML if needed
-        cleanup();
-      }
-
+      function fail() { cleanup(); }
       function cleanup() {
         try { vid.pause(); } catch(e){}
-        vid.removeAttribute('src'); vid.load();
-        vid.remove();
+        vid.removeAttribute('src'); vid.load(); vid.remove();
         cv = null;
       }
 
@@ -464,7 +487,6 @@
         try { var p = vid.play(); (p && p.catch ? p.catch(function(){}) : null); vid.pause(); } catch(e){}
         try { vid.currentTime = Math.max(0, time); } catch (e) {}
       });
-
       vid.addEventListener('seeked', insertThumb);
       vid.addEventListener('loadeddata', function(){
         if (vid.currentTime === 0 || !vid.currentTime) insertThumb();
@@ -473,7 +495,9 @@
     }
 
     function initVideoThumbs() {
-      document.querySelectorAll('a.thumb.is-video[data-video]').forEach(makeVideoThumb);
+      // Ensure classification ran
+      if (window.__bfClassifyThumbs) window.__bfClassifyThumbs();
+      document.querySelectorAll('a.thumb').forEach(makeVideoThumb);
     }
 
     if (document.readyState === 'loading') {
