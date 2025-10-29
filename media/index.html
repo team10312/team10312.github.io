@@ -38,20 +38,9 @@
         --shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
       }
 
-      * {
-        box-sizing: border-box;
-      }
-
-      html,
-      body {
-        height: 100%;
-      }
-
-      html {
-        background: var(--bg);
-        transition: background-color 0.25s ease;
-      }
-
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      html { background: var(--bg); transition: background-color 0.25s ease; }
       body {
         margin: 0;
         font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
@@ -61,362 +50,106 @@
         transition: color 0.25s ease;
       }
 
-      a {
-        color: inherit;
-        text-decoration: none;
-      }
+      a { color: inherit; text-decoration: none; }
+      img { max-width: 100%; display: block; }
 
-      img {
-        max-width: 100%;
-        display: block;
-      }
-
-      .container {
-        width: min(1150px, 92vw);
-        margin: 0 auto;
-      }
+      .container { width: min(1150px, 92vw); margin: 0 auto; }
 
       .liquid-bg {
-        position: fixed;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
+        position: fixed; inset: 0; z-index: 0; pointer-events: none;
         background:
           radial-gradient(1200px 600px at 70% -20%, var(--rg1), transparent 60%),
           radial-gradient(900px 500px at -10% 10%, var(--rg2), transparent 60%);
       }
-
-      body > *:not(.liquid-bg) {
-        position: relative;
-        z-index: 1;
-      }
+      body > *:not(.liquid-bg) { position: relative; z-index: 1; }
 
       header {
-        position: sticky;
-        top: 0;
-        z-index: 50;
-        backdrop-filter: saturate(140%) blur(8px);
-        background: var(--bg-soft);
-        border-bottom: 1px solid var(--panel-border);
-        isolation: isolate;
+        position: sticky; top: 0; z-index: 50; backdrop-filter: saturate(140%) blur(8px);
+        background: var(--bg-soft); border-bottom: 1px solid var(--panel-border); isolation: isolate;
       }
 
-      .nav {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        padding: 0.8rem 0;
-      }
+      .nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.8rem 0; }
+      .nav-left { display: flex; align-items: center; gap: 1rem; }
 
-      .nav-left {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-      }
+      .logo { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 900; letter-spacing: 0.2px; }
+      .logo img { height: 40px; width: auto; }
 
-      .logo {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.6rem;
-        font-weight: 900;
-        letter-spacing: 0.2px;
-      }
-
-      .logo img {
-        height: 40px;
-        width: auto;
-      }
-
-      .nav-links {
-        display: none;
-        gap: 1.2rem;
-        color: var(--muted);
-      }
-
-      .nav-cta {
-        display: none;
-        gap: 0.6rem;
-        align-items: center;
-      }
-
-      @media (min-width: 900px) {
-        .nav-links,
-        .nav-cta {
-          display: flex;
-        }
-      }
-
-      .nav-links a.active {
-        color: var(--brand);
-        font-weight: 700;
-      }
+      .nav-links { display: none; gap: 1.2rem; color: var(--muted); }
+      .nav-cta { display: none; gap: 0.6rem; align-items: center; }
+      @media (min-width: 900px) { .nav-links, .nav-cta { display: flex; } }
+      .nav-links a.active { color: var(--brand); font-weight: 700; }
 
       .toggle-theme {
-        background: transparent;
-        border: 1px solid var(--panel-border);
-        color: var(--text);
-        border-radius: 999px;
-        padding: 0.45rem 0.9rem;
-        font-weight: 700;
-        cursor: pointer;
+        background: transparent; border: 1px solid var(--panel-border); color: var(--text);
+        border-radius: 999px; padding: 0.45rem 0.9rem; font-weight: 700; cursor: pointer;
       }
 
-      .btn,
-      .glass-button {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.55rem;
-        padding: 0.9rem 1.1rem;
-        border-radius: calc(var(--radius) - 4px);
-        color: #fff;
-        font-weight: 700;
-        border: none;
-        cursor: pointer;
-        box-shadow: var(--shadow);
-        background: linear-gradient(135deg, var(--brand), var(--brand-2));
-        overflow: hidden;
-        isolation: isolate;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      .btn, .glass-button {
+        position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem;
+        padding: 0.9rem 1.1rem; border-radius: calc(var(--radius) - 4px); color: #fff; font-weight: 700; border: none;
+        cursor: pointer; box-shadow: var(--shadow); background: linear-gradient(135deg, var(--brand), var(--brand-2));
+        overflow: hidden; isolation: isolate; transition: transform 0.15s ease, box-shadow 0.15s ease;
       }
+      .btn:hover, .glass-button:hover { transform: translateY(-1px); box-shadow: 0 14px 40px rgba(255, 127, 0, 0.35); }
+      .btn.secondary { background: transparent; border: 1px solid var(--panel-border); color: var(--text); box-shadow: none; }
 
-      .btn:hover,
-      .glass-button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 14px 40px rgba(255, 127, 0, 0.35);
+      .glass-button::before, .btn::before {
+        content: ""; position: absolute; inset: -40% -40% auto auto; width: 180%; height: 180%;
+        background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 127, 0, 0.55), transparent 65%);
+        mix-blend-mode: screen; pointer-events: none; transition: opacity 0.12s ease; opacity: 0;
       }
+      .glass-button:hover::before, .btn:hover::before { opacity: 0.8; }
 
-      .btn.secondary {
-        background: transparent;
-        border: 1px solid var(--panel-border);
-        color: var(--text);
-        box-shadow: none;
-      }
+      .hero { padding: 4.8rem 0 1.6rem; }
+      .headline { font-size: clamp(2rem, 4.8vw, 3.4rem); line-height: 1.05; margin: 0 0 0.6rem; color: var(--brand); }
+      .muted { color: var(--muted); }
+      .section { padding: 2.8rem 0; }
+      .h2 { font-size: clamp(1.6rem, 3.4vw, 2.2rem); margin: 0.3rem 0 1rem; color: var(--accent); }
 
-      .glass-button::before,
-      .btn::before {
-        content: "";
-        position: absolute;
-        inset: -40% -40% auto auto;
-        width: 180%;
-        height: 180%;
-        background: radial-gradient(
-          circle at var(--mx, 50%) var(--my, 50%),
-          rgba(255, 127, 0, 0.55),
-          transparent 65%
-        );
-        mix-blend-mode: screen;
-        pointer-events: none;
-        transition: opacity 0.12s ease;
-        opacity: 0;
-      }
+      .grid-3 { display: grid; gap: 1rem; grid-template-columns: repeat(3, 1fr); }
+      @media (max-width: 1000px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
+      @media (max-width: 680px) { .grid-3 { grid-template-columns: 1fr; } }
 
-      .glass-button:hover::before,
-      .btn:hover::before {
-        opacity: 0.8;
-      }
+      .grid-4 { display: grid; gap: 1rem; grid-template-columns: repeat(4, 1fr); }
+      @media (max-width: 1100px) { .grid-4 { grid-template-columns: 1fr 1fr 1fr; } }
+      @media (max-width: 740px) { .grid-4 { grid-template-columns: 1fr 1fr; } }
+      @media (max-width: 520px) { .grid-4 { grid-template-columns: 1fr; } }
 
-      .hero {
-        padding: 4.8rem 0 1.6rem;
-      }
+      .card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.1rem; }
 
-      .headline {
-        font-size: clamp(2rem, 4.8vw, 3.4rem);
-        line-height: 1.05;
-        margin: 0 0 0.6rem;
-        color: var(--brand);
-      }
+      footer { margin-top: 2rem; padding: 2rem 0 3rem; color: var(--muted); border-top: 1px solid var(--panel-border); }
 
-      .muted {
-        color: var(--muted);
-      }
+      .foot-grid { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 1rem; }
+      @media (max-width: 900px) { .foot-grid { grid-template-columns: 1fr 1fr; } }
+      @media (max-width: 600px) { .foot-grid { grid-template-columns: 1fr; } }
 
-      .section {
-        padding: 2.8rem 0;
-      }
+      .video { aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; }
 
-      .h2 {
-        font-size: clamp(1.6rem, 3.4vw, 2.2rem);
-        margin: 0.3rem 0 1rem;
-        color: var(--accent);
-      }
-
-      .grid-3 {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(3, 1fr);
-      }
-
-      @media (max-width: 1000px) {
-        .grid-3 {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-
-      @media (max-width: 680px) {
-        .grid-3 {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .grid-4 {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(4, 1fr);
-      }
-
-      @media (max-width: 1100px) {
-        .grid-4 {
-          grid-template-columns: 1fr 1fr 1fr;
-        }
-      }
-
-      @media (max-width: 740px) {
-        .grid-4 {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-
-      @media (max-width: 520px) {
-        .grid-4 {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--panel-border);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        padding: 1.1rem;
-      }
-
-      footer {
-        margin-top: 2rem;
-        padding: 2rem 0 3rem;
-        color: var(--muted);
-        border-top: 1px solid var(--panel-border);
-      }
-
-      .foot-grid {
-        display: grid;
-        grid-template-columns: 1.4fr repeat(3, 1fr);
-        gap: 1rem;
-      }
-
-      @media (max-width: 900px) {
-        .foot-grid {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-
-      @media (max-width: 600px) {
-        .foot-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .video {
-        aspect-ratio: 16/9;
-        border-radius: 12px;
-        overflow: hidden;
-        background: #000;
-      }
-
-      .gallery {
-        display: grid;
-        gap: 0.6rem;
-        grid-template-columns: repeat(6, 1fr);
-      }
-
-      @media (max-width: 1000px) {
-        .gallery {
-          grid-template-columns: repeat(4, 1fr);
-        }
-      }
-
-      @media (max-width: 640px) {
-        .gallery {
-          grid-template-columns: repeat(2, 1fr);
-        }
-      }
-
-      .thumb {
-        aspect-ratio: 1;
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.2);
-        overflow: hidden;
-      }
+      .gallery { display: grid; gap: 0.6rem; grid-template-columns: repeat(6, 1fr); }
+      @media (max-width: 1000px) { .gallery { grid-template-columns: repeat(4, 1fr); } }
+      @media (max-width: 640px) { .gallery { grid-template-columns: repeat(2, 1fr); } }
+      .thumb { aspect-ratio: 1; border-radius: 10px; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
     </style>
 
     <!-- Liquid Glass Header & Lightbox CSS (injected) -->
     <style>
       /* ===== Liquid Glass Header ===== */
       .liquid-glass-header {
-        position: sticky;
-        top: 0;
-        z-index: 9999;
-        background: rgba(255, 255, 255, 0.55);
+        position: sticky; top: 0; z-index: 9999; background: rgba(255, 255, 255, 0.55);
         -webkit-backdrop-filter: blur(12px) saturate(160%);
         backdrop-filter: blur(12px) saturate(160%);
         border-bottom: 1px solid rgba(0, 0, 0, 0.08);
         transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
       }
+      .liquid-glass-header.scrolled { background: rgba(255, 255, 255, 0.72); box-shadow: 0 2px 20px rgba(0, 0, 0, 0.12); }
+      :root[data-theme="dark"] .liquid-glass-header { background: rgba(17, 25, 40, 0.45); border-color: rgba(255, 255, 255, 0.08); }
+      :root[data-theme="dark"] .liquid-glass-header.scrolled { background: rgba(17, 25, 40, 0.62); }
 
-      .liquid-glass-header.scrolled {
-        background: rgba(255, 255, 255, 0.72);
-        box-shadow: 0 2px 20px rgba(0, 0, 0, 0.12);
-      }
-
-      /* Dark theme support if site uses a data-theme root or prefers-color-scheme */
-      :root[data-theme="dark"] .liquid-glass-header {
-        background: rgba(17, 25, 40, 0.45);
-        border-color: rgba(255, 255, 255, 0.08);
-      }
-
-      :root[data-theme="dark"] .liquid-glass-header.scrolled {
-        background: rgba(17, 25, 40, 0.62);
-      }
-
-      /* ===== Simple Lightbox (only activates on media gallery pages) ===== */
-      #lightbox-overlay {
-        position: fixed;
-        inset: 0;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        background: rgba(0, 0, 0, 0.6);
-        z-index: 2147483645;
-        padding: 4vw;
-      }
-
-      #lightbox-overlay.show {
-        display: flex;
-      }
-
-      #lightbox-image {
-        max-width: 100%;
-        max-height: 100%;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-        border-radius: 12px;
-      }
-
-      #lightbox-close {
-        position: absolute;
-        top: 16px;
-        right: 20px;
-        background: rgba(0, 0, 0, 0.45);
-        color: #fff;
-        border: 0;
-        font-size: 32px;
-        line-height: 1;
-        width: 44px;
-        height: 44px;
-        border-radius: 8px;
-        cursor: pointer;
-      }
+      /* ===== Simple Lightbox ===== */
+      #lightbox-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); z-index: 2147483645; padding: 4vw; }
+      #lightbox-overlay.show { display: flex; }
+      #lightbox-image { max-width: 100%; max-height: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.4); border-radius: 12px; }
+      #lightbox-close { position: absolute; top: 16px; right: 20px; background: rgba(0,0,0,0.45); color: #fff; border: 0; font-size: 32px; line-height: 1; width: 44px; height: 44px; border-radius: 8px; cursor: pointer; }
     </style>
   </head>
 
@@ -443,13 +176,7 @@
 
         <div class="nav-cta">
           <button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button>
-          <a
-            id="link-get-involved"
-            class="btn glass-button"
-            data-link="sponsors"
-            href="/sponsors/#become-a-sponsor"
-            >Get Involved</a
-          >
+          <a id="link-get-involved" class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor">Get Involved</a>
         </div>
       </div>
     </header>
@@ -465,14 +192,7 @@
       <div class="container">
         <h2 class="h2">Robot Reveal</h2>
         <div class="card video">
-          <iframe
-            width="100%"
-            height="100%"
-            src="https://www.thebluealliance.com/team/10312"
-            title="Robot Reveal"
-            frameborder="0"
-            allowfullscreen
-          ></iframe>
+          <iframe width="100%" height="100%" src="https://www.thebluealliance.com/team/10312" title="Robot Reveal" frameborder="0" allowfullscreen></iframe>
         </div>
       </div>
     </section>
@@ -480,92 +200,19 @@
     <section class="section">
       <div class="container">
         <h2 class="h2">Photo Gallery</h2>
-
         <div class="gallery">
-          <div class="thumb">
-            <img
-              src="media1.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media2.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media3.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media4.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media5.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media6.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media7.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media8.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media9.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media10.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media11.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
-          <div class="thumb">
-            <img
-              src="media12.jpg"
-              alt=""
-              style="width:100%;height:100%;object-fit:cover;border-radius:10px"
-            />
-          </div>
+          <div class="thumb"><img src="media1.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media2.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media3.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media4.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media5.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media6.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media7.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media8.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media9.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media10.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media11.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
+          <div class="thumb"><img src="media12.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px" /></div>
         </div>
       </div>
     </section>
@@ -579,20 +226,17 @@
           </div>
           <p class="muted" style="margin-top:.6rem;max-width:46ch">Orange • White • Black.</p>
         </div>
-
         <div>
           <h4>Explore</h4>
           <a class="muted" data-link="team" href="/team/">Team</a><br />
           <a class="muted" data-link="robots" href="/robots/">Robots</a><br />
           <a class="muted" data-link="media" href="/media/">Media</a>
         </div>
-
         <div>
           <h4>Support</h4>
           <a class="muted" data-link="sponsors" href="/sponsors/">Sponsors</a><br />
           <a class="muted" data-link="contact" href="/contact/">Contact</a>
         </div>
-
         <div>
           <h4>Follow</h4>
           <a class="muted" href="#">YouTube</a><br />
@@ -600,10 +244,7 @@
         </div>
       </div>
 
-      <div
-        class="container"
-        style="margin-top:1.4rem;display:flex;justify-content:space-between;gap:.8rem;flex-wrap:wrap"
-      >
+      <div class="container" style="margin-top:1.4rem;display:flex;justify-content:space-between;gap:.8rem;flex-wrap:wrap">
         <span class="muted">© <span id="year"></span> Byte Force Robotics — Team 10312</span>
         <div style="display:flex;gap:1rem">
           <a class="muted" href="#">Privacy</a><a class="muted" href="#">Terms</a>
@@ -613,16 +254,7 @@
 
     <script>
       // ----- CONFIG: Set these to your WordPress page slugs/URLs -----
-      const LINKS = {
-        home: '/',
-        about: '/about/',
-        team: '/team/',
-        robots: '/robots/',
-        sponsors: '/sponsors/',
-        media: '/media/',
-        contact: '/contact/'
-      };
-
+      const LINKS = { home: '/', about: '/about/', team: '/team/', robots: '/robots/', sponsors: '/sponsors/', media: '/media/', contact: '/contact/' };
       const PAGE = 'media'; // current page key
 
       // Apply year
@@ -636,7 +268,6 @@
         document.querySelectorAll('[data-link]').forEach(a => {
           const key = a.getAttribute('data-link');
           if (LINKS[key]) {
-            // Preserve anchor fragments if present in href template
             const href = a.getAttribute('href') || '';
             const hash = href.includes('#') ? href.substring(href.indexOf('#')) : '';
             a.setAttribute('href', LINKS[key] + hash);
@@ -652,45 +283,39 @@
         if (toggle) toggle.textContent = html.getAttribute('data-theme') === 'dark' ? 'Light' : 'Dark';
       }
 
-      const stored = localStorage.getItem('bf-theme');
-      if (stored) {
+      // initial theme from localStorage or system
+      (function initTheme() {
+        const stored = localStorage.getItem('bf-theme');
         if (stored === 'dark') html.setAttribute('data-theme', 'dark');
         else if (stored === 'light') html.setAttribute('data-theme', 'light');
-      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        html.setAttribute('data-theme', 'dark');
-      }
+        else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          html.setAttribute('data-theme', 'dark');
+        }
+        setLabel();
+      })();
 
-      setLabel();
+      // Always wire links and active state
+      wireLinks();
+      (function setActive(){
+        document.querySelectorAll(`.nav-links a[data-link="${PAGE}"]`).forEach(a => a.classList.add('active'));
+      })();
 
       if (toggle) {
         toggle.addEventListener('click', () => {
           const isDark = html.getAttribute('data-theme') === 'dark';
-          if (isDark) {
-            html.setAttribute('data-theme', 'light');
-            localStorage.setItem('bf-theme', 'light');
-          } else {
-            html.setAttribute('data-theme', 'dark');
-            localStorage.setItem('bf-theme', 'dark');
-          }
+          html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+          localStorage.setItem('bf-theme', isDark ? 'light' : 'dark');
           setLabel();
         });
 
-        // Button ripple follows pointer
+        // Button ripple follows pointer (fix: use proper template strings)
         document.querySelectorAll('.btn, .glass-button').forEach(btn => {
           btn.addEventListener('mousemove', (e) => {
             const r = btn.getBoundingClientRect();
-            btn.style.setProperty('--mx', ${e.clientX - r.left}px);
-            btn.style.setProperty('--my', ${e.clientY - r.top}px);
+            btn.style.setProperty('--mx', `${e.clientX - r.left}px`);
+            btn.style.setProperty('--my', `${e.clientY - r.top}px`);
           });
         });
-
-        // Active nav
-        function setActive() {
-          document.querySelectorAll(.nav-links a[data-link="${PAGE}"]).forEach(a => a.classList.add('active'));
-        }
-
-        wireLinks();
-        setActive();
       }
     </script>
 
@@ -699,25 +324,18 @@
       (function () {
         // ===== Liquid Glass Header enhancer =====
         function enhanceHeader() {
-          var candidates = document.querySelectorAll(
-            'header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]'
-          );
+          var candidates = document.querySelectorAll('header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]');
           if (candidates.length) {
             var el = candidates[0];
             if (!el.classList.contains('liquid-glass-header')) {
               el.classList.add('liquid-glass-header');
             }
           }
-
           var headerEl = document.querySelector('.liquid-glass-header');
           if (headerEl) {
             var onScroll = function () {
               var y = (window.scrollY || document.documentElement.scrollTop || 0);
-              if (y > 8) {
-                headerEl.classList.add('scrolled');
-              } else {
-                headerEl.classList.remove('scrolled');
-              }
+              if (y > 8) headerEl.classList.add('scrolled'); else headerEl.classList.remove('scrolled');
             };
             onScroll();
             window.addEventListener('scroll', onScroll, { passive: true });
@@ -726,11 +344,9 @@
 
         // ===== Lightweight Lightbox (activates on media/gallery pages only) =====
         function setupLightbox() {
-          // Look for common gallery selectors
           var galleryRoot = document.querySelector('[data-gallery], .gallery, #gallery, .photo-gallery, .media-gallery');
           if (!galleryRoot) return; // Only enable where a gallery exists
 
-          // Build overlay markup once
           var overlay = document.createElement('div');
           overlay.id = 'lightbox-overlay';
           overlay.innerHTML = '<button id="lightbox-close" aria-label="Close">×</button><img id="lightbox-image" alt="">';
@@ -740,34 +356,21 @@
           var closeBtn = overlay.querySelector('#lightbox-close');
 
           function openLightbox(src, alt) {
-            imgEl.src = src;
-            imgEl.alt = alt || '';
+            imgEl.src = src; imgEl.alt = alt || '';
             overlay.classList.add('show');
             document.body.style.overflow = 'hidden';
           }
-
           function closeLightbox() {
             overlay.classList.remove('show');
             document.body.style.overflow = '';
-            // Defer clearing src to allow smooth fade on some browsers
-            setTimeout(function () {
-              imgEl.src = '';
-            }, 200);
+            setTimeout(function () { imgEl.src = ''; }, 200);
           }
 
           overlay.addEventListener('click', function (e) {
-            if (e.target === overlay || e.target.id === 'lightbox-close') {
-              closeLightbox();
-            }
+            if (e.target === overlay || e.target.id === 'lightbox-close') closeLightbox();
           });
+          document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLightbox(); });
 
-          document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') {
-              closeLightbox();
-            }
-          });
-
-          // Delegate click on any IMG inside the gallery root
           galleryRoot.addEventListener('click', function (e) {
             var t = e.target;
             if (t && t.tagName === 'IMG') {
@@ -779,16 +382,9 @@
           });
         }
 
-        // Initialize after DOM ready
         if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', function () {
-            enhanceHeader();
-            setupLightbox();
-          });
-        } else {
-          enhanceHeader();
-          setupLightbox();
-        }
+          document.addEventListener('DOMContentLoaded', function () { enhanceHeader(); setupLightbox(); });
+        } else { enhanceHeader(); setupLightbox(); }
       })();
     </script>
 
@@ -797,22 +393,18 @@
       (function () {
         function forEachLogo(fn) {
           var imgs = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
-          imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn);
+          (imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn));
         }
-
         function isDarkMode() {
-          var html = document.documentElement;
-          var dt = (html.getAttribute('data-theme') || '').toLowerCase();
+          var htmlEl = document.documentElement;
+          var dt = (htmlEl.getAttribute('data-theme') || '').toLowerCase();
           if (dt === 'dark') return true;
           if (dt === 'light') return false;
-          if (html.classList && (html.classList.contains('dark') || html.classList.contains('theme-dark'))) return true;
-          if (html.classList && (html.classList.contains('light') || html.classList.contains('theme-light'))) return false;
-          if (window.matchMedia) {
-            return window.matchMedia('(prefers-color-scheme: dark)').matches;
-          }
+          if (htmlEl.classList && (htmlEl.classList.contains('dark') || htmlEl.classList.contains('theme-dark'))) return true;
+          if (htmlEl.classList && (htmlEl.classList.contains('light') || htmlEl.classList.contains('theme-light'))) return false;
+          if (window.matchMedia) return window.matchMedia('(prefers-color-scheme: dark)').matches;
           return false;
         }
-
         function setLogoByTheme() {
           var dark = isDarkMode();
           forEachLogo(function (img) {
@@ -821,21 +413,13 @@
             if (desired !== current) img.setAttribute('src', desired);
           });
         }
-
         setLogoByTheme();
-
         try {
           var obs = new MutationObserver(setLogoByTheme);
           obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
-
-          if (window.matchMedia) {
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setLogoByTheme);
-          }
-
+          if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setLogoByTheme);
           window.addEventListener('storage', setLogoByTheme);
-        } catch (e) {
-          // MutationObserver not supported; ignore
-        }
+        } catch (e) { /* ignore */ }
       })();
     </script>
   </body>
