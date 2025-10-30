@@ -66,14 +66,60 @@
     .muted{ color: var(--muted); }
     .section{ padding: 2.8rem 0; }
     .h2{ font-size: clamp(1.6rem, 3.4vw, 2.2rem); margin:.3rem 0 1rem; color: var(--accent); }
-    .grid-3{ display:grid; gap:1rem; grid-template-columns: repeat(3, 1fr); }
-    @media (max-width:1000px){ .grid-3{ grid-template-columns: 1fr 1fr; } }
-    @media (max-width:680px){ .grid-3{ grid-template-columns: 1fr; } }
     .grid-4{ display:grid; gap:1rem; grid-template-columns: repeat(4, 1fr); }
     @media (max-width:1100px){ .grid-4{ grid-template-columns: 1fr 1fr 1fr; } }
     @media (max-width:740px){ .grid-4{ grid-template-columns: 1fr 1fr; } }
     @media (max-width:520px){ .grid-4{ grid-template-columns: 1fr; } }
-    .card{ background: var(--panel); border:1px solid var(--panel-border); border-radius: var(--radius); box-shadow: var(--shadow); padding:1.1rem; }
+
+    .card{
+      background: var(--panel);
+      border:1px solid var(--panel-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding:1.1rem;
+    }
+
+    /* NEW: sponsor rows inside each tier */
+    .sponsor-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:.6rem;
+      margin-top:.8rem;
+    }
+
+    .sponsor-card{
+      flex:1 1 calc(33.333% - .6rem);
+      min-width:120px;
+      background:rgba(255,255,255,.2);
+      border-radius:10px;
+      border:1px solid var(--panel-border);
+      box-shadow:var(--shadow);
+      padding:.6rem;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      aspect-ratio:3/2;
+      overflow:hidden;
+    }
+
+    .sponsor-card img{
+      max-width:90%;
+      max-height:90%;
+      object-fit:contain;
+      display:block;
+    }
+
+    @media(max-width:600px){
+      .sponsor-card{
+        flex:1 1 calc(50% - .6rem);
+      }
+    }
+    @media(max-width:400px){
+      .sponsor-card{
+        flex:1 1 100%;
+      }
+    }
+
     footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px solid var(--panel-border); }
     .foot-grid{ display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:1rem; }
     @media (max-width:900px){ .foot-grid{ grid-template-columns: 1fr 1fr; } }
@@ -165,13 +211,79 @@
     <div class="container">
       <h2 class="h2">Sponsor Tiers</h2>
       <div class="grid-4">
-        <div class="card"><h3>Platinum — $5000+</h3><p class="muted">Logo on robot, banners, shirts; demo at your site; social features.</p><div style="height:90px;background:rgba(255,255,255,.2);border-radius:10px"></div></div>
-        <div class="card"><h3>Gold — $2500</h3><p class="muted">Logo on robot & pit banner; social features.</p><div style="height:90px;background:rgba(255,255,255,.2);border-radius:10px"></div></div>
-        <div class="card"><h3>Silver — $1000</h3><p class="muted">Logo on pit banner; website recognition.</p><div style="height:90px;background:rgba(255,255,255,.2);border-radius:10px"></div></div>
-        <div class="card"><h3>Bronze — $500</h3><p class="muted">Website recognition; thank-you note from the team.</p><div style="height:90px;background:rgba(255,255,255,.2);border-radius:10px"></div></div>
+
+        <!-- Platinum -->
+        <div class="card">
+          <h3>Platinum — $5000+</h3>
+          <p class="muted">Logo on robot, banners, shirts; demo at your site; social features.</p>
+          <div class="sponsor-row">
+            <div class="sponsor-card">
+              <img src="platinum1.png" alt="Platinum Sponsor 1">
+            </div>
+            <div class="sponsor-card">
+              <img src="platinum2.png" alt="Platinum Sponsor 2">
+            </div>
+            <div class="sponsor-card">
+              <img src="platinum3.png" alt="Platinum Sponsor 3">
+            </div>
+          </div>
+        </div>
+
+        <!-- Gold -->
+        <div class="card">
+          <h3>Gold — $2500</h3>
+          <p class="muted">Logo on robot &amp; pit banner; social features.</p>
+          <div class="sponsor-row">
+            <div class="sponsor-card">
+              <img src="gold1.png" alt="Gold Sponsor 1">
+            </div>
+            <div class="sponsor-card">
+              <img src="gold2.png" alt="Gold Sponsor 2">
+            </div>
+            <div class="sponsor-card">
+              <img src="gold3.png" alt="Gold Sponsor 3">
+            </div>
+          </div>
+        </div>
+
+        <!-- Silver -->
+        <div class="card">
+          <h3>Silver — $1000</h3>
+          <p class="muted">Logo on pit banner; website recognition.</p>
+          <div class="sponsor-row">
+            <div class="sponsor-card">
+              <img src="silver1.png" alt="Silver Sponsor 1">
+            </div>
+            <div class="sponsor-card">
+              <img src="silver2.png" alt="Silver Sponsor 2">
+            </div>
+            <div class="sponsor-card">
+              <img src="silver3.png" alt="Silver Sponsor 3">
+            </div>
+          </div>
+        </div>
+
+        <!-- Bronze -->
+        <div class="card">
+          <h3>Bronze — $500</h3>
+          <p class="muted">Website recognition; thank-you note from the team.</p>
+          <div class="sponsor-row">
+            <div class="sponsor-card">
+              <img src="bronze1.png" alt="Bronze Sponsor 1">
+            </div>
+            <div class="sponsor-card">
+              <img src="bronze2.png" alt="Bronze Sponsor 2">
+            </div>
+            <div class="sponsor-card">
+              <img src="bronze3.png" alt="Bronze Sponsor 3">
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </section>
+
   <section id="become-a-sponsor" class="section">
     <div class="container">
       <h2 class="h2">Become a Sponsor</h2>
