@@ -87,20 +87,21 @@
       margin-top:.8rem;
     }
 
-    .sponsor-card{
-      flex:1 1 calc(33.333% - .6rem);
-      min-width:120px;
-      background:rgba(255,255,255,.2);
-      border-radius:10px;
-      border:1px solid var(--panel-border);
-      box-shadow:var(--shadow);
-      padding:.6rem;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      aspect-ratio:3/2;
-      overflow:hidden;
-    }
+  .sponsor-card{
+    flex:1 1 calc(33.333% - .6rem);
+    min-width:120px;
+    background: var(--panel);              /* ← back to original container color */
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    box-shadow:var(--shadow);
+    padding:.6rem;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    aspect-ratio:3/2;
+    overflow:hidden;
+  }
+
 
     .sponsor-card img{
       max-width:90%;
