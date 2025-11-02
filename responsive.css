@@ -1,0 +1,107 @@
+/* ======= Global Responsive Styles for Team10312 Site ======= */
+/* Mobile-first tweaks; enhance on larger screens */
+:root {
+  --container-max: 1200px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fluid media */
+img, video, canvas, iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Containers */
+.container, .wrap, .page, main {
+  width: min(100% - 2rem, var(--container-max));
+  margin-inline: auto;
+}
+
+/* Grids (common classnames in this site) */
+.grid, .cards, .sponsors-grid, .media-grid, .robot-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* On small screens, stack everything into 1 column */
+@media (max-width: 768px) {
+  .grid, .grid-2, .grid-3, .grid-4,
+  .cards, .sponsors-grid, .media-grid, .robot-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
+  }
+
+  header, .site-header, nav, .site-nav {
+    position: relative;
+  }
+
+  /* Optional: squeeze paddings for panels/sections */
+  section, .section, .panel, .glass, .card {
+    padding: clamp(0.75rem, 2vw, 1rem);
+  }
+
+  /* Headings scale down */
+  h1 { font-size: clamp(1.6rem, 6vw, 2rem); }
+  h2 { font-size: clamp(1.25rem, 4.5vw, 1.5rem); }
+  h3 { font-size: clamp(1.1rem, 4vw, 1.25rem); }
+
+  /* Tables: add horizontal scroll if needed */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table { min-width: 600px; }
+}
+
+/* Medium and up refinements */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Nav — auto-collapse to hamburger on small screens (JS adds .nav-open) */
+.nav-toggle {
+  display: none;
+  border: 0;
+  background: transparent;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+}
+
+.nav-toggle span, .nav-toggle::before, .nav-toggle::after {
+  content: "";
+  display: block;
+  height: 2px;
+  margin: 8px;
+  background: currentColor;
+}
+
+@media (max-width: 768px) {
+  .nav-toggle { display: inline-block; }
+
+  .site-nav ul, nav ul {
+    display: none;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .nav-open .site-nav ul, .nav-open nav ul {
+    display: flex;
+  }
+}
+
+/* Utility: device classes set by JS */
+body.is-mobile .desktop-only { display: none !important; }
+body.is-desktop .mobile-only { display: none !important; }
