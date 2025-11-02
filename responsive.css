@@ -12,7 +12,7 @@ html, body {
 }
 
 /* Fluid media */
-img, video, canvas, iframe {
+img, video, canvas {
   max-width: 100%;
   height: auto;
 }
@@ -105,3 +105,49 @@ img, video, canvas, iframe {
 /* Utility: device classes set by JS */
 body.is-mobile .desktop-only { display: none !important; }
 body.is-desktop .mobile-only { display: none !important; }
+
+/* ===== Mobile nav for .container.nav + .nav-links ===== */
+@media (max-width: 768px) {
+  header .container.nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 50;
+  }
+
+  header .container.nav .nav-links {
+    display: none;
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    padding: 0.75rem 1rem;
+    background: var(--panel, rgba(0,0,0,.86));
+    backdrop-filter: saturate(120%) blur(10px);
+    border-top: 1px solid var(--panel-border, rgba(255,255,255,.08));
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  body.nav-open header .container.nav .nav-links {
+    display: flex;
+  }
+
+  /* Ensure the hamburger is visible */
+  .nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    z-index: 60;
+  }
+}
+
+@media (min-width: 769px) {
+  header .container.nav .nav-links {
+    display: flex;
+    gap: 0.75rem;
+  }
+}

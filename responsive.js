@@ -34,4 +34,33 @@
   setupNav(document.querySelector(".site-nav"));
   setupNav(document.querySelector("header nav"));
   setupNav(document.querySelector("nav"));
+
+  // Also support `.container.nav` + `.nav-links` structure used on Team10312
+  (function() {
+    const bar = document.querySelector("header .container.nav");
+    const links = bar?.querySelector(".nav-links");
+    if (!bar || !links || bar.dataset.enhanced) return;
+    bar.dataset.enhanced = "true";
+
+    // Insert toggle button to the right side (after existing left items)
+    const btn = document.createElement("button");
+    btn.className = "nav-toggle";
+    btn.setAttribute("aria-label", "Toggle menu");
+    btn.innerHTML = "<span></span>";
+    // Prefer placing button before .nav-links so it shows on the right
+    bar.insertBefore(btn, links);
+
+    btn.addEventListener("click", () => {
+      document.body.classList.toggle("nav-open");
+    });
+
+    // Close on link click (single-page feel)
+    links.addEventListener("click", (e) => {
+      const t = e.target;
+      if (t && t.tagName === "A") {
+        document.body.classList.remove("nav-open");
+      }
+    });
+  })();
+
 })();
