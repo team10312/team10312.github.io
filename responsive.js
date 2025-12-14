@@ -1,130 +1,186 @@
-/* ======= Device / Layout Detection ======= */
+/*
+  ===== Device-aware mobile enhancements (desktop layout preserved) =====
+
+  - Adds `body.is-mobile` ONLY when the visitor is on a mobile device.
+  - On mobile, injects a hamburger button + dropdown menu.
+  - On desktop, removes the mobile menu and restores the original DOM.
+
+  This avoids desktop layout shifts and only changes the site for mobile visitors.
+*/
+
 (function() {
-  // Treat "mobile" as: small viewport AND touch-capable (or obvious mobile UA).
-  // This prevents narrow desktop windows from getting the mobile-only nav.
-  // NOTE: The site hides the desktop nav below 900px, so we align to that breakpoint.
-  const mq = window.matchMedia("(max-width: 899px)");
-  const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  const isTouch = (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) || ("ontouchstart" in window);
+  const MOBILE_MAX_WIDTH = 900; // matches site nav breakpoint in page CSS
+  const mq = window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH}px)`);
+  const ua = (navigator.userAgent || '').toLowerCase();
+  const uaMobile = /android|iphone|ipod|ipad|iemobile|windows phone|blackberry|opera mini|mobile/.test(ua);
 
-  function classify() {
-    const mobileLike = mq.matches && (uaMobile || isTouch);
-    document.body.classList.toggle("is-mobile", mobileLike);
-    document.body.classList.toggle("is-desktop", !mobileLike);
+  let containerNav, navLeft, navLinks, navCta;
+  let original = null;
+  let lastMobile = null;
+  let mobileListenersOn = false;
 
-    // If we leave mobile, force-close the mobile menu.
-    if (!mobileLike) {
-      document.body.classList.remove("nav-open");
+  function cacheDom() {
+    containerNav = document.querySelector('header .container.nav');
+    if (!containerNav) return;
+    navLeft = containerNav.querySelector('.nav-left');
+    navLinks = containerNav.querySelector('.nav-links');
+    navCta = containerNav.querySelector('.nav-cta');
+
+    if (!original && navLinks && navCta) {
+      original = {
+        navLinksParent: navLinks.parentNode,
+        navLinksNext: navLinks.nextSibling,
+        navCtaParent: navCta.parentNode,
+        navCtaNext: navCta.nextSibling
+      };
     }
   }
 
-  classify();
-  window.addEventListener("resize", classify);
-  mq.addEventListener?.("change", classify);
+  function isMobileDevice() {
+    // Device-aware AND view-aware:
+    // - Must look like a mobile device (UA)
+    // - AND be within the site's mobile breakpoint
+    // This prevents touch laptops / desktop resizing from entering mobile mode.
+    return uaMobile && mq.matches;
+  }
 
-  // ======= Auto-inject hamburger for existing navs =======
-  function setupNav(nav) {
-    if (!nav) return;
-    if (nav.dataset.enhanced) return;
-    nav.dataset.enhanced = "true";
+  function ensureToggle() {
+    if (!containerNav) return;
+    if (containerNav.querySelector('.nav-toggle')) return;
 
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "nav-toggle";
-    btn.setAttribute("aria-label", "Toggle navigation");
-    btn.setAttribute("aria-expanded", "false");
-    btn.innerHTML = "<span class=\"bar\"></span>";
-    nav.prepend(btn);
+    const btn = document.createElement('button');
+    btn.className = 'nav-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Toggle menu');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.innerHTML = '<span></span>';
 
-    // Ensure we have a full-screen overlay that can sit above everything.
-    let overlay = document.getElementById("nav-overlay");
-    if (!overlay) {
-      overlay = document.createElement("div");
-      overlay.id = "nav-overlay";
-      overlay.setAttribute("aria-hidden", "true");
-      document.body.appendChild(overlay);
-    }
+    // Put toggle at the far right on mobile (container is flex).
+    containerNav.appendChild(btn);
 
-    btn.addEventListener("click", () => {
-      const open = document.body.classList.toggle("nav-open");
-      btn.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-
-    // Close when tapping the overlay
-    overlay.addEventListener("click", () => {
-      if (!document.body.classList.contains("nav-open")) return;
-      document.body.classList.remove("nav-open");
-      btn.setAttribute("aria-expanded", "false");
-    });
-
-    // Close on ESC
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && document.body.classList.contains("nav-open")) {
-        document.body.classList.remove("nav-open");
-        btn.setAttribute("aria-expanded", "false");
-      }
+    btn.addEventListener('click', () => {
+      const open = document.body.classList.toggle('nav-open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
   }
 
-  // Try common selectors
-  setupNav(document.querySelector(".site-nav"));
-  setupNav(document.querySelector("header nav"));
-  setupNav(document.querySelector("nav"));
+  function ensureMobileMenu() {
+    if (!containerNav || !navLinks || !navCta || !original) return;
 
-  // Also support `.container.nav` + `.nav-links` structure used on Team10312
-  (function() {
-    const bar = document.querySelector("header .container.nav");
-    const links = bar?.querySelector(".nav-links");
-    if (!bar || !links || bar.dataset.enhanced) return;
-    bar.dataset.enhanced = "true";
+    let menu = containerNav.querySelector('#mobile-menu');
+    if (!menu) {
+      menu = document.createElement('div');
+      menu.id = 'mobile-menu';
+      menu.setAttribute('role', 'menu');
+      containerNav.appendChild(menu);
 
-    // Insert toggle button to the right side (after existing left items)
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "nav-toggle";
-    btn.setAttribute("aria-label", "Toggle menu");
-    btn.setAttribute("aria-expanded", "false");
-    btn.innerHTML = "<span class=\"bar\"></span>";
-    // Prefer placing button before .nav-links so it shows on the right
-    bar.insertBefore(btn, links);
-
-    // Ensure we have a full-screen overlay that can sit above everything.
-    let overlay = document.getElementById("nav-overlay");
-    if (!overlay) {
-      overlay = document.createElement("div");
-      overlay.id = "nav-overlay";
-      overlay.setAttribute("aria-hidden", "true");
-      document.body.appendChild(overlay);
+      // Close the menu when any link inside is clicked
+      menu.addEventListener('click', (e) => {
+        const t = e.target;
+        if (t && t.tagName === 'A') {
+          document.body.classList.remove('nav-open');
+          const btn = containerNav.querySelector('.nav-toggle');
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+      });
     }
 
-    btn.addEventListener("click", () => {
-      const open = document.body.classList.toggle("nav-open");
-      btn.setAttribute("aria-expanded", open ? "true" : "false");
-    });
+    // Move the existing nav groups into the mobile menu (mobile only)
+    if (navLinks.parentNode !== menu) menu.appendChild(navLinks);
+    if (navCta.parentNode !== menu) menu.appendChild(navCta);
 
-    // Close when tapping the overlay
-    overlay.addEventListener("click", () => {
-      if (!document.body.classList.contains("nav-open")) return;
-      document.body.classList.remove("nav-open");
-      btn.setAttribute("aria-expanded", "false");
-    });
+    // Tap outside to close (only bind once)
+    if (!mobileListenersOn) {
+      document.addEventListener('click', onOutsideClick, true);
+      document.addEventListener('keydown', onEscape);
+      mobileListenersOn = true;
+    }
+  }
 
-    // Close on ESC
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && document.body.classList.contains("nav-open")) {
-        document.body.classList.remove("nav-open");
-        btn.setAttribute("aria-expanded", "false");
+  function restoreDesktopNav() {
+    if (!original || !navLinks || !navCta) return;
+
+    const menu = document.querySelector('#mobile-menu');
+    if (menu) menu.remove();
+
+    // Restore navLinks
+    if (original.navLinksParent) {
+      if (original.navLinksNext && original.navLinksNext.parentNode === original.navLinksParent) {
+        original.navLinksParent.insertBefore(navLinks, original.navLinksNext);
+      } else {
+        original.navLinksParent.appendChild(navLinks);
       }
-    });
+    }
 
-    // Close on link click (single-page feel)
-    links.addEventListener("click", (e) => {
-      const t = e.target;
-      if (t && t.tagName === "A") {
-        document.body.classList.remove("nav-open");
-        btn.setAttribute("aria-expanded", "false");
+    // Restore navCta
+    if (original.navCtaParent) {
+      if (original.navCtaNext && original.navCtaNext.parentNode === original.navCtaParent) {
+        original.navCtaParent.insertBefore(navCta, original.navCtaNext);
+      } else {
+        original.navCtaParent.appendChild(navCta);
       }
-    });
-  })();
+    }
 
+    // Remove toggle button
+    const btn = document.querySelector('.nav-toggle');
+    if (btn) btn.remove();
+
+    // Remove mobile-only listeners
+    if (mobileListenersOn) {
+      document.removeEventListener('click', onOutsideClick, true);
+      document.removeEventListener('keydown', onEscape);
+      mobileListenersOn = false;
+    }
+
+    document.body.classList.remove('nav-open');
+  }
+
+  function onOutsideClick(e) {
+    if (!document.body.classList.contains('nav-open')) return;
+    const menu = document.querySelector('#mobile-menu');
+    const btn = document.querySelector('.nav-toggle');
+    if (!menu || !btn) return;
+    if (menu.contains(e.target) || btn.contains(e.target)) return;
+    document.body.classList.remove('nav-open');
+    btn.setAttribute('aria-expanded', 'false');
+  }
+
+  function onEscape(e) {
+    if (e.key !== 'Escape') return;
+    if (!document.body.classList.contains('nav-open')) return;
+    document.body.classList.remove('nav-open');
+    const btn = document.querySelector('.nav-toggle');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+
+  function apply() {
+    cacheDom();
+    const mobile = isMobileDevice();
+    if (mobile === lastMobile) return;
+    lastMobile = mobile;
+
+    document.body.classList.toggle('is-mobile', mobile);
+    document.body.classList.toggle('is-desktop', !mobile);
+
+    if (mobile) {
+      ensureToggle();
+      ensureMobileMenu();
+    } else {
+      restoreDesktopNav();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', apply);
+  } else {
+    apply();
+  }
+
+  // If the device rotates / resizes, re-check (won't affect desktop unless it becomes mobile)
+  window.addEventListener('resize', () => {
+    // Only re-evaluate on resize for mobile devices.
+    if (uaMobile) apply();
+  });
+
+  mq.addEventListener?.('change', () => { if (uaMobile) apply(); });
 })();

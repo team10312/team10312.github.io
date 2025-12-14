@@ -1,170 +1,100 @@
-/* ======= Global Responsive Styles for Team10312 Site ======= */
-/* Mobile-first tweaks; enhance on larger screens */
-:root {
-  --container-max: 1200px;
-}
+/*
+  ===== Mobile-only enhancements (keeps desktop layout untouched) =====
 
-* { box-sizing: border-box; }
+  This file is intentionally light.
+  Desktop styling lives inside each page's inline <style> blocks.
 
-html, body {
-  max-width: 100%;
-  overflow-x: hidden;
-}
+  JS (responsive.js) will add `body.is-mobile` only on mobile devices.
+  All overrides are scoped to `body.is-mobile` so desktop stays exactly the same.
+*/
 
-/* Fluid media */
-img, video, canvas {
-  max-width: 100%;
-  height: auto;
-}
+/* Safe media defaults (won't change layout, just prevents overflow) */
+img, video, canvas { max-width: 100%; height: auto; }
 
-/* Containers */
-.container, .wrap, .page, main {
-  width: min(100% - 2rem, var(--container-max));
-  margin-inline: auto;
-}
-
-/* Grids (common classnames in this site) */
-.grid, .cards, .sponsors-grid, .media-grid, .robot-grid {
+/* ===== Split layouts used by the site ===== */
+.split-grid{
   display: grid;
   gap: 1rem;
+  grid-template-columns: 1.1fr 1fr;
+  align-items: start;
 }
-
-.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-
-/* On small screens, stack everything into 1 column */
-@media (max-width: 768px) {
-  .grid, .grid-2, .grid-3, .grid-4,
-  .cards, .sponsors-grid, .media-grid, .robot-grid {
-    grid-template-columns: 1fr !important;
-    gap: 0.75rem;
-  }
-
-  header, .site-header, nav, .site-nav {
-    position: relative;
-  }
-
-  /* Optional: squeeze paddings for panels/sections */
-  section, .section, .panel, .glass, .card {
-    padding: clamp(0.75rem, 2vw, 1rem);
-  }
-
-  /* Headings scale down */
-  h1 { font-size: clamp(1.6rem, 6vw, 2rem); }
-  h2 { font-size: clamp(1.25rem, 4.5vw, 1.5rem); }
-  h3 { font-size: clamp(1.1rem, 4vw, 1.25rem); }
-
-  /* Tables: add horizontal scroll if needed */
-  .table-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  table { min-width: 600px; }
-}
-
-/* Medium and up refinements */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-/* Nav — mobile-only full-screen overlay menu (JS sets body.is-mobile + toggles body.nav-open) */
-.nav-toggle {
-  display: none;
-  border: 0;
-  background: transparent;
-  width: 44px;
-  height: 44px;
-  cursor: pointer;
-  position: relative;
-}
-
-/* Hamburger bars (built to avoid the "slanted" look) */
-.nav-toggle .bar,
-.nav-toggle::before,
-.nav-toggle::after {
-  content: "";
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  height: 2px;
-  background: currentColor;
-  border-radius: 999px;
-  transition: transform 200ms ease, opacity 200ms ease, top 200ms ease;
-}
-
-.nav-toggle .bar { top: 21px; }
-.nav-toggle::before { top: 14px; }
-.nav-toggle::after { top: 28px; }
-
-/* When open: turn into an X */
-body.nav-open .nav-toggle .bar { opacity: 0; }
-body.nav-open .nav-toggle::before { top: 21px; transform: rotate(45deg); }
-body.nav-open .nav-toggle::after { top: 21px; transform: rotate(-45deg); }
-
-/* Fullscreen backdrop overlay (created by JS as #nav-overlay) */
-#nav-overlay {
-  display: none;
-}
-
-body.is-mobile.nav-open #nav-overlay {
-  display: block;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.68);
-  backdrop-filter: blur(2px);
-  z-index: 9998;
-}
-
-/* Lock background scroll when the mobile menu is open */
-body.is-mobile.nav-open { overflow: hidden; }
-
-/* Utility: device classes set by JS */
-body.is-mobile .desktop-only { display: none !important; }
-body.is-desktop .mobile-only { display: none !important; }
-
-/* ===== Mobile nav for .container.nav + .nav-links ===== */
-body.is-mobile header .container.nav {
-  display: flex;
+.split-grid--hero{
+  gap: 2rem;
+  grid-template-columns: 1.2fr 1fr;
   align-items: center;
-  justify-content: space-between;
-  position: relative;
-  z-index: 10000; /* above overlay + nav panel */
+}
+body.is-mobile .split-grid,
+body.is-mobile .split-grid--hero{
+  grid-template-columns: 1fr !important;
 }
 
-body.is-mobile .nav-toggle {
+/* ===== Mobile nav (only when body.is-mobile is present) ===== */
+body.is-mobile header .container.nav{ position: relative; }
+
+body.is-mobile .nav-toggle{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--panel-border, rgba(0,0,0,.12));
+  background: transparent;
+  border-radius: 12px;
+  cursor: pointer;
 }
 
-/* Full-screen nav panel (sits above the overlay) */
-body.is-mobile header .container.nav .nav-links {
+body.is-mobile .nav-toggle span,
+body.is-mobile .nav-toggle::before,
+body.is-mobile .nav-toggle::after{
+  content: "";
+  display: block;
+  height: 2px;
+  width: 22px;
+  background: currentColor;
+  border-radius: 2px;
+}
+body.is-mobile .nav-toggle span{ margin: 0; }
+body.is-mobile .nav-toggle::before{ margin-bottom: 6px; }
+body.is-mobile .nav-toggle::after{ margin-top: 6px; }
+
+/* Dropdown container created by JS on mobile */
+body.is-mobile #mobile-menu{
   display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  padding: 96px 24px 24px;
-  background: var(--panel, rgba(0,0,0,.86));
-  backdrop-filter: saturate(120%) blur(12px);
-  border-top: 1px solid var(--panel-border, rgba(255,255,255,.08));
-  flex-direction: column;
-  align-items: center;
-  gap: 0.9rem;
-  overflow-y: auto;
-}
-
-body.is-mobile.nav-open header .container.nav .nav-links {
-  display: flex;
-}
-
-/* Make links big and tappable */
-body.is-mobile header .container.nav .nav-links a {
-  font-size: 1.15rem;
-  padding: 12px 16px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 10px);
+  padding: 0.85rem;
   border-radius: 14px;
-  width: min(520px, 100%);
-  text-align: center;
+  background: var(--bg-soft, rgba(255,255,255,.82));
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--panel-border, rgba(0,0,0,.12));
+  box-shadow: 0 16px 50px rgba(0,0,0,.18);
+  z-index: 60;
 }
+body.is-mobile.nav-open #mobile-menu{ display: block; }
+
+body.is-mobile #mobile-menu .nav-links{
+  display: flex !important;
+  flex-direction: column;
+  gap: .5rem;
+  padding: .25rem 0 .75rem;
+}
+body.is-mobile #mobile-menu .nav-links a{
+  padding: .7rem .75rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+body.is-mobile #mobile-menu .nav-links a:hover{
+  border-color: var(--panel-border, rgba(0,0,0,.12));
+}
+
+body.is-mobile #mobile-menu .nav-cta{
+  display: flex !important;
+  flex-direction: column;
+  gap: .6rem;
+}
+
+/* Slightly reduce hero spacing on mobile so it doesn't feel oversized */
+body.is-mobile .hero{ padding: 3.2rem 0 1.2rem; }
