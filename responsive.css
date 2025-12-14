@@ -29,8 +29,14 @@ body.is-mobile .split-grid--hero{
 }
 
 /* ===== Mobile nav (only when body.is-mobile is present) ===== */
-body.is-mobile header .container.nav{ position: relative; }
 
+/* Ensure the sticky header always paints above page content on mobile */
+body.is-mobile header.liquid-glass-header,
+body.is-mobile header{
+  z-index: 2147483644 !important;
+}
+
+/* Hamburger button (injected by responsive.js) */
 body.is-mobile .nav-toggle{
   display: inline-flex;
   align-items: center;
@@ -41,29 +47,51 @@ body.is-mobile .nav-toggle{
   background: transparent;
   border-radius: 12px;
   cursor: pointer;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
 }
 
+/* Draw 3 lines using pseudo-elements + span, perfectly centered */
 body.is-mobile .nav-toggle span,
 body.is-mobile .nav-toggle::before,
 body.is-mobile .nav-toggle::after{
   content: "";
-  display: block;
-  height: 2px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 22px;
+  height: 2px;
   background: currentColor;
   border-radius: 2px;
+  transform: translate(-50%, -50%);
+  transition: transform 160ms ease, opacity 160ms ease;
 }
-body.is-mobile .nav-toggle span{ margin: 0; }
-body.is-mobile .nav-toggle::before{ margin-bottom: 6px; }
-body.is-mobile .nav-toggle::after{ margin-top: 6px; }
+body.is-mobile .nav-toggle::before{ transform: translate(-50%, calc(-50% - 7px)); }
+body.is-mobile .nav-toggle::after{  transform: translate(-50%, calc(-50% + 7px)); }
 
-/* Dropdown container created by JS on mobile */
+/* Animate hamburger -> X when menu is open */
+body.is-mobile.nav-open .nav-toggle span{ opacity: 0; }
+body.is-mobile.nav-open .nav-toggle::before{ transform: translate(-50%, -50%) rotate(45deg); }
+body.is-mobile.nav-open .nav-toggle::after{  transform: translate(-50%, -50%) rotate(-45deg); }
+
+/* Backdrop (created by JS) to prevent page text from blocking clicks */
+body.is-mobile #mobile-menu-backdrop{
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  /* Keep the header/toggle clickable above the backdrop */
+  z-index: 2147483642;
+}
+body.is-mobile.nav-open #mobile-menu-backdrop{ display: block; }
+
+/* Mobile menu panel (created by JS) */
 body.is-mobile #mobile-menu{
   display: none;
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 10px);
+  position: fixed;
+  left: 4vw;
+  right: 4vw;
+  top: calc(var(--mobile-nav-top, 64px) + 10px);
   padding: 0.85rem;
   border-radius: 14px;
   background: var(--bg-soft, rgba(255,255,255,.82));
@@ -71,10 +99,15 @@ body.is-mobile #mobile-menu{
   backdrop-filter: blur(12px) saturate(160%);
   border: 1px solid var(--panel-border, rgba(0,0,0,.12));
   box-shadow: 0 16px 50px rgba(0,0,0,.18);
-  z-index: 60;
+  /* Above header and backdrop */
+  z-index: 2147483645;
+  max-height: calc(100vh - (var(--mobile-nav-top, 64px) + 24px));
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 body.is-mobile.nav-open #mobile-menu{ display: block; }
 
+/* Make the moved nav groups stack nicely */
 body.is-mobile #mobile-menu .nav-links{
   display: flex !important;
   flex-direction: column;
@@ -95,6 +128,9 @@ body.is-mobile #mobile-menu .nav-cta{
   flex-direction: column;
   gap: .6rem;
 }
+
+/* Prevent background scroll when the menu is open */
+body.is-mobile.nav-open{ overflow: hidden; }
 
 /* Slightly reduce hero spacing on mobile so it doesn't feel oversized */
 body.is-mobile .hero{ padding: 3.2rem 0 1.2rem; }
