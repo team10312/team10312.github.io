@@ -69,113 +69,102 @@ img, video, canvas {
   .grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* Mobile Nav Toggle (hamburger -> X) */
+/* Nav — mobile-only full-screen overlay menu (JS sets body.is-mobile + toggles body.nav-open) */
 .nav-toggle {
   display: none;
   border: 0;
   background: transparent;
-  width: 46px;
-  height: 46px;
-  padding: 0;
+  width: 44px;
+  height: 44px;
   cursor: pointer;
   position: relative;
 }
 
-.nav-toggle .bar {
+/* Hamburger bars (built to avoid the "slanted" look) */
+.nav-toggle .bar,
+.nav-toggle::before,
+.nav-toggle::after {
+  content: "";
   position: absolute;
-  left: 11px;
-  right: 11px;
+  left: 10px;
+  right: 10px;
   height: 2px;
-  border-radius: 2px;
   background: currentColor;
-  transform-origin: center;
-  transition: transform 180ms ease, opacity 180ms ease, top 180ms ease;
+  border-radius: 999px;
+  transition: transform 200ms ease, opacity 200ms ease, top 200ms ease;
 }
 
-.nav-toggle .bar:nth-child(1) { top: 15px; }
-.nav-toggle .bar:nth-child(2) { top: 22px; }
-.nav-toggle .bar:nth-child(3) { top: 29px; }
+.nav-toggle .bar { top: 21px; }
+.nav-toggle::before { top: 14px; }
+.nav-toggle::after { top: 28px; }
 
-/* Animate to X when open */
-.nav-toggle.open .bar:nth-child(1) { top: 22px; transform: rotate(45deg); }
-.nav-toggle.open .bar:nth-child(2) { opacity: 0; }
-.nav-toggle.open .bar:nth-child(3) { top: 22px; transform: rotate(-45deg); }
+/* When open: turn into an X */
+body.nav-open .nav-toggle .bar { opacity: 0; }
+body.nav-open .nav-toggle::before { top: 21px; transform: rotate(45deg); }
+body.nav-open .nav-toggle::after { top: 21px; transform: rotate(-45deg); }
+
+/* Fullscreen backdrop overlay (created by JS as #nav-overlay) */
+#nav-overlay {
+  display: none;
+}
+
+body.is-mobile.nav-open #nav-overlay {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.68);
+  backdrop-filter: blur(2px);
+  z-index: 9998;
+}
+
+/* Lock background scroll when the mobile menu is open */
+body.is-mobile.nav-open { overflow: hidden; }
 
 /* Utility: device classes set by JS */
 body.is-mobile .desktop-only { display: none !important; }
 body.is-desktop .mobile-only { display: none !important; }
 
 /* ===== Mobile nav for .container.nav + .nav-links ===== */
-@media (max-width: 768px) {
-  /* Lock page scroll while the menu is open */
-  body.nav-open { overflow: hidden; }
-
-  /* Keep header + toggle above the overlay so the X is always clickable */
-  header { z-index: 2147483647; }
-
-  header .container.nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: relative;
-    z-index: 2147483647;
-  }
-
-  header .container.nav .nav-links {
-    /* Full-screen overlay (fixes z-index stacking issues) */
-    display: flex;
-    position: fixed;
-    inset: 0;
-    padding: calc(56px + 1rem) 1rem 1.25rem;
-    background: rgba(0, 0, 0, 0.68);
-    -webkit-backdrop-filter: saturate(140%) blur(12px);
-    backdrop-filter: saturate(140%) blur(12px);
-    z-index: 2147483646;
-    flex-direction: column;
-    gap: 0.75rem;
-    overflow-y: auto;
-
-    /* Hidden by default */
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transition: opacity 160ms ease, visibility 0s linear 160ms;
-  }
-
-  body.nav-open header .container.nav .nav-links {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    transition: opacity 160ms ease, visibility 0s;
-  }
-
-  /* Make each link look like a tappable "glass" tile */
-  header .container.nav .nav-links a {
-    width: min(560px, 92vw);
-    margin-inline: auto;
-    padding: 1rem 1rem;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.10);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    color: #fff;
-    font-weight: 750;
-  }
-
-  header .container.nav .nav-links a.active {
-    border-color: rgba(255, 174, 66, 0.55);
-    box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.22) inset;
-    color: #fff;
-  }
-
-  /* Ensure the hamburger is visible */
-  .nav-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 46px;
-    height: 46px;
-    z-index: 2147483647;
-  }
+body.is-mobile header .container.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 10000; /* above overlay + nav panel */
 }
 
-/* Desktop nav layout is controlled by each page's existing CSS. */
+body.is-mobile .nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+/* Full-screen nav panel (sits above the overlay) */
+body.is-mobile header .container.nav .nav-links {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  padding: 96px 24px 24px;
+  background: var(--panel, rgba(0,0,0,.86));
+  backdrop-filter: saturate(120%) blur(12px);
+  border-top: 1px solid var(--panel-border, rgba(255,255,255,.08));
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  overflow-y: auto;
+}
+
+body.is-mobile.nav-open header .container.nav .nav-links {
+  display: flex;
+}
+
+/* Make links big and tappable */
+body.is-mobile header .container.nav .nav-links a {
+  font-size: 1.15rem;
+  padding: 12px 16px;
+  border-radius: 14px;
+  width: min(520px, 100%);
+  text-align: center;
+}
