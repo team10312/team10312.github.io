@@ -65,9 +65,48 @@
     .muted{ color: var(--muted); }
     .section{ padding: 2.8rem 0; }
     .h2{ font-size: clamp(1.6rem, 3.4vw, 2.2rem); margin:.3rem 0 1rem; color: var(--accent); }
-    /* Tiers: two wide cards on desktop, single column on smaller screens */
-    .grid-4{ display:grid; gap:1rem; grid-template-columns: repeat(2, 1fr); }
-    @media (max-width:900px){ .grid-4{ grid-template-columns: 1fr; } }
+    /* ===== Sponsor tiers (desktop-first) =====
+       Mobile device layout overrides are scoped to body.is-mobile (see responsive.js).
+    */
+    .tiers{ display:grid; gap:1.1rem; grid-template-columns: 1fr; }
+
+    .tier-card{
+      position: relative;
+      overflow: hidden;
+      --slot-h: 160px;
+      --slot-font: 1rem;
+      --tier-glow: rgba(255,127,0,.18);
+    }
+    .tier-card::before{
+      content:"";
+      position:absolute;
+      inset: -40% -30% auto auto;
+      width: 140%;
+      height: 140%;
+      background: radial-gradient(circle at 60% 40%, var(--tier-glow), transparent 65%);
+      pointer-events:none;
+      opacity: .9;
+    }
+    .tier-card > *{ position: relative; z-index: 1; }
+
+    /* Make higher tiers visually louder (similar tier hierarchy treatment) */
+    .tier-card h3{ margin: 0 0 .35rem; letter-spacing: .2px; }
+    .tier--platinum h3{ font-size: 1.55rem; }
+    .tier--gold h3{ font-size: 1.38rem; }
+    .tier--silver h3{ font-size: 1.22rem; }
+    .tier--bronze h3{ font-size: 1.12rem; }
+
+    /* Tier sizing hierarchy */
+    .tier--platinum{ --slot-h: 240px; --slot-font: 1.15rem; --tier-glow: rgba(255,174,66,.26); }
+    .tier--gold{     --slot-h: 200px; --slot-font: 1.08rem; --tier-glow: rgba(255,127,0,.22); }
+    .tier--silver{   --slot-h: 175px; --slot-font: 1.02rem; --tier-glow: rgba(180,190,205,.22); }
+    .tier--bronze{   --slot-h: 155px; --slot-font: 1.00rem; --tier-glow: rgba(205,140,95,.22); }
+
+    /* Mobile device: scale the slot heights down slightly */
+    body.is-mobile .tier--platinum{ --slot-h: 190px; }
+    body.is-mobile .tier--gold{ --slot-h: 165px; }
+    body.is-mobile .tier--silver{ --slot-h: 150px; }
+    body.is-mobile .tier--bronze{ --slot-h: 135px; }
 
     .card{
       background: var(--panel);
@@ -86,7 +125,7 @@
     .sponsor-card{
       width: 100%;
       min-width: 0;
-      height: 150px;
+      height: var(--slot-h);
       background: var(--panel);
       border: 1px solid var(--panel-border);
       border-radius: 12px;
@@ -115,6 +154,7 @@
       font-weight: 900;
       color: var(--muted);
       letter-spacing: .2px;
+      font-size: var(--slot-font);
     }
     .sponsor-card.open{
       border-style: dashed;
@@ -123,9 +163,9 @@
     .sponsor-card.open .open-slot{ display: block; }
     .sponsor-card.open img{ display: none !important; }
 
-    @media (max-width:520px){
-      .sponsor-card{ height: 120px; }
-    }
+    /* IMPORTANT: No viewport-based tier layout changes.
+       Mobile sizing is handled via body.is-mobile (device-aware) above.
+    */
 footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px solid var(--panel-border); }
     .foot-grid{ display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:1rem; }
     @media (max-width:900px){ .foot-grid{ grid-template-columns: 1fr 1fr; } }
@@ -227,9 +267,9 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
   <section class="section">
     <div class="container">
       <h2 class="h2">Sponsor Tiers</h2>
-      <div class="grid-4">
+      <div class="tiers">
         <!-- Platinum -->
-        <div class="card">
+        <div class="card tier-card tier--platinum">
           <h3>Platinum — $5000+</h3>
           <p class="muted">Logo on robot, banners, shirts; demo at your site; social features.</p>
           <div class="sponsor-row">
@@ -240,7 +280,7 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
         </div>
 
         <!-- Gold -->
-        <div class="card">
+        <div class="card tier-card tier--gold">
           <h3>Gold — $2500</h3>
           <p class="muted">Logo on robot &amp; pit banner; social features.</p>
           <div class="sponsor-row">
@@ -251,7 +291,7 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
         </div>
 
         <!-- Silver -->
-        <div class="card">
+        <div class="card tier-card tier--silver">
           <h3>Silver — $1000</h3>
           <p class="muted">Logo on pit banner; website recognition.</p>
           <div class="sponsor-row">
@@ -262,7 +302,7 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
         </div>
 
         <!-- Bronze -->
-        <div class="card">
+        <div class="card tier-card tier--bronze">
           <h3>Bronze — $500</h3>
           <p class="muted">Website recognition; thank-you note from the team.</p>
           <div class="sponsor-row">
