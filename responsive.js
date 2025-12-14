@@ -11,8 +11,6 @@
 (function() {
   const MOBILE_MAX_WIDTH = 900; // matches site nav breakpoint in page CSS
   const mq = window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH}px)`);
-  const coarse = window.matchMedia('(pointer: coarse)');
-
   const ua = (navigator.userAgent || '').toLowerCase();
   const uaMobile = /android|iphone|ipod|ipad|iemobile|windows phone|blackberry|opera mini|mobile/.test(ua);
 
@@ -39,9 +37,11 @@
   }
 
   function isMobileDevice() {
-    // Intentional: prefer device signal over just viewport width.
-    // - UA match OR (coarse pointer + small viewport)
-    return uaMobile || (coarse.matches && mq.matches);
+    // Device-aware AND view-aware:
+    // - Must look like a mobile device (UA)
+    // - AND be within the site's mobile breakpoint
+    // This prevents touch laptops / desktop resizing from entering mobile mode.
+    return uaMobile && mq.matches;
   }
 
   function ensureToggle() {
@@ -178,11 +178,9 @@
 
   // If the device rotates / resizes, re-check (won't affect desktop unless it becomes mobile)
   window.addEventListener('resize', () => {
-    // Only re-evaluate on resize if we're on a coarse pointer or UA indicates mobile.
-    // This avoids desktop users accidentally entering mobile mode just by resizing a window.
-    if (uaMobile || coarse.matches) apply();
+    // Only re-evaluate on resize for mobile devices.
+    if (uaMobile) apply();
   });
 
-  coarse.addEventListener?.('change', apply);
-  mq.addEventListener?.('change', () => { if (uaMobile || coarse.matches) apply(); });
+  mq.addEventListener?.('change', () => { if (uaMobile) apply(); });
 })();

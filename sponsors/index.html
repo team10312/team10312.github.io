@@ -101,18 +101,19 @@
     .tier--bronze h3{ font-size: 1.12rem; }
 
     /* Tier sizing hierarchy (Platinum largest -> Bronze smallest)
-       Make differences obvious by changing BOTH height and max width.
+       NOTE: You asked that the *whole tier section* gets smaller, not just the boxes.
+       So we shrink the card itself (tier-max), and also slightly shrink the slot height.
     */
-    .tier--platinum{ --slot-h: 320px; --slot-font: 1.22rem; --row-max: 980px; --tier-pad: 1.45rem; --tier-glow: rgba(255,174,66,.30); }
-    .tier--gold{     --slot-h: 250px; --slot-font: 1.12rem; --row-max: 860px; --tier-pad: 1.30rem; --tier-glow: rgba(255,127,0,.24); }
-    .tier--silver{   --slot-h: 205px; --slot-font: 1.06rem; --row-max: 740px; --tier-pad: 1.10rem; --tier-glow: rgba(180,190,205,.22); }
-    .tier--bronze{   --slot-h: 175px; --slot-font: 1.00rem; --row-max: 650px; --tier-pad: 1.00rem; --tier-glow: rgba(205,140,95,.20); }
+    .tier--platinum{ --tier-max: 860px; --row-max: 800px; --slot-h: 165px; --slot-font: 1.02rem; --tier-pad: 1.05rem; --tier-glow: rgba(255,174,66,.24); }
+    .tier--gold{     --tier-max: 760px; --row-max: 700px; --slot-h: 140px; --slot-font: .98rem;  --tier-pad: .98rem;  --tier-glow: rgba(255,127,0,.20); }
+    .tier--silver{   --tier-max: 680px; --row-max: 620px; --slot-h: 118px; --slot-font: .94rem;  --tier-pad: .92rem;  --tier-glow: rgba(180,190,205,.18); }
+    .tier--bronze{   --tier-max: 600px; --row-max: 540px; --slot-h: 100px; --slot-font: .90rem;  --tier-pad: .86rem;  --tier-glow: rgba(205,140,95,.16); }
 
-    /* Mobile device: scale the slot heights down slightly */
-    body.is-mobile .tier--platinum{ --slot-h: 235px; --row-max: 100%; }
-    body.is-mobile .tier--gold{ --slot-h: 200px; --row-max: 100%; }
-    body.is-mobile .tier--silver{ --slot-h: 175px; --row-max: 100%; }
-    body.is-mobile .tier--bronze{ --slot-h: 155px; --row-max: 100%; }
+    /* Mobile device: tiers go full width, and heights shrink a bit */
+    body.is-mobile .tier--platinum{ --tier-max: 100%; --row-max: 100%; --slot-h: 145px; }
+    body.is-mobile .tier--gold{     --tier-max: 100%; --row-max: 100%; --slot-h: 125px; }
+    body.is-mobile .tier--silver{   --tier-max: 100%; --row-max: 100%; --slot-h: 110px; }
+    body.is-mobile .tier--bronze{   --tier-max: 100%; --row-max: 100%; --slot-h: 95px; }
 
     .card{
       background: var(--panel);
@@ -133,6 +134,13 @@
       grid-template-columns: 1fr;
       gap:.75rem;
     }
+
+    /* Shrink the tier *card* itself (not just the inner row) */
+    .tier-card{
+      width: min(100%, var(--tier-max, 900px));
+      margin-left: auto;
+      margin-right: auto;
+    }
     .sponsor-card{
       width: 100%;
       min-width: 0;
@@ -141,7 +149,7 @@
       border: 1px solid var(--panel-border);
       border-radius: 12px;
       box-shadow: var(--shadow);
-      padding: .65rem;
+      padding: .45rem;
       display: flex;
       align-items: center;
       justify-content: center;
