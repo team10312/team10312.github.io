@@ -65,10 +65,9 @@
     .muted{ color: var(--muted); }
     .section{ padding: 2.8rem 0; }
     .h2{ font-size: clamp(1.6rem, 3.4vw, 2.2rem); margin:.3rem 0 1rem; color: var(--accent); }
-    .grid-4{ display:grid; gap:1rem; grid-template-columns: repeat(4, 1fr); }
-    @media (max-width:1100px){ .grid-4{ grid-template-columns: 1fr 1fr 1fr; } }
-    @media (max-width:740px){ .grid-4{ grid-template-columns: 1fr 1fr; } }
-    @media (max-width:520px){ .grid-4{ grid-template-columns: 1fr; } }
+    /* Tiers: two wide cards on desktop, single column on smaller screens */
+    .grid-4{ display:grid; gap:1rem; grid-template-columns: repeat(2, 1fr); }
+    @media (max-width:900px){ .grid-4{ grid-template-columns: 1fr; } }
 
     .card{
       background: var(--panel);
@@ -77,41 +76,57 @@
       box-shadow: var(--shadow);
       padding:1.1rem;
     }
-
-    /* Sponsor rows (3 containers per tier) */
+    /* Sponsor slots: 3 large tiles stacked per tier (all equal size) */
     .sponsor-row{
-      display:flex;
-      flex-wrap:wrap;
-      gap:.6rem;
-      margin-top:.8rem;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:.75rem;
+      margin-top:.9rem;
     }
     .sponsor-card{
-      flex: 1 1 calc(33.333% - .6rem);
-      min-width: 120px;
-      height: 90px;                 /* reverted sizing */
-      background: var(--panel);     /* reverted color */
+      width: 100%;
+      min-width: 0;
+      height: 150px;
+      background: var(--panel);
       border: 1px solid var(--panel-border);
-      border-radius: 10px;
+      border-radius: 12px;
       box-shadow: var(--shadow);
-      padding: 0;                   /* match original placeholder */
+      padding: .65rem;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      position: relative;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .sponsor-card:hover{
+      transform: translateY(-1px);
+      box-shadow: 0 14px 40px rgba(255,127,0,.22);
     }
     .sponsor-card img{
       max-height: 100%;
       max-width: 100%;
       object-fit: contain;
     }
-    @media(max-width:600px){
-      .sponsor-card{ flex:1 1 calc(50% - .6rem); }
+    .sponsor-card .open-slot{
+      display: none;
+      padding: 0 .9rem;
+      text-align: center;
+      font-weight: 900;
+      color: var(--muted);
+      letter-spacing: .2px;
     }
-    @media(max-width:400px){
-      .sponsor-card{ flex:1 1 100%; }
+    .sponsor-card.open{
+      border-style: dashed;
+      box-shadow: none;
     }
+    .sponsor-card.open .open-slot{ display: block; }
+    .sponsor-card.open img{ display: none !important; }
 
-    footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px solid var(--panel-border); }
+    @media (max-width:520px){
+      .sponsor-card{ height: 120px; }
+    }
+footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px solid var(--panel-border); }
     .foot-grid{ display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:1rem; }
     @media (max-width:900px){ .foot-grid{ grid-template-columns: 1fr 1fr; } }
     @media (max-width:600px){ .foot-grid{ grid-template-columns: 1fr; } }
@@ -218,9 +233,9 @@
           <h3>Platinum — $5000+</h3>
           <p class="muted">Logo on robot, banners, shirts; demo at your site; social features.</p>
           <div class="sponsor-row">
-            <div class="sponsor-card"><img src="platinum1.png" alt="Platinum Sponsor 1"></div>
-            <div class="sponsor-card"><img src="platinum2.png" alt="Platinum Sponsor 2"></div>
-            <div class="sponsor-card"><img src="platinum3.png" alt="Platinum Sponsor 3"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="platinum1.png" alt="Platinum Sponsor 1"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="platinum2.png" alt="Platinum Sponsor 2"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="platinum3.png" alt="Platinum Sponsor 3"></div>
           </div>
         </div>
 
@@ -229,9 +244,9 @@
           <h3>Gold — $2500</h3>
           <p class="muted">Logo on robot &amp; pit banner; social features.</p>
           <div class="sponsor-row">
-            <div class="sponsor-card"><img src="gold1.png" alt="Gold Sponsor 1"></div>
-            <div class="sponsor-card"><img src="gold2.png" alt="Gold Sponsor 2"></div>
-            <div class="sponsor-card"><img src="gold3.png" alt="Gold Sponsor 3"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="gold1.png" alt="Gold Sponsor 1"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="gold2.png" alt="Gold Sponsor 2"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="gold3.png" alt="Gold Sponsor 3"></div>
           </div>
         </div>
 
@@ -240,9 +255,9 @@
           <h3>Silver — $1000</h3>
           <p class="muted">Logo on pit banner; website recognition.</p>
           <div class="sponsor-row">
-            <div class="sponsor-card"><img src="silver1.png" alt="Silver Sponsor 1"></div>
-            <div class="sponsor-card"><img src="silver2.png" alt="Silver Sponsor 2"></div>
-            <div class="sponsor-card"><img src="silver3.png" alt="Silver Sponsor 3"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="silver1.png" alt="Silver Sponsor 1"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="silver2.png" alt="Silver Sponsor 2"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="silver3.png" alt="Silver Sponsor 3"></div>
           </div>
         </div>
 
@@ -251,9 +266,9 @@
           <h3>Bronze — $500</h3>
           <p class="muted">Website recognition; thank-you note from the team.</p>
           <div class="sponsor-row">
-            <div class="sponsor-card"><img src="bronze1.png" alt="Bronze Sponsor 1"></div>
-            <div class="sponsor-card"><img src="bronze2.png" alt="Bronze Sponsor 2"></div>
-            <div class="sponsor-card"><img src="bronze3.png" alt="Bronze Sponsor 3"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="bronze1.png" alt="Bronze Sponsor 1"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="bronze2.png" alt="Bronze Sponsor 2"></div>
+            <div class="sponsor-card"><span class="open-slot">Open for Sponsors</span><img src="bronze3.png" alt="Bronze Sponsor 3"></div>
           </div>
         </div>
       </div>
@@ -358,6 +373,25 @@
 
     wireLinks();
     setActive();
+
+    // Sponsor placeholders: if an image doesn't exist, show "Open for Sponsors"
+    function setupSponsorOpenSlots(){
+      document.querySelectorAll('.sponsor-card img').forEach(img => {
+        const card = img.closest('.sponsor-card');
+        if (!card) return;
+
+        img.addEventListener('error', () => {
+          card.classList.add('open');
+        });
+        img.addEventListener('load', () => {
+          card.classList.remove('open');
+        });
+
+        const src = (img.getAttribute('src') || '').trim();
+        if (!src) card.classList.add('open');
+      });
+    }
+    setupSponsorOpenSlots();
   </script>
 
   <!-- Liquid Glass Header & Lightbox JS (injected) -->

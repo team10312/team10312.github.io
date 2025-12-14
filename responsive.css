@@ -151,3 +151,22 @@ body.is-desktop .mobile-only { display: none !important; }
     gap: 0.75rem;
   }
 }
+
+
+/* ===== Split (two-column) layout helpers =====
+   Used on pages that previously used inline grid-template-columns.
+*/
+.split-grid{
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1.1fr 1fr;
+  align-items: start;
+}
+.split-grid--hero{
+  gap: 2rem;
+  grid-template-columns: 1.2fr 1fr;
+  align-items: center;
+}
+@media (max-width: 768px){
+  .split-grid{ grid-template-columns: 1fr !important; }
+}
