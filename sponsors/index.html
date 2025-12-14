@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1" name="viewport"/>
-<title>Sponsors — Byte Force Robotics · Team 10312</title>
-<meta content="Sponsors — Byte Force Robotics · Team 10312" name="description"/>
-<style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sponsors — Byte Force Robotics · Team 10312</title>
+  <meta name="description" content="Sponsors — Byte Force Robotics · Team 10312" />
+  <style>
     /* ===== COLOR SYSTEM & THEME ===== */
     :root {
       --bg:#ffffff; --bg-soft:rgba(255,255,255,.55); --panel:rgba(255,255,255,.28); --panel-border:rgba(0,0,0,.08);
@@ -66,55 +65,10 @@
     .muted{ color: var(--muted); }
     .section{ padding: 2.8rem 0; }
     .h2{ font-size: clamp(1.6rem, 3.4vw, 2.2rem); margin:.3rem 0 1rem; color: var(--accent); }
-    /* ===== Sponsor tiers (desktop-first) =====
-       Mobile device layout overrides are scoped to body.is-mobile (see responsive.js).
-    */
-    .tiers{ display:grid; gap:1.1rem; grid-template-columns: 1fr; }
-
-    .tier-card{
-      position: relative;
-      overflow: hidden;
-      /* Tier-controlled sizing (descending tiers get smaller) */
-      --slot-h: 190px;
-      --slot-font: 1rem;
-      --row-max: 900px;
-      --tier-pad: 1.15rem;
-      --tier-glow: rgba(255,127,0,.18);
-      padding: var(--tier-pad);
-    }
-    .tier-card::before{
-      content:"";
-      position:absolute;
-      inset: -40% -30% auto auto;
-      width: 140%;
-      height: 140%;
-      background: radial-gradient(circle at 60% 40%, var(--tier-glow), transparent 65%);
-      pointer-events:none;
-      opacity: .9;
-    }
-    .tier-card > *{ position: relative; z-index: 1; }
-
-    /* Make higher tiers visually louder (similar tier hierarchy treatment) */
-    .tier-card h3{ margin: 0 0 .35rem; letter-spacing: .2px; }
-    .tier--platinum h3{ font-size: 1.55rem; }
-    .tier--gold h3{ font-size: 1.38rem; }
-    .tier--silver h3{ font-size: 1.22rem; }
-    .tier--bronze h3{ font-size: 1.12rem; }
-
-    /* Tier sizing hierarchy (Platinum largest -> Bronze smallest)
-       NOTE: You asked that the *whole tier section* gets smaller, not just the boxes.
-       So we shrink the card itself (tier-max), and also slightly shrink the slot height.
-    */
-    .tier--platinum{ --row-max: 900px; --slot-h: 150px; --slot-font: 1.0rem;  --tier-pad: 1.0rem;  --tier-glow: rgba(255,174,66,.24); }
-    .tier--gold{     --row-max: 820px; --slot-h: 125px; --slot-font: .96rem; --tier-pad: .94rem; --tier-glow: rgba(255,127,0,.20); }
-    .tier--silver{   --row-max: 740px; --slot-h: 105px; --slot-font: .92rem; --tier-pad: .90rem; --tier-glow: rgba(180,190,205,.18); }
-    .tier--bronze{   --row-max: 660px; --slot-h: 90px;  --slot-font: .90rem; --tier-pad: .86rem; --tier-glow: rgba(205,140,95,.16); }
-
-    /* Mobile device: tiers go full width, and heights shrink a bit */
-    body.is-mobile .tier--platinum{ --row-max: 100%; --slot-h: 135px; }
-    body.is-mobile .tier--gold{     --row-max: 100%; --slot-h: 115px; }
-    body.is-mobile .tier--silver{   --row-max: 100%; --slot-h: 102px; }
-    body.is-mobile .tier--bronze{   --row-max: 100%; --slot-h: 90px;  }
+    .grid-4{ display:grid; gap:1rem; grid-template-columns: repeat(4, 1fr); }
+    @media (max-width:1100px){ .grid-4{ grid-template-columns: 1fr 1fr 1fr; } }
+    @media (max-width:740px){ .grid-4{ grid-template-columns: 1fr 1fr; } }
+    @media (max-width:520px){ .grid-4{ grid-template-columns: 1fr; } }
 
     .card{
       background: var(--panel);
@@ -123,115 +77,41 @@
       box-shadow: var(--shadow);
       padding:1.1rem;
     }
-    /* Ensure tier padding overrides the base card padding */
-    .card.tier-card{ padding: var(--tier-pad); }
-    /* Sponsor slots: 3 tiles stacked per tier.
-       Row width shrinks by tier (matches Trinity Force-style tier scaling).
-    */
+
+    /* Sponsor rows (3 containers per tier) */
     .sponsor-row{
-      width: 100%;
-      margin: .9rem 0 0;
-      display: grid;
-      gap: .75rem;
-    }
-
-    /* Platinum stays stacked (3 slots on top of each other) */
-    .tier--platinum .sponsor-row{ grid-template-columns: 1fr; }
-
-    /* Other tiers can be reordered/resized within their section */
-    .tier--gold .sponsor-row{
-      grid-template-columns: repeat(2, 1fr);
-      grid-template-areas:
-        "g1 g1"
-        "g2 g3";
-    }
-    .tier--gold .sponsor-card.slot-1{ grid-area: g1; height: calc(var(--slot-h) * 1.08); }
-    .tier--gold .sponsor-card.slot-2{ grid-area: g2; }
-    .tier--gold .sponsor-card.slot-3{ grid-area: g3; }
-
-    .tier--silver .sponsor-row{
-      grid-template-columns: repeat(2, 1fr);
-      grid-template-areas:
-        "s1 s2"
-        "s3 s3";
-    }
-    .tier--silver .sponsor-card.slot-1{ grid-area: s1; }
-    .tier--silver .sponsor-card.slot-2{ grid-area: s2; }
-    .tier--silver .sponsor-card.slot-3{ grid-area: s3; }
-
-    .tier--bronze .sponsor-row{
-      grid-template-columns: repeat(2, 1fr);
-      grid-template-areas:
-        "b1 b2"
-        "b3 b3";
-    }
-    .tier--bronze .sponsor-card.slot-1{ grid-area: b1; }
-    .tier--bronze .sponsor-card.slot-2{ grid-area: b2; }
-    .tier--bronze .sponsor-card.slot-3{ grid-area: b3; }
-
-    /* Mobile devices: stack all tiers cleanly */
-    body.is-mobile .tier--gold .sponsor-row,
-    body.is-mobile .tier--silver .sponsor-row,
-    body.is-mobile .tier--bronze .sponsor-row{
-      grid-template-columns: 1fr;
-      grid-template-areas: none;
-    }
-    body.is-mobile .tier--gold .sponsor-card.slot-1{ height: var(--slot-h); }
-
-
-    /* Tier cards stay full width (match site-wide section width);
-       hierarchy is expressed through inner content sizing.
-    */
-    .tier-card{
-      width: 100%;
-      margin-left: 0;
-      margin-right: 0;
+      display:flex;
+      flex-wrap:wrap;
+      gap:.6rem;
+      margin-top:.8rem;
     }
     .sponsor-card{
-      width: 100%;
-      min-width: 0;
-      height: var(--slot-h);
-      background: var(--panel);
+      flex: 1 1 calc(33.333% - .6rem);
+      min-width: 120px;
+      height: 90px;                 /* reverted sizing */
+      background: var(--panel);     /* reverted color */
       border: 1px solid var(--panel-border);
-      border-radius: 12px;
+      border-radius: 10px;
       box-shadow: var(--shadow);
-      padding: .35rem;
+      padding: 0;                   /* match original placeholder */
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      position: relative;
-      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
-    }
-    .sponsor-card:hover{
-      transform: translateY(-1px);
-      box-shadow: 0 14px 40px rgba(255,127,0,.22);
     }
     .sponsor-card img{
       max-height: 100%;
       max-width: 100%;
       object-fit: contain;
     }
-    .sponsor-card .open-slot{
-      display: none;
-      padding: 0 .9rem;
-      text-align: center;
-      font-weight: 900;
-      color: var(--muted);
-      letter-spacing: .2px;
-      font-size: var(--slot-font);
+    @media(max-width:600px){
+      .sponsor-card{ flex:1 1 calc(50% - .6rem); }
     }
-    .sponsor-card.open{
-      border-style: dashed;
-      box-shadow: none;
+    @media(max-width:400px){
+      .sponsor-card{ flex:1 1 100%; }
     }
-    .sponsor-card.open .open-slot{ display: block; }
-    .sponsor-card.open img{ display: none !important; }
 
-    /* IMPORTANT: No viewport-based tier layout changes.
-       Mobile sizing is handled via body.is-mobile (device-aware) above.
-    */
-footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px solid var(--panel-border); }
+    footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px solid var(--panel-border); }
     .foot-grid{ display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:1rem; }
     @media (max-width:900px){ .foot-grid{ grid-template-columns: 1fr 1fr; } }
     @media (max-width:600px){ .foot-grid{ grid-template-columns: 1fr; } }
@@ -241,8 +121,9 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
     @media (max-width:640px){.gallery{grid-template-columns:repeat(2,1fr)}}
     .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; }
   </style>
-<!-- Liquid Glass Header & Lightbox CSS (injected) -->
-<style>
+
+  <!-- Liquid Glass Header & Lightbox CSS (injected) -->
+  <style>
     .liquid-glass-header{
       position: sticky;
       top: 0;
@@ -296,123 +177,132 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
       cursor: pointer;
     }
   </style>
-<link href="../responsive.css" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="../responsive.css" />
 </head>
 <body>
-<div aria-hidden="true" class="liquid-bg"></div>
-<header>
-<div class="container nav">
-<div class="nav-left">
-<a class="logo" data-link="home" href="/"><img alt="Team 10312 Logo" src="blacklogo.png"/><span></span></a>
-<nav class="nav-links">
-<a data-link="about" href="/about/">About</a>
-<a data-link="team" href="/team/">Team</a>
-<a data-link="robots" href="/robots/">Robots</a>
-<a data-link="sponsors" href="/sponsors/">Sponsors</a>
-<a data-link="media" href="/media/">Media</a>
-<a data-link="contact" href="/contact/">Contact</a>
-</nav>
-</div>
-<div class="nav-cta">
-<button aria-label="Toggle theme" class="toggle-theme" id="themeToggle">Dark</button>
-<a class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor" id="link-get-involved">Get Involved</a>
-</div>
-</div>
-</header>
-<section class="hero">
-<div class="container">
-<h1 class="headline">Sponsors</h1>
-<p class="muted">We’re grateful for the organizations and families who make our season possible.</p>
-</div>
-</section>
-<section class="section">
-<div class="container">
-<h2 class="h2">Sponsor Tiers</h2>
-<div class="tiers">
-<!-- Platinum -->
-<div class="card tier-card tier--platinum">
-<h3>Platinum — $5000+</h3>
-<p class="muted">Logo on robot, banners, shirts; demo at your site; social features.</p>
-<div class="sponsor-row">
-<div class="sponsor-card slot-1"><span class="open-slot">Open for Sponsors</span><img alt="Platinum Sponsor 1" src="platinum1.png"/></div>
-<div class="sponsor-card slot-2"><span class="open-slot">Open for Sponsors</span><img alt="Platinum Sponsor 2" src="platinum2.png"/></div>
-<div class="sponsor-card slot-3"><span class="open-slot">Open for Sponsors</span><img alt="Platinum Sponsor 3" src="platinum3.png"/></div>
-</div>
-</div>
-<!-- Gold -->
-<div class="card tier-card tier--gold">
-<h3>Gold — $2500</h3>
-<p class="muted">Logo on robot &amp; pit banner; social features.</p>
-<div class="sponsor-row">
-<div class="sponsor-card slot-1"><span class="open-slot">Open for Sponsors</span><img alt="Gold Sponsor 1" src="gold1.png"/></div>
-<div class="sponsor-card slot-2"><span class="open-slot">Open for Sponsors</span><img alt="Gold Sponsor 2" src="gold2.png"/></div>
-<div class="sponsor-card slot-3"><span class="open-slot">Open for Sponsors</span><img alt="Gold Sponsor 3" src="gold3.png"/></div>
-</div>
-</div>
-<!-- Silver -->
-<div class="card tier-card tier--silver">
-<h3>Silver — $1000</h3>
-<p class="muted">Logo on pit banner; website recognition.</p>
-<div class="sponsor-row">
-<div class="sponsor-card slot-1"><span class="open-slot">Open for Sponsors</span><img alt="Silver Sponsor 1" src="silver1.png"/></div>
-<div class="sponsor-card slot-2"><span class="open-slot">Open for Sponsors</span><img alt="Silver Sponsor 2" src="silver2.png"/></div>
-<div class="sponsor-card slot-3"><span class="open-slot">Open for Sponsors</span><img alt="Silver Sponsor 3" src="silver3.png"/></div>
-</div>
-</div>
-<!-- Bronze -->
-<div class="card tier-card tier--bronze">
-<h3>Bronze — $500</h3>
-<p class="muted">Website recognition; thank-you note from the team.</p>
-<div class="sponsor-row">
-<div class="sponsor-card slot-1"><span class="open-slot">Open for Sponsors</span><img alt="Bronze Sponsor 1" src="bronze1.png"/></div>
-<div class="sponsor-card slot-2"><span class="open-slot">Open for Sponsors</span><img alt="Bronze Sponsor 2" src="bronze2.png"/></div>
-<div class="sponsor-card slot-3"><span class="open-slot">Open for Sponsors</span><img alt="Bronze Sponsor 3" src="bronze3.png"/></div>
-</div>
-</div>
-</div>
-</div>
-</section>
-<section class="section" id="become-a-sponsor">
-<div class="container">
-<h2 class="h2">Become a Sponsor</h2>
-<div class="card" style="display:grid;gap:.8rem">
-<p class="muted">Download our sponsorship packet or reach out for a customized partnership.</p>
-<div style="display:flex;gap:.6rem;flex-wrap:wrap">
-<a class="btn glass-button" href="#">Sponsorship Packet (PDF)</a>
-<a class="btn secondary" data-link="contact" href="/contact/">Contact Us</a>
-</div>
-</div>
-</div>
-</section>
-<footer>
-<div class="container foot-grid">
-<div>
-<div class="logo"><img alt="Team 10312 Logo" src="blacklogo.png" style="height:28px"/><strong>Byte Force</strong></div>
-<p class="muted" style="margin-top:.6rem;max-width:46ch">Orange • White • Black.</p>
-</div>
-<div>
-<h4>Explore</h4>
-<a class="muted" data-link="team" href="/team/">Team</a><br/>
-<a class="muted" data-link="robots" href="/robots/">Robots</a><br/>
-<a class="muted" data-link="media" href="/media/">Media</a>
-</div>
-<div>
-<h4>Support</h4>
-<a class="muted" data-link="sponsors" href="/sponsors/">Sponsors</a><br/>
-<a class="muted" data-link="contact" href="/contact/">Contact</a>
-</div>
-<div>
-<h4>Follow</h4>
-<a class="muted" href="#">YouTube</a><br/>
-<a class="muted" href="#">Instagram</a>
-</div>
-</div>
-<div class="container" style="margin-top:1.4rem;display:flex;justify-content:space-between;gap:.8rem;flex-wrap:wrap">
-<span class="muted">© <span id="year"></span> Byte Force Robotics — Team 10312</span>
-<div style="display:flex;gap:1rem"><a class="muted" href="#">Privacy</a><a class="muted" href="#">Terms</a></div>
-</div>
-</footer>
-<script>
+  <div class="liquid-bg" aria-hidden="true"></div>
+  <header>
+    <div class="container nav">
+      <div class="nav-left">
+        <a class="logo" data-link="home" href="/"><img src="blacklogo.png" alt="Team 10312 Logo"><span></span></a>
+        <nav class="nav-links">
+          <a data-link="about" href="/about/">About</a>
+          <a data-link="team" href="/team/">Team</a>
+          <a data-link="robots" href="/robots/">Robots</a>
+          <a data-link="sponsors" href="/sponsors/">Sponsors</a>
+          <a data-link="media" href="/media/">Media</a>
+          <a data-link="contact" href="/contact/">Contact</a>
+        </nav>
+      </div>
+      <div class="nav-cta">
+        <button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button>
+        <a id="link-get-involved" class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor">Get Involved</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <h1 class="headline">Sponsors</h1>
+      <p class="muted">We’re grateful for the organizations and families who make our season possible.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="h2">Sponsor Tiers</h2>
+      <div class="grid-4">
+        <!-- Platinum -->
+        <div class="card">
+          <h3>Platinum — $5000+</h3>
+          <p class="muted">Logo on robot, banners, shirts; demo at your site; social features.</p>
+          <div class="sponsor-row">
+            <div class="sponsor-card"><img src="platinum1.png" alt="Platinum Sponsor 1"></div>
+            <div class="sponsor-card"><img src="platinum2.png" alt="Platinum Sponsor 2"></div>
+            <div class="sponsor-card"><img src="platinum3.png" alt="Platinum Sponsor 3"></div>
+          </div>
+        </div>
+
+        <!-- Gold -->
+        <div class="card">
+          <h3>Gold — $2500</h3>
+          <p class="muted">Logo on robot &amp; pit banner; social features.</p>
+          <div class="sponsor-row">
+            <div class="sponsor-card"><img src="gold1.png" alt="Gold Sponsor 1"></div>
+            <div class="sponsor-card"><img src="gold2.png" alt="Gold Sponsor 2"></div>
+            <div class="sponsor-card"><img src="gold3.png" alt="Gold Sponsor 3"></div>
+          </div>
+        </div>
+
+        <!-- Silver -->
+        <div class="card">
+          <h3>Silver — $1000</h3>
+          <p class="muted">Logo on pit banner; website recognition.</p>
+          <div class="sponsor-row">
+            <div class="sponsor-card"><img src="silver1.png" alt="Silver Sponsor 1"></div>
+            <div class="sponsor-card"><img src="silver2.png" alt="Silver Sponsor 2"></div>
+            <div class="sponsor-card"><img src="silver3.png" alt="Silver Sponsor 3"></div>
+          </div>
+        </div>
+
+        <!-- Bronze -->
+        <div class="card">
+          <h3>Bronze — $500</h3>
+          <p class="muted">Website recognition; thank-you note from the team.</p>
+          <div class="sponsor-row">
+            <div class="sponsor-card"><img src="bronze1.png" alt="Bronze Sponsor 1"></div>
+            <div class="sponsor-card"><img src="bronze2.png" alt="Bronze Sponsor 2"></div>
+            <div class="sponsor-card"><img src="bronze3.png" alt="Bronze Sponsor 3"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="become-a-sponsor" class="section">
+    <div class="container">
+      <h2 class="h2">Become a Sponsor</h2>
+      <div class="card" style="display:grid;gap:.8rem">
+        <p class="muted">Download our sponsorship packet or reach out for a customized partnership.</p>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+          <a class="btn glass-button" href="#">Sponsorship Packet (PDF)</a>
+          <a class="btn secondary" data-link="contact" href="/contact/">Contact Us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container foot-grid">
+      <div>
+        <div class="logo"><img src="blacklogo.png" alt="Team 10312 Logo" style="height:28px"><strong>Byte Force</strong></div>
+        <p class="muted" style="margin-top:.6rem;max-width:46ch">Orange • White • Black.</p>
+      </div>
+      <div>
+        <h4>Explore</h4>
+        <a class="muted" data-link="team" href="/team/">Team</a><br>
+        <a class="muted" data-link="robots" href="/robots/">Robots</a><br>
+        <a class="muted" data-link="media" href="/media/">Media</a>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <a class="muted" data-link="sponsors" href="/sponsors/">Sponsors</a><br>
+        <a class="muted" data-link="contact" href="/contact/">Contact</a>
+      </div>
+      <div>
+        <h4>Follow</h4>
+        <a class="muted" href="#">YouTube</a><br>
+        <a class="muted" href="#">Instagram</a>
+      </div>
+    </div>
+    <div class="container" style="margin-top:1.4rem;display:flex;justify-content:space-between;gap:.8rem;flex-wrap:wrap">
+      <span class="muted">© <span id="year"></span> Byte Force Robotics — Team 10312</span>
+      <div style="display:flex;gap:1rem"><a class="muted" href="#">Privacy</a><a class="muted" href="#">Terms</a></div>
+    </div>
+  </footer>
+
+  <script>
     // ----- CONFIG -----
     const LINKS = {
       home: '/', about: '/about/', team: '/team/', robots: '/robots/',
@@ -468,28 +358,10 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
 
     wireLinks();
     setActive();
-
-    // Sponsor placeholders: if an image doesn't exist, show "Open for Sponsors"
-    function setupSponsorOpenSlots(){
-      document.querySelectorAll('.sponsor-card img').forEach(img => {
-        const card = img.closest('.sponsor-card');
-        if (!card) return;
-
-        img.addEventListener('error', () => {
-          card.classList.add('open');
-        });
-        img.addEventListener('load', () => {
-          card.classList.remove('open');
-        });
-
-        const src = (img.getAttribute('src') || '').trim();
-        if (!src) card.classList.add('open');
-      });
-    }
-    setupSponsorOpenSlots();
   </script>
-<!-- Liquid Glass Header & Lightbox JS (injected) -->
-<script>
+
+  <!-- Liquid Glass Header & Lightbox JS (injected) -->
+  <script>
     (function(){
       function enhanceHeader(){
         var candidates = document.querySelectorAll('header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]');
@@ -566,8 +438,9 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
       }
     })();
   </script>
-<!-- Logo swap script injected -->
-<script>
+
+  <!-- Logo swap script injected -->
+  <script>
     (function() {
       function forEachLogo(fn){
         var imgs = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
@@ -602,21 +475,7 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
       } catch (e) {}
     })();
   </script>
-<!-- Sponsor slot helper: if an image is missing, show "Open for Sponsors" automatically -->
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-      document.querySelectorAll('.sponsor-card').forEach((card) => {
-        const img = card.querySelector('img');
-        if (!img || !img.getAttribute('src')) {
-          card.classList.add('open');
-          return;
-        }
-        img.addEventListener('error', () => {
-          card.classList.add('open');
-        }, { once: true });
-      });
-    });
-  </script>
-<script defer="" src="../responsive.js"></script>
+
+  <script src="../responsive.js" defer></script>
 </body>
 </html>
