@@ -73,9 +73,13 @@
     .tier-card{
       position: relative;
       overflow: hidden;
-      --slot-h: 160px;
+      /* Tier-controlled sizing (descending tiers get smaller) */
+      --slot-h: 190px;
       --slot-font: 1rem;
+      --row-max: 900px;
+      --tier-pad: 1.15rem;
       --tier-glow: rgba(255,127,0,.18);
+      padding: var(--tier-pad);
     }
     .tier-card::before{
       content:"";
@@ -96,17 +100,19 @@
     .tier--silver h3{ font-size: 1.22rem; }
     .tier--bronze h3{ font-size: 1.12rem; }
 
-    /* Tier sizing hierarchy */
-    .tier--platinum{ --slot-h: 240px; --slot-font: 1.15rem; --tier-glow: rgba(255,174,66,.26); }
-    .tier--gold{     --slot-h: 200px; --slot-font: 1.08rem; --tier-glow: rgba(255,127,0,.22); }
-    .tier--silver{   --slot-h: 175px; --slot-font: 1.02rem; --tier-glow: rgba(180,190,205,.22); }
-    .tier--bronze{   --slot-h: 155px; --slot-font: 1.00rem; --tier-glow: rgba(205,140,95,.22); }
+    /* Tier sizing hierarchy (Platinum largest -> Bronze smallest)
+       Make differences obvious by changing BOTH height and max width.
+    */
+    .tier--platinum{ --slot-h: 320px; --slot-font: 1.22rem; --row-max: 980px; --tier-pad: 1.45rem; --tier-glow: rgba(255,174,66,.30); }
+    .tier--gold{     --slot-h: 250px; --slot-font: 1.12rem; --row-max: 860px; --tier-pad: 1.30rem; --tier-glow: rgba(255,127,0,.24); }
+    .tier--silver{   --slot-h: 205px; --slot-font: 1.06rem; --row-max: 740px; --tier-pad: 1.10rem; --tier-glow: rgba(180,190,205,.22); }
+    .tier--bronze{   --slot-h: 175px; --slot-font: 1.00rem; --row-max: 650px; --tier-pad: 1.00rem; --tier-glow: rgba(205,140,95,.20); }
 
     /* Mobile device: scale the slot heights down slightly */
-    body.is-mobile .tier--platinum{ --slot-h: 190px; }
-    body.is-mobile .tier--gold{ --slot-h: 165px; }
-    body.is-mobile .tier--silver{ --slot-h: 150px; }
-    body.is-mobile .tier--bronze{ --slot-h: 135px; }
+    body.is-mobile .tier--platinum{ --slot-h: 235px; --row-max: 100%; }
+    body.is-mobile .tier--gold{ --slot-h: 200px; --row-max: 100%; }
+    body.is-mobile .tier--silver{ --slot-h: 175px; --row-max: 100%; }
+    body.is-mobile .tier--bronze{ --slot-h: 155px; --row-max: 100%; }
 
     .card{
       background: var(--panel);
@@ -115,12 +121,17 @@
       box-shadow: var(--shadow);
       padding:1.1rem;
     }
-    /* Sponsor slots: 3 large tiles stacked per tier (all equal size) */
+    /* Ensure tier padding overrides the base card padding */
+    .card.tier-card{ padding: var(--tier-pad); }
+    /* Sponsor slots: 3 tiles stacked per tier.
+       Row width shrinks by tier (matches Trinity Force-style tier scaling).
+    */
     .sponsor-row{
+      width: min(100%, var(--row-max));
+      margin: .9rem auto 0;
       display:grid;
       grid-template-columns: 1fr;
       gap:.75rem;
-      margin-top:.9rem;
     }
     .sponsor-card{
       width: 100%;
