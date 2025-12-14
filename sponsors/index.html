@@ -510,6 +510,22 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
     })();
   </script>
 
+  <!-- Sponsor slot helper: if an image is missing, show "Open for Sponsors" automatically -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.sponsor-card').forEach((card) => {
+        const img = card.querySelector('img');
+        if (!img || !img.getAttribute('src')) {
+          card.classList.add('open');
+          return;
+        }
+        img.addEventListener('error', () => {
+          card.classList.add('open');
+        }, { once: true });
+      });
+    });
+  </script>
+
   <script src="../responsive.js" defer></script>
 </body>
 </html>

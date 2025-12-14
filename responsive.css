@@ -1,161 +1,17 @@
-/* ======= Global Responsive Styles for Team10312 Site ======= */
-/* Mobile-first tweaks; enhance on larger screens */
-:root {
-  --container-max: 1200px;
-}
+/*
+  ===== Mobile-only enhancements (keeps desktop layout untouched) =====
 
-* { box-sizing: border-box; }
+  This file is intentionally light.
+  Desktop styling lives inside each page's inline <style> blocks.
 
-html, body {
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-/* Fluid media */
-img, video, canvas {
-  max-width: 100%;
-  height: auto;
-}
-
-/* Containers */
-.container, .wrap, .page, main {
-  width: min(100% - 2rem, var(--container-max));
-  margin-inline: auto;
-}
-
-/* Grids (common classnames in this site) */
-.grid, .cards, .sponsors-grid, .media-grid, .robot-grid {
-  display: grid;
-  gap: 1rem;
-}
-
-.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-
-/* On small screens, stack everything into 1 column */
-@media (max-width: 768px) {
-  .grid, .grid-2, .grid-3, .grid-4,
-  .cards, .sponsors-grid, .media-grid, .robot-grid {
-    grid-template-columns: 1fr !important;
-    gap: 0.75rem;
-  }
-
-  header, .site-header, nav, .site-nav {
-    position: relative;
-  }
-
-  /* Optional: squeeze paddings for panels/sections */
-  section, .section, .panel, .glass, .card {
-    padding: clamp(0.75rem, 2vw, 1rem);
-  }
-
-  /* Headings scale down */
-  h1 { font-size: clamp(1.6rem, 6vw, 2rem); }
-  h2 { font-size: clamp(1.25rem, 4.5vw, 1.5rem); }
-  h3 { font-size: clamp(1.1rem, 4vw, 1.25rem); }
-
-  /* Tables: add horizontal scroll if needed */
-  .table-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  table { min-width: 600px; }
-}
-
-/* Medium and up refinements */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-/* Nav — auto-collapse to hamburger on small screens (JS adds .nav-open) */
-.nav-toggle {
-  display: none;
-  border: 0;
-  background: transparent;
-  width: 44px;
-  height: 44px;
-  cursor: pointer;
-}
-
-.nav-toggle span, .nav-toggle::before, .nav-toggle::after {
-  content: "";
-  display: block;
-  height: 2px;
-  margin: 8px;
-  background: currentColor;
-}
-
-@media (max-width: 768px) {
-  .nav-toggle { display: inline-block; }
-
-  .site-nav ul, nav ul {
-    display: none;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-  }
-
-  .nav-open .site-nav ul, .nav-open nav ul {
-    display: flex;
-  }
-}
-
-/* Utility: device classes set by JS */
-body.is-mobile .desktop-only { display: none !important; }
-body.is-desktop .mobile-only { display: none !important; }
-
-/* ===== Mobile nav for .container.nav + .nav-links ===== */
-@media (max-width: 768px) {
-  header .container.nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: relative;
-    z-index: 50;
-  }
-
-  header .container.nav .nav-links {
-    display: none;
-    position: absolute;
-    top: 56px;
-    left: 0;
-    right: 0;
-    padding: 0.75rem 1rem;
-    background: var(--panel, rgba(0,0,0,.86));
-    backdrop-filter: saturate(120%) blur(10px);
-    border-top: 1px solid var(--panel-border, rgba(255,255,255,.08));
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  body.nav-open header .container.nav .nav-links {
-    display: flex;
-  }
-
-  /* Ensure the hamburger is visible */
-  .nav-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    z-index: 60;
-  }
-}
-
-@media (min-width: 769px) {
-  header .container.nav .nav-links {
-    display: flex;
-    gap: 0.75rem;
-  }
-}
-
-
-/* ===== Split (two-column) layout helpers =====
-   Used on pages that previously used inline grid-template-columns.
+  JS (responsive.js) will add `body.is-mobile` only on mobile devices.
+  All overrides are scoped to `body.is-mobile` so desktop stays exactly the same.
 */
+
+/* Safe media defaults (won't change layout, just prevents overflow) */
+img, video, canvas { max-width: 100%; height: auto; }
+
+/* ===== Split layouts used by the site ===== */
 .split-grid{
   display: grid;
   gap: 1rem;
@@ -167,6 +23,78 @@ body.is-desktop .mobile-only { display: none !important; }
   grid-template-columns: 1.2fr 1fr;
   align-items: center;
 }
-@media (max-width: 768px){
-  .split-grid{ grid-template-columns: 1fr !important; }
+body.is-mobile .split-grid,
+body.is-mobile .split-grid--hero{
+  grid-template-columns: 1fr !important;
 }
+
+/* ===== Mobile nav (only when body.is-mobile is present) ===== */
+body.is-mobile header .container.nav{ position: relative; }
+
+body.is-mobile .nav-toggle{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--panel-border, rgba(0,0,0,.12));
+  background: transparent;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+body.is-mobile .nav-toggle span,
+body.is-mobile .nav-toggle::before,
+body.is-mobile .nav-toggle::after{
+  content: "";
+  display: block;
+  height: 2px;
+  width: 22px;
+  background: currentColor;
+  border-radius: 2px;
+}
+body.is-mobile .nav-toggle span{ margin: 0; }
+body.is-mobile .nav-toggle::before{ margin-bottom: 6px; }
+body.is-mobile .nav-toggle::after{ margin-top: 6px; }
+
+/* Dropdown container created by JS on mobile */
+body.is-mobile #mobile-menu{
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 10px);
+  padding: 0.85rem;
+  border-radius: 14px;
+  background: var(--bg-soft, rgba(255,255,255,.82));
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--panel-border, rgba(0,0,0,.12));
+  box-shadow: 0 16px 50px rgba(0,0,0,.18);
+  z-index: 60;
+}
+body.is-mobile.nav-open #mobile-menu{ display: block; }
+
+body.is-mobile #mobile-menu .nav-links{
+  display: flex !important;
+  flex-direction: column;
+  gap: .5rem;
+  padding: .25rem 0 .75rem;
+}
+body.is-mobile #mobile-menu .nav-links a{
+  padding: .7rem .75rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+body.is-mobile #mobile-menu .nav-links a:hover{
+  border-color: var(--panel-border, rgba(0,0,0,.12));
+}
+
+body.is-mobile #mobile-menu .nav-cta{
+  display: flex !important;
+  flex-direction: column;
+  gap: .6rem;
+}
+
+/* Slightly reduce hero spacing on mobile so it doesn't feel oversized */
+body.is-mobile .hero{ padding: 3.2rem 0 1.2rem; }
