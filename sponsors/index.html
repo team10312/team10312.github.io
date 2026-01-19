@@ -232,6 +232,11 @@
       grid-template-columns: 1fr;
       grid-template-areas: none;
     }
+    body.is-mobile .tier--gold .sponsor-card,
+    body.is-mobile .tier--silver .sponsor-card,
+    body.is-mobile .tier--bronze .sponsor-card{
+      grid-area: auto;
+    }
     body.is-mobile .tier--gold .sponsor-card.slot-1{ height: var(--slot-h); }
 
     /* Fallback for small screens that may not get body.is-mobile */
@@ -241,6 +246,11 @@
       .tier--bronze .sponsor-row{
         grid-template-columns: 1fr;
         grid-template-areas: none;
+      }
+      .tier--gold .sponsor-card,
+      .tier--silver .sponsor-card,
+      .tier--bronze .sponsor-card{
+        grid-area: auto;
       }
       .tier--gold .sponsor-card.slot-1{ height: var(--slot-h); }
     }
