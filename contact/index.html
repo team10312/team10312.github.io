@@ -9,22 +9,48 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
   <meta name="apple-mobile-web-app-title" content="team10312" />
   <link rel="manifest" href="/favicons/site.webmanifest" />
-  <script>
+    <script>
     (function () {
       var link = document.getElementById('favicon');
-      if (!link || !window.matchMedia) {
+      if (!link) {
         return;
       }
-      var mq = window.matchMedia('(prefers-color-scheme: dark)');
-      var setFavicon = function () {
-        link.href = mq.matches ? '/favicons/favicon-dark.ico?v=dark' : '/favicons/favicon.ico?v=light';
-      };
-      setFavicon();
-      if (mq.addEventListener) {
-        mq.addEventListener('change', setFavicon);
-      } else if (mq.addListener) {
-        mq.addListener(setFavicon);
+      function isDarkMode() {
+        var html = document.documentElement;
+        var dt = (html.getAttribute('data-theme') || '').toLowerCase();
+        if (dt === 'dark') return true;
+        if (dt === 'light') return false;
+        try {
+          var stored = localStorage.getItem('bf-theme');
+          if (stored === 'dark') return true;
+          if (stored === 'light') return false;
+        } catch (e) {
+          // localStorage unavailable
+        }
+        if (window.matchMedia) {
+          return window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        return false;
       }
+      function setFavicon() {
+        link.href = isDarkMode() ? '/favicons/favicon-dark.ico?v=dark' : '/favicons/favicon.ico?v=light';
+      }
+      setFavicon();
+      try {
+        var obs = new MutationObserver(setFavicon);
+        obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+      } catch (e) {
+        // ignore
+      }
+      if (window.matchMedia) {
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        if (mq.addEventListener) {
+          mq.addEventListener('change', setFavicon);
+        } else if (mq.addListener) {
+          mq.addListener(setFavicon);
+        }
+      }
+      window.addEventListener('storage', setFavicon);
     })();
   </script>
 <!-- ===== reCAPTCHA v3 (replace SITE_KEY_HERE with your site key) ===== -->
@@ -201,15 +227,8 @@
 
   <section class="section">
     <div class="container">
-      <div class="card" style="display:flex;flex-wrap:wrap;gap:.9rem;align-items:center;justify-content:space-between">
-        <div>
-          <h2 class="h2" style="margin:0 0 .4rem">Join via Google Form</h2>
-          <p class="muted" style="margin:0">Fastest way to sponsor or join the team.</p>
-        </div>
-        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-          <a class="btn glass-button" href="https://docs.google.com/forms/d/e/1FAIpQLScNEXf2bBgNwZtKZW-MfJZ5giXuMtf9dNDbhZAiAvn21IZapw/viewform?pli=1" target="_blank" rel="noopener noreferrer">Join via Google Form</a>
-          <a class="btn secondary" href="#send-message">Send a Message</a>
-        </div>
+      <div class="card">
+        <a class="btn glass-button" href="https://docs.google.com/forms/d/e/1FAIpQLScNEXf2bBgNwZtKZW-MfJZ5giXuMtf9dNDbhZAiAvn21IZapw/viewform?pli=1" target="_blank" rel="noopener noreferrer" style="width:100%;font-size:1.1rem;padding:1.15rem 1.2rem">Join via Google Form</a>
       </div>
     </div>
   </section>

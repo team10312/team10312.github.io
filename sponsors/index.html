@@ -9,22 +9,48 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
   <meta name="apple-mobile-web-app-title" content="team10312" />
   <link rel="manifest" href="/favicons/site.webmanifest" />
-  <script>
+    <script>
     (function () {
       var link = document.getElementById('favicon');
-      if (!link || !window.matchMedia) {
+      if (!link) {
         return;
       }
-      var mq = window.matchMedia('(prefers-color-scheme: dark)');
-      var setFavicon = function () {
-        link.href = mq.matches ? '/favicons/favicon-dark.ico?v=dark' : '/favicons/favicon.ico?v=light';
-      };
-      setFavicon();
-      if (mq.addEventListener) {
-        mq.addEventListener('change', setFavicon);
-      } else if (mq.addListener) {
-        mq.addListener(setFavicon);
+      function isDarkMode() {
+        var html = document.documentElement;
+        var dt = (html.getAttribute('data-theme') || '').toLowerCase();
+        if (dt === 'dark') return true;
+        if (dt === 'light') return false;
+        try {
+          var stored = localStorage.getItem('bf-theme');
+          if (stored === 'dark') return true;
+          if (stored === 'light') return false;
+        } catch (e) {
+          // localStorage unavailable
+        }
+        if (window.matchMedia) {
+          return window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        return false;
       }
+      function setFavicon() {
+        link.href = isDarkMode() ? '/favicons/favicon-dark.ico?v=dark' : '/favicons/favicon.ico?v=light';
+      }
+      setFavicon();
+      try {
+        var obs = new MutationObserver(setFavicon);
+        obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+      } catch (e) {
+        // ignore
+      }
+      if (window.matchMedia) {
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        if (mq.addEventListener) {
+          mq.addEventListener('change', setFavicon);
+        } else if (mq.addListener) {
+          mq.addListener(setFavicon);
+        }
+      }
+      window.addEventListener('storage', setFavicon);
     })();
   </script>
 <meta content="Sponsors — Byte Force Robotics · Team 10312" name="description"/>
