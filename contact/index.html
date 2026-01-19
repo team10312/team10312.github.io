@@ -33,7 +33,15 @@
         return false;
       }
       function setFavicon() {
-        link.href = isDarkMode() ? '/favicons/favicon-dark.ico?v=dark' : '/favicons/favicon.ico?v=light';
+        var href = isDarkMode() ? '/favicons/favicon-dark.ico?v=dark' : '/favicons/favicon.ico?v=light';
+        if (link.getAttribute('href') === href) {
+          return;
+        }
+        var newLink = link.cloneNode(false);
+        newLink.setAttribute('href', href);
+        newLink.setAttribute('id', 'favicon');
+        link.parentNode.replaceChild(newLink, link);
+        link = newLink;
       }
       setFavicon();
       try {
