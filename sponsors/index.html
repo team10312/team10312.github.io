@@ -201,6 +201,17 @@
     }
     body.is-mobile .tier--gold .sponsor-card.slot-1{ height: var(--slot-h); }
 
+    /* Fallback for small screens that may not get body.is-mobile */
+    @media (max-width: 700px){
+      .tier--gold .sponsor-row,
+      .tier--silver .sponsor-row,
+      .tier--bronze .sponsor-row{
+        grid-template-columns: 1fr;
+        grid-template-areas: none;
+      }
+      .tier--gold .sponsor-card.slot-1{ height: var(--slot-h); }
+    }
+
 
     /* Tier cards stay full width (match site-wide section width);
        hierarchy is expressed through inner content sizing.
@@ -364,7 +375,7 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
 </div>
 <!-- Gold -->
 <div class="card tier-card tier--gold">
-<h3>Gold — $2500</h3>
+<h3>Gold — $2500+</h3>
 <p class="muted">Logo on robot &amp; pit banner; social features.</p>
 <div class="sponsor-row">
 <div class="sponsor-card slot-1"><span class="open-slot">Open for Sponsors</span><img alt="Gold Sponsor 1" src="gold1.png"/></div>
@@ -374,7 +385,7 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
 </div>
 <!-- Silver -->
 <div class="card tier-card tier--silver">
-<h3>Silver — $1000</h3>
+<h3>Silver — $1000+</h3>
 <p class="muted">Logo on pit banner; website recognition.</p>
 <div class="sponsor-row">
 <div class="sponsor-card slot-1"><span class="open-slot">Open for Sponsors</span><img alt="Silver Sponsor 1" src="silver1.png"/></div>
@@ -384,7 +395,7 @@ footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px
 </div>
 <!-- Bronze -->
 <div class="card tier-card tier--bronze">
-<h3>Bronze — $500</h3>
+<h3>Bronze — $500+</h3>
 <p class="muted">Website recognition; thank-you note from the team.</p>
 <div class="sponsor-row">
 <div class="sponsor-card slot-1"><span class="open-slot">Open for Sponsors</span><img alt="Bronze Sponsor 1" src="bronze1.png"/></div>
