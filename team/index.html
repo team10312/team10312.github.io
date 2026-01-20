@@ -143,6 +143,15 @@
     @media (max-width:1000px){.gallery{grid-template-columns:repeat(4,1fr)}} 
     @media (max-width:640px){.gallery{grid-template-columns:repeat(2,1fr)}}
     .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; }
+    .lead-photo{
+      width:100%;
+      max-width:600px;
+      aspect-ratio:3/2;
+      object-fit:cover;
+      border-radius:12px;
+      display:block;
+      margin:0 auto 0.6rem;
+    }
     
   </style>
 
@@ -227,10 +236,10 @@
     <div class="container">
       <h2 class="h2">Leadership</h2>
       <div class="grid-4">
-        <div class="card"><img src="lead_mentor.jpg" alt="Lead Mentor" style="border-radius:12px;display:block;margin:0 auto 0.6rem auto;max-width:180px;width:100%"><h3>Lead Mentor - Darius</h3><span style="display:inline-block;padding:.2rem .55rem;border-radius:999px;background:rgba(255,127,0,.12);color:var(--brand);font-size:.75rem;font-weight:700">Leadership</span><p class="muted">Leads strategy, operations, and competitions.</p></div>
-        <div class="card"><img src="soft_lead.jpg" alt="Software Lead" style="border-radius:12px"><h3>Software Lead - Sid</h3><span style="display:inline-block;padding:.2rem .55rem;border-radius:999px;background:rgba(255,127,0,.12);color:var(--brand);font-size:.75rem;font-weight:700">Software</span><p class="muted">Autonomous, vision, and controls.</p></div>
-        <div class="card"><img src="mech_lead.jpg" alt="Mechanical Lead" style="border-radius:12px"><h3>Mechanical Lead -  Jaeden</h3><span style="display:inline-block;padding:.2rem .55rem;border-radius:999px;background:rgba(255,127,0,.12);color:var(--brand);font-size:.75rem;font-weight:700">Mechanical</span><p class="muted">Machining, assembly, and prototyping.</p></div>
-        <div class="card"><img src="desi_lead.jpg" alt="Design Lead" style="border-radius:12px"><h3>Design Lead - Shanyu</h3><span style="display:inline-block;padding:.2rem .55rem;border-radius:999px;background:rgba(255,127,0,.12);color:var(--brand);font-size:.75rem;font-weight:700">Design</span><p class="muted">Envisioning, CAD, and Modeling.</p></div>
+        <div class="card"><img class="lead-photo" src="lead_mentor.jpg" alt="Lead Mentor"><h3>Lead Mentor - Darius</h3><span style="display:inline-block;padding:.2rem .55rem;border-radius:999px;background:rgba(255,127,0,.12);color:var(--brand);font-size:.75rem;font-weight:700">Leadership</span><p class="muted">Leads strategy, operations, and competitions.</p></div>
+        <div class="card"><img class="lead-photo" src="soft_lead.jpg" alt="Software Lead"><h3>Software Lead - Sid</h3><span style="display:inline-block;padding:.2rem .55rem;border-radius:999px;background:rgba(255,127,0,.12);color:var(--brand);font-size:.75rem;font-weight:700">Software</span><p class="muted">Autonomous, vision, and controls.</p></div>
+        <div class="card"><img class="lead-photo" src="mech_lead.jpg" alt="Mechanical Lead"><h3>Mechanical Lead -  Jaeden</h3><span style="display:inline-block;padding:.2rem .55rem;border-radius:999px;background:rgba(255,127,0,.12);color:var(--brand);font-size:.75rem;font-weight:700">Mechanical</span><p class="muted">Machining, assembly, and prototyping.</p></div>
+        <div class="card"><img class="lead-photo" src="desi_lead.jpg" alt="Design Lead"><h3>Design Lead - Shanyu</h3><span style="display:inline-block;padding:.2rem .55rem;border-radius:999px;background:rgba(255,127,0,.12);color:var(--brand);font-size:.75rem;font-weight:700">Design</span><p class="muted">Envisioning, CAD, and Modeling.</p></div>
       </div>
     </div>
   </section>
