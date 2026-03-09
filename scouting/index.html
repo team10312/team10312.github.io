@@ -299,7 +299,7 @@
                 </label>
               </div>
 
-              <div class="form-grid form-grid--dual">
+              <div class="form-grid form-grid--triple">
                 <div class="field">
                   <span>Alliance</span>
                   <div class="segmented segmented--2" data-segmented>
@@ -309,6 +309,19 @@
                     </label>
                     <label>
                       <input type="radio" name="alliance_color" value="Red" />
+                      <span>Red</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="field">
+                  <span>Shift 1 Starts With</span>
+                  <div class="segmented segmented--2" data-segmented>
+                    <label>
+                      <input type="radio" name="shift_1_alliance" value="Blue" checked />
+                      <span>Blue</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="shift_1_alliance" value="Red" />
                       <span>Red</span>
                     </label>
                   </div>
@@ -351,36 +364,40 @@
                     <button type="button" class="counter-button" data-counter-target="match-transition_fuel" data-counter-step="1">+</button>
                   </div>
                 </div>
-                <div class="counter-card">
-                  <span class="section-label">Shift 1</span>
+                <div class="counter-card shift-card" data-shift-card="1">
+                  <span id="shift-1-label" class="section-label">Shift 1 · Blue</span>
                   <strong>Fuel</strong>
+                  <div id="shift-1-note" class="counter-note">Your scoring shift</div>
                   <div class="counter-controls">
                     <button type="button" class="counter-button" data-counter-target="match-shift_1_fuel" data-counter-step="-1">-</button>
                     <input id="match-shift_1_fuel" class="counter-value" name="shift_1_fuel" type="number" min="0" value="0" inputmode="numeric" />
                     <button type="button" class="counter-button" data-counter-target="match-shift_1_fuel" data-counter-step="1">+</button>
                   </div>
                 </div>
-                <div class="counter-card">
-                  <span class="section-label">Shift 2</span>
+                <div class="counter-card shift-card" data-shift-card="2">
+                  <span id="shift-2-label" class="section-label">Shift 2 · Red</span>
                   <strong>Fuel</strong>
+                  <div id="shift-2-note" class="counter-note">Opposing scoring shift</div>
                   <div class="counter-controls">
                     <button type="button" class="counter-button" data-counter-target="match-shift_2_fuel" data-counter-step="-1">-</button>
                     <input id="match-shift_2_fuel" class="counter-value" name="shift_2_fuel" type="number" min="0" value="0" inputmode="numeric" />
                     <button type="button" class="counter-button" data-counter-target="match-shift_2_fuel" data-counter-step="1">+</button>
                   </div>
                 </div>
-                <div class="counter-card">
-                  <span class="section-label">Shift 3</span>
+                <div class="counter-card shift-card" data-shift-card="3">
+                  <span id="shift-3-label" class="section-label">Shift 3 · Blue</span>
                   <strong>Fuel</strong>
+                  <div id="shift-3-note" class="counter-note">Your scoring shift</div>
                   <div class="counter-controls">
                     <button type="button" class="counter-button" data-counter-target="match-shift_3_fuel" data-counter-step="-1">-</button>
                     <input id="match-shift_3_fuel" class="counter-value" name="shift_3_fuel" type="number" min="0" value="0" inputmode="numeric" />
                     <button type="button" class="counter-button" data-counter-target="match-shift_3_fuel" data-counter-step="1">+</button>
                   </div>
                 </div>
-                <div class="counter-card">
-                  <span class="section-label">Shift 4</span>
+                <div class="counter-card shift-card" data-shift-card="4">
+                  <span id="shift-4-label" class="section-label">Shift 4 · Red</span>
                   <strong>Fuel</strong>
+                  <div id="shift-4-note" class="counter-note">Opposing scoring shift</div>
                   <div class="counter-controls">
                     <button type="button" class="counter-button" data-counter-target="match-shift_4_fuel" data-counter-step="-1">-</button>
                     <input id="match-shift_4_fuel" class="counter-value" name="shift_4_fuel" type="number" min="0" value="0" inputmode="numeric" />
@@ -513,6 +530,55 @@
                     <option>Light</option>
                     <option>Unknown</option>
                   </select>
+                </label>
+              </div>
+
+              <div class="form-grid form-grid--triple">
+                <label class="field">
+                  <span>Cycle Time</span>
+                  <input name="cycle_time" type="text" maxlength="40" placeholder="8 sec, 10-12 sec, or unknown" />
+                </label>
+                <label class="field">
+                  <span>Scoring Speed</span>
+                  <select name="scoring_speed">
+                    <option>Very fast</option>
+                    <option>Fast</option>
+                    <option>Average</option>
+                    <option>Slow</option>
+                    <option>Unknown</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Intake Style</span>
+                  <select name="intake_style">
+                    <option>Over bumper</option>
+                    <option>Under bumper</option>
+                    <option>Both</option>
+                    <option>No floor intake</option>
+                    <option>Unknown</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="form-grid form-grid--triple">
+                <label class="field">
+                  <span>Shooter Type</span>
+                  <select name="shooter_type">
+                    <option>Turret</option>
+                    <option>Wide shooter</option>
+                    <option>Static shooter</option>
+                    <option>Articulated</option>
+                    <option>Other</option>
+                    <option>Unknown</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Hopper Size</span>
+                  <input name="hopper_size" type="text" maxlength="40" placeholder="Small, medium, large, or approx count" />
+                </label>
+                <label class="field">
+                  <span>Climb Level</span>
+                  <input name="climb_level" type="text" maxlength="60" placeholder="None, low, mid, high, or specific level" />
                 </label>
               </div>
 

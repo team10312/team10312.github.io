@@ -19,6 +19,7 @@ create table if not exists public.match_scout_entries (
   match_number integer not null check (match_number > 0),
   match_type text not null check (match_type in ('Practice', 'Qualification', 'Playoff')),
   alliance_color text not null check (alliance_color in ('Blue', 'Red')),
+  shift_1_alliance text not null default 'Blue' check (shift_1_alliance in ('Blue', 'Red')),
   station integer not null check (station between 1 and 3),
   scout_name text not null,
   auto_fuel integer not null default 0 check (auto_fuel >= 0),
@@ -35,6 +36,17 @@ create table if not exists public.match_scout_entries (
   breakdown boolean not null default false,
   no_show boolean not null default false,
   notes text not null default '',
+  constraint match_scout_entries_shift_fuel_guard check (
+    (
+      alliance_color = shift_1_alliance and
+      shift_2_fuel = 0 and
+      shift_4_fuel = 0
+    ) or (
+      alliance_color <> shift_1_alliance and
+      shift_1_fuel = 0 and
+      shift_3_fuel = 0
+    )
+  ),
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -44,6 +56,26 @@ create index if not exists match_scout_entries_event_team_idx
 create index if not exists match_scout_entries_event_match_idx
   on public.match_scout_entries (event_id, match_number, created_at desc);
 
+alter table if exists public.match_scout_entries
+  add column if not exists shift_1_alliance text not null default 'Blue'
+  check (shift_1_alliance in ('Blue', 'Red'));
+
+alter table if exists public.match_scout_entries
+  drop constraint if exists match_scout_entries_shift_fuel_guard;
+
+alter table if exists public.match_scout_entries
+  add constraint match_scout_entries_shift_fuel_guard check (
+    (
+      alliance_color = shift_1_alliance and
+      shift_2_fuel = 0 and
+      shift_4_fuel = 0
+    ) or (
+      alliance_color <> shift_1_alliance and
+      shift_1_fuel = 0 and
+      shift_3_fuel = 0
+    )
+  ) not valid;
+
 create table if not exists public.pit_scout_entries (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references public.scouting_events(id) on delete cascade,
@@ -52,6 +84,12 @@ create table if not exists public.pit_scout_entries (
   drivetrain text not null,
   fuel_scoring_capability text not null,
   tower_capability text not null,
+  cycle_time text not null default '',
+  scoring_speed text not null default '',
+  intake_style text not null default '',
+  shooter_type text not null default '',
+  hopper_size text not null default '',
+  climb_level text not null default '',
   auto_summary text not null default '',
   defense_capability text not null,
   preferred_strategy text not null default '',
@@ -62,6 +100,24 @@ create table if not exists public.pit_scout_entries (
 
 create index if not exists pit_scout_entries_event_team_idx
   on public.pit_scout_entries (event_id, team_number, created_at desc);
+
+alter table if exists public.pit_scout_entries
+  add column if not exists cycle_time text not null default '';
+
+alter table if exists public.pit_scout_entries
+  add column if not exists scoring_speed text not null default '';
+
+alter table if exists public.pit_scout_entries
+  add column if not exists intake_style text not null default '';
+
+alter table if exists public.pit_scout_entries
+  add column if not exists shooter_type text not null default '';
+
+alter table if exists public.pit_scout_entries
+  add column if not exists hopper_size text not null default '';
+
+alter table if exists public.pit_scout_entries
+  add column if not exists climb_level text not null default '';
 
 create or replace view public.team_summary_2026
 with (security_invoker = true) as
@@ -98,6 +154,12 @@ pit_latest as (
     drivetrain,
     fuel_scoring_capability,
     tower_capability,
+    cycle_time,
+    scoring_speed,
+    intake_style,
+    shooter_type,
+    hopper_size,
+    climb_level,
     auto_summary,
     defense_capability,
     preferred_strategy,
@@ -119,6 +181,12 @@ select
   pit_latest.drivetrain,
   pit_latest.fuel_scoring_capability,
   pit_latest.tower_capability,
+  pit_latest.cycle_time,
+  pit_latest.scoring_speed,
+  pit_latest.intake_style,
+  pit_latest.shooter_type,
+  pit_latest.hopper_size,
+  pit_latest.climb_level,
   pit_latest.auto_summary,
   pit_latest.defense_capability,
   pit_latest.preferred_strategy,
@@ -182,5 +250,23 @@ create policy "team domain insert pit scout entries"
   with check (lower(coalesce(auth.jwt() ->> 'email', '')) like '%@team10312.com');
 
 insert into public.scouting_events (slug, name, event_code, location, start_date, end_date, is_active)
-values ('sample-event', 'Sample Event', 'SAMPLE', 'Replace Me', current_date, current_date, true)
+values
+  (
+    'fit-san-antonio-2026',
+    'FIT District San Antonio Event',
+    'TXSAN',
+    'Freeman Coliseum, San Antonio, TX',
+    '2026-03-12',
+    '2026-03-14',
+    true
+  ),
+  (
+    'fit-amarillo-2026',
+    'FIT District Amarillo Event',
+    'TXAMA',
+    'Amarillo Civic Center, Amarillo, TX',
+    '2026-04-02',
+    '2026-04-04',
+    false
+  )
 on conflict (slug) do nothing;

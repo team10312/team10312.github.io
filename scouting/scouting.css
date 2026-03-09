@@ -290,17 +290,17 @@ code {
 
 .status-pill.is-success {
   border-color: rgba(31, 143, 73, 0.24);
-  color: var(--success);
+  color: #ffffff;
 }
 
 .status-pill.is-warn {
   border-color: rgba(204, 122, 0, 0.24);
-  color: var(--warn);
+  color: #ffffff;
 }
 
 .status-pill.is-danger {
   border-color: rgba(191, 43, 43, 0.24);
-  color: var(--danger);
+  color: #ffffff;
 }
 
 .section {
@@ -312,7 +312,7 @@ code {
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 1.2rem;
+  padding: 1.4rem;
 }
 
 .hero-sidecard h2,
@@ -346,7 +346,7 @@ code {
 
 .app-container {
   display: grid;
-  gap: 1rem;
+  gap: 1.35rem;
 }
 
 .setup-banner {
@@ -360,7 +360,11 @@ code {
 .lock-shell {
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lock-card {
+  width: 100%;
 }
 
 .unlock-form,
@@ -463,7 +467,8 @@ code {
 }
 
 .tab-panel {
-  display: block;
+  display: grid;
+  gap: 1.35rem;
 }
 
 .hidden {
@@ -472,8 +477,8 @@ code {
 
 .stat-grid {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.15rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .stat-card strong {
@@ -484,8 +489,8 @@ code {
 
 .overview-grid {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: 0.95fr 1.35fr;
+  gap: 1.15rem;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
   align-items: start;
 }
 
@@ -654,6 +659,20 @@ code {
   font-size: 1.1rem;
 }
 
+.counter-note {
+  min-height: 1.2rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.counter-card--disabled {
+  opacity: 0.58;
+}
+
+.counter-card--disabled .counter-note {
+  color: #d7a44a;
+}
+
 .counter-controls {
   display: grid;
   gap: 0.55rem;
@@ -721,15 +740,15 @@ code {
 }
 
 .form-message.is-success {
-  color: var(--success);
+  color: #ffffff;
 }
 
 .form-message.is-warn {
-  color: var(--warn);
+  color: #ffffff;
 }
 
 .form-message.is-danger {
-  color: var(--danger);
+  color: #ffffff;
 }
 
 .form-message--soft {

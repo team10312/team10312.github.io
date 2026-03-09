@@ -30,6 +30,7 @@ const MATCH_DEFAULTS = Object.freeze({
   match_number: "",
   match_type: "Qualification",
   alliance_color: "Blue",
+  shift_1_alliance: "Blue",
   station: "1",
   auto_fuel: 0,
   auto_tower_result: "None",
@@ -53,12 +54,39 @@ const PIT_DEFAULTS = Object.freeze({
   drivetrain: "Swerve",
   fuel_scoring_capability: "High volume",
   tower_capability: "Consistent",
+  cycle_time: "",
+  scoring_speed: "Unknown",
+  intake_style: "Unknown",
+  shooter_type: "Unknown",
+  hopper_size: "",
+  climb_level: "",
   auto_summary: "",
   defense_capability: "Balanced",
   preferred_strategy: "",
   reliability_notes: "",
   notes: ""
 });
+
+const DEFAULT_SCOUTING_EVENTS = Object.freeze([
+  {
+    slug: "fit-san-antonio-2026",
+    name: "FIT District San Antonio Event",
+    event_code: "TXSAN",
+    location: "Freeman Coliseum, San Antonio, TX",
+    start_date: "2026-03-12",
+    end_date: "2026-03-14",
+    is_active: true
+  },
+  {
+    slug: "fit-amarillo-2026",
+    name: "FIT District Amarillo Event",
+    event_code: "TXAMA",
+    location: "Amarillo Civic Center, Amarillo, TX",
+    start_date: "2026-04-02",
+    end_date: "2026-04-04",
+    is_active: false
+  }
+]);
 
 const state = {
   config: null,
@@ -229,6 +257,7 @@ function bindEvents() {
   bindCounterButtons();
   bindDraftPersistence(elements.matchForm, "match");
   bindDraftPersistence(elements.pitForm, "pit");
+  bindShiftAvailability();
 
   if (elements.matchSaveDraftButton) {
     elements.matchSaveDraftButton.addEventListener("click", () => {
@@ -422,9 +451,23 @@ function initPointerRipples() {
 function hydrateDraftForms() {
   setFormValues(elements.matchForm, normalizeMatchValues(loadStoredJson(STORAGE_KEYS.matchDraft, MATCH_DEFAULTS)));
   setFormValues(elements.pitForm, normalizePitValues(loadStoredJson(STORAGE_KEYS.pitDraft, PIT_DEFAULTS)));
+  updateShiftFieldAvailability();
   renderDraftStamp("match");
   renderDraftStamp("pit");
   showTab(state.activeTab);
+}
+
+function bindShiftAvailability() {
+  if (!elements.matchForm) return;
+
+  elements.matchForm
+    .querySelectorAll('[name="alliance_color"], [name="shift_1_alliance"]')
+    .forEach((field) => {
+      field.addEventListener("change", () => {
+        updateShiftFieldAvailability();
+        persistDraft("match");
+      });
+    });
 }
 
 async function handleGoogleSignIn() {
@@ -488,10 +531,10 @@ async function syncSession(session) {
   }
 
   setAuthMessage(`Signed in as ${email}.`, "success");
-  await refreshData({ message: `Signed in as ${email}.` });
+  await refreshData({ message: "" });
 }
 
-async function refreshData({ message = "" } = {}) {
+async function refreshData({ message } = {}) {
   if (!state.client || !state.session) return;
 
   state.isRefreshing = true;
@@ -503,7 +546,11 @@ async function refreshData({ message = "" } = {}) {
     await loadEntriesForActiveEvent();
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
-    setAppMessage(message || "Scouting data refreshed.", "success");
+    if (typeof message === "string") {
+      setAppMessage(message, message ? "success" : "");
+    } else {
+      setAppMessage("Scouting data refreshed.", "success");
+    }
   } catch (error) {
     setAppMessage(normalizeError(error, "Unable to load scouting data from Supabase."), "danger");
   } finally {
@@ -513,16 +560,12 @@ async function refreshData({ message = "" } = {}) {
 }
 
 async function loadEvents() {
-  const { data, error } = await state.client
-    .from("scouting_events")
-    .select("*")
-    .order("is_active", { ascending: false })
-    .order("start_date", { ascending: false })
-    .order("name", { ascending: true });
-
+  const { data, error } = await fetchScoutingEvents();
   if (error) throw error;
 
-  state.events = Array.isArray(data) ? data : [];
+  let events = Array.isArray(data) ? data : [];
+  events = await ensureDefaultScoutingEvents(events);
+  state.events = events;
 
   const currentStillExists = state.events.some((event) => event.id === state.activeEventId);
   if (!currentStillExists) {
@@ -536,6 +579,45 @@ async function loadEvents() {
   }
 
   saveStoredValue(STORAGE_KEYS.activeEventId, state.activeEventId);
+}
+
+async function fetchScoutingEvents() {
+  return state.client
+    .from("scouting_events")
+    .select("*")
+    .order("is_active", { ascending: false })
+    .order("start_date", { ascending: false })
+    .order("name", { ascending: true });
+}
+
+async function ensureDefaultScoutingEvents(existingEvents) {
+  if (!state.client || !state.session) return existingEvents;
+
+  const existingSlugs = new Set(existingEvents.map((event) => event.slug));
+  const missingEvents = DEFAULT_SCOUTING_EVENTS.filter((event) => !existingSlugs.has(event.slug));
+
+  if (!missingEvents.length) {
+    return existingEvents;
+  }
+
+  let insertedAny = false;
+
+  for (const event of missingEvents) {
+    const { error } = await state.client.from("scouting_events").insert(event);
+    if (error) {
+      if (isUniqueConflictError(error)) continue;
+      throw error;
+    }
+    insertedAny = true;
+  }
+
+  if (!insertedAny) {
+    return existingEvents;
+  }
+
+  const refreshed = await fetchScoutingEvents();
+  if (refreshed.error) throw refreshed.error;
+  return Array.isArray(refreshed.data) ? refreshed.data : existingEvents;
 }
 
 async function loadEntriesForActiveEvent() {
@@ -626,23 +708,32 @@ async function submitMatchForm() {
       throw new Error("Device is offline.");
     }
 
-    const { error } = await state.client.from("match_scout_entries").insert(payload);
-    if (error) throw error;
+    const result = await insertMatchEntry(payload);
 
     resetMatchDraft(payload.scout_name);
     await loadEntriesForActiveEvent();
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
     setFormMessage(elements.matchFormMessage, "Match entry synced.", "success");
-    setAppMessage("Match entry saved to Supabase.", "success");
-  } catch (error) {
-    enqueueOutbox("match", payload);
-    setFormMessage(
-      elements.matchFormMessage,
-      "Sync failed. The match entry was saved to this device outbox.",
-      "warn"
+    setAppMessage(
+      result.missingColumns.length
+        ? `Match entry saved, but Supabase is missing: ${result.missingColumns.join(", ")}.`
+        : "Match entry saved to Supabase.",
+      result.missingColumns.length ? "warn" : "success"
     );
-    setAppMessage(normalizeError(error, "Entry queued in the outbox for retry."), "warn");
+  } catch (error) {
+    if (shouldQueueSyncError(error)) {
+      enqueueOutbox("match", payload);
+      setFormMessage(
+        elements.matchFormMessage,
+        "Sync failed. The match entry was saved to this device outbox.",
+        "warn"
+      );
+      setAppMessage(normalizeError(error, "Entry queued in the outbox for retry."), "warn");
+    } else {
+      setFormMessage(elements.matchFormMessage, normalizeError(error, "Unable to save match entry."), "danger");
+      setAppMessage(normalizeError(error, "Unable to save match entry."), "danger");
+    }
   } finally {
     elements.matchSubmitButton.disabled = false;
     renderAll();
@@ -670,23 +761,32 @@ async function submitPitForm() {
       throw new Error("Device is offline.");
     }
 
-    const { error } = await state.client.from("pit_scout_entries").insert(payload);
-    if (error) throw error;
+    const result = await insertPitEntry(payload);
 
     resetPitDraft(payload.scout_name);
     await loadEntriesForActiveEvent();
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
     setFormMessage(elements.pitFormMessage, "Pit entry synced.", "success");
-    setAppMessage("Pit entry saved to Supabase.", "success");
-  } catch (error) {
-    enqueueOutbox("pit", payload);
-    setFormMessage(
-      elements.pitFormMessage,
-      "Sync failed. The pit entry was saved to this device outbox.",
-      "warn"
+    setAppMessage(
+      result.missingColumns.length
+        ? `Pit entry saved, but Supabase is missing: ${result.missingColumns.join(", ")}.`
+        : "Pit entry saved to Supabase.",
+      result.missingColumns.length ? "warn" : "success"
     );
-    setAppMessage(normalizeError(error, "Entry queued in the outbox for retry."), "warn");
+  } catch (error) {
+    if (shouldQueueSyncError(error)) {
+      enqueueOutbox("pit", payload);
+      setFormMessage(
+        elements.pitFormMessage,
+        "Sync failed. The pit entry was saved to this device outbox.",
+        "warn"
+      );
+      setAppMessage(normalizeError(error, "Entry queued in the outbox for retry."), "warn");
+    } else {
+      setFormMessage(elements.pitFormMessage, normalizeError(error, "Unable to save pit entry."), "danger");
+      setAppMessage(normalizeError(error, "Unable to save pit entry."), "danger");
+    }
   } finally {
     elements.pitSubmitButton.disabled = false;
     renderAll();
@@ -712,9 +812,11 @@ async function flushOutbox() {
 
   for (const item of state.outbox) {
     try {
-      const tableName = item.type === "match" ? "match_scout_entries" : "pit_scout_entries";
-      const { error } = await state.client.from(tableName).insert(item.payload);
-      if (error) throw error;
+      if (item.type === "match") {
+        await insertMatchEntry(item.payload);
+      } else {
+        await insertPitEntry(item.payload);
+      }
       syncedCount += 1;
     } catch (error) {
       remaining.push(item);
@@ -923,6 +1025,12 @@ function renderSummaryTable() {
     return (
       row.team_number.toString().includes(query) ||
       pitSnapshot.includes(query) ||
+      (row.cycle_time || "").toLowerCase().includes(query) ||
+      (row.scoring_speed || "").toLowerCase().includes(query) ||
+      (row.intake_style || "").toLowerCase().includes(query) ||
+      (row.shooter_type || "").toLowerCase().includes(query) ||
+      (row.hopper_size || "").toLowerCase().includes(query) ||
+      (row.climb_level || "").toLowerCase().includes(query) ||
       (row.preferred_strategy || "").toLowerCase().includes(query) ||
       (row.auto_summary || "").toLowerCase().includes(query)
     );
@@ -1031,6 +1139,7 @@ function resetPitDraft(scoutName) {
 
 function buildMatchPayload() {
   const values = collectMatchValues();
+  const shift1Alliance = values.shift_1_alliance;
   return {
     event_id: state.activeEventId,
     scout_name: values.scout_name,
@@ -1038,14 +1147,15 @@ function buildMatchPayload() {
     match_number: toPositiveInteger(values.match_number),
     match_type: values.match_type,
     alliance_color: values.alliance_color,
+    shift_1_alliance: shift1Alliance,
     station: clampInteger(values.station, 1, 3),
     auto_fuel: toNonNegativeInteger(values.auto_fuel),
     auto_tower_result: values.auto_tower_result,
     transition_fuel: toNonNegativeInteger(values.transition_fuel),
-    shift_1_fuel: toNonNegativeInteger(values.shift_1_fuel),
-    shift_2_fuel: toNonNegativeInteger(values.shift_2_fuel),
-    shift_3_fuel: toNonNegativeInteger(values.shift_3_fuel),
-    shift_4_fuel: toNonNegativeInteger(values.shift_4_fuel),
+    shift_1_fuel: normalizeShiftFuel(1, values),
+    shift_2_fuel: normalizeShiftFuel(2, values),
+    shift_3_fuel: normalizeShiftFuel(3, values),
+    shift_4_fuel: normalizeShiftFuel(4, values),
     endgame_fuel: toNonNegativeInteger(values.endgame_fuel),
     endgame_tower_result: values.endgame_tower_result,
     defense_rating: clampInteger(values.defense_rating, 0, 5),
@@ -1065,6 +1175,12 @@ function buildPitPayload() {
     drivetrain: values.drivetrain,
     fuel_scoring_capability: values.fuel_scoring_capability,
     tower_capability: values.tower_capability,
+    cycle_time: values.cycle_time,
+    scoring_speed: values.scoring_speed,
+    intake_style: values.intake_style,
+    shooter_type: values.shooter_type,
+    hopper_size: values.hopper_size,
+    climb_level: values.climb_level,
     auto_summary: values.auto_summary,
     defense_capability: values.defense_capability,
     preferred_strategy: values.preferred_strategy,
@@ -1098,6 +1214,7 @@ function collectMatchValues() {
     match_number: readFieldValue(form, "match_number"),
     match_type: readFieldValue(form, "match_type"),
     alliance_color: readRadioValue(form, "alliance_color", "Blue"),
+    shift_1_alliance: readRadioValue(form, "shift_1_alliance", "Blue"),
     station: readRadioValue(form, "station", "1"),
     auto_fuel: readFieldValue(form, "auto_fuel"),
     auto_tower_result: readFieldValue(form, "auto_tower_result"),
@@ -1124,6 +1241,12 @@ function collectPitValues() {
     drivetrain: readFieldValue(form, "drivetrain"),
     fuel_scoring_capability: readFieldValue(form, "fuel_scoring_capability"),
     tower_capability: readFieldValue(form, "tower_capability"),
+    cycle_time: readFieldValue(form, "cycle_time"),
+    scoring_speed: readFieldValue(form, "scoring_speed"),
+    intake_style: readFieldValue(form, "intake_style"),
+    shooter_type: readFieldValue(form, "shooter_type"),
+    hopper_size: readFieldValue(form, "hopper_size"),
+    climb_level: readFieldValue(form, "climb_level"),
     auto_summary: readFieldValue(form, "auto_summary"),
     defense_capability: readFieldValue(form, "defense_capability"),
     preferred_strategy: readFieldValue(form, "preferred_strategy"),
@@ -1140,6 +1263,34 @@ function enqueueOutbox(type, payload) {
     created_at: new Date().toISOString()
   });
   saveStoredJson(STORAGE_KEYS.outbox, state.outbox);
+}
+
+async function insertMatchEntry(payload) {
+  return insertRowWithSchemaFallback("match_scout_entries", payload);
+}
+
+async function insertPitEntry(payload) {
+  return insertRowWithSchemaFallback("pit_scout_entries", payload);
+}
+
+async function insertRowWithSchemaFallback(tableName, payload) {
+  const legacyPayload = { ...payload };
+  const missingColumns = [];
+
+  while (true) {
+    const { error } = await state.client.from(tableName).insert(legacyPayload);
+    if (!error) {
+      return { missingColumns };
+    }
+
+    const missingColumn = extractMissingColumnName(error, legacyPayload);
+    if (!missingColumn || missingColumns.includes(missingColumn)) {
+      throw error;
+    }
+
+    delete legacyPayload[missingColumn];
+    missingColumns.push(missingColumn);
+  }
 }
 
 function buildTeamSummary(matchEntries, pitEntries) {
@@ -1206,6 +1357,12 @@ function buildTeamSummary(matchEntries, pitEntries) {
       drivetrain: pit?.drivetrain || "",
       fuel_scoring_capability: pit?.fuel_scoring_capability || "",
       tower_capability: pit?.tower_capability || "",
+      cycle_time: pit?.cycle_time || "",
+      scoring_speed: pit?.scoring_speed || "",
+      intake_style: pit?.intake_style || "",
+      shooter_type: pit?.shooter_type || "",
+      hopper_size: pit?.hopper_size || "",
+      climb_level: pit?.climb_level || "",
       auto_summary: pit?.auto_summary || "",
       defense_capability: pit?.defense_capability || "",
       preferred_strategy: pit?.preferred_strategy || "",
@@ -1228,6 +1385,12 @@ function normalizeSummaryRow(row) {
     drivetrain: row.drivetrain || "",
     fuel_scoring_capability: row.fuel_scoring_capability || "",
     tower_capability: row.tower_capability || "",
+    cycle_time: row.cycle_time || "",
+    scoring_speed: row.scoring_speed || "",
+    intake_style: row.intake_style || "",
+    shooter_type: row.shooter_type || "",
+    hopper_size: row.hopper_size || "",
+    climb_level: row.climb_level || "",
     auto_summary: row.auto_summary || "",
     defense_capability: row.defense_capability || "",
     preferred_strategy: row.preferred_strategy || "",
@@ -1237,8 +1400,16 @@ function normalizeSummaryRow(row) {
 }
 
 function buildPitSnapshot(row) {
-  const snapshot = [row.drivetrain, row.fuel_scoring_capability, row.tower_capability]
-    .filter(Boolean)
+  const snapshot = [
+    row.drivetrain,
+    row.shooter_type,
+    row.intake_style,
+    row.cycle_time ? `Cycle ${row.cycle_time}` : "",
+    row.scoring_speed,
+    row.climb_level ? `Climb ${row.climb_level}` : "",
+    row.hopper_size ? `Hopper ${row.hopper_size}` : ""
+  ]
+    .filter((value) => value && value !== "Unknown")
     .join(" • ");
 
   return snapshot || "No pit data";
@@ -1256,6 +1427,7 @@ function exportMatchCsv() {
     match_number: entry.match_number,
     match_type: entry.match_type,
     alliance_color: entry.alliance_color,
+    shift_1_alliance: entry.shift_1_alliance,
     station: entry.station,
     scout_name: entry.scout_name,
     auto_fuel: entry.auto_fuel,
@@ -1291,6 +1463,12 @@ function exportPitCsv() {
     drivetrain: entry.drivetrain,
     fuel_scoring_capability: entry.fuel_scoring_capability,
     tower_capability: entry.tower_capability,
+    cycle_time: entry.cycle_time,
+    scoring_speed: entry.scoring_speed,
+    intake_style: entry.intake_style,
+    shooter_type: entry.shooter_type,
+    hopper_size: entry.hopper_size,
+    climb_level: entry.climb_level,
     auto_summary: entry.auto_summary,
     defense_capability: entry.defense_capability,
     preferred_strategy: entry.preferred_strategy,
@@ -1320,6 +1498,12 @@ function exportSummaryCsv() {
     drivetrain: row.drivetrain,
     fuel_scoring_capability: row.fuel_scoring_capability,
     tower_capability: row.tower_capability,
+    cycle_time: row.cycle_time,
+    scoring_speed: row.scoring_speed,
+    intake_style: row.intake_style,
+    shooter_type: row.shooter_type,
+    hopper_size: row.hopper_size,
+    climb_level: row.climb_level,
     auto_summary: row.auto_summary,
     defense_capability: row.defense_capability,
     preferred_strategy: row.preferred_strategy,
@@ -1460,6 +1644,10 @@ function setFormValues(form, values) {
 
     fields[0].value = String(value ?? "");
   });
+
+  if (form === elements.matchForm) {
+    updateShiftFieldAvailability();
+  }
 }
 
 function readFieldValue(form, name) {
@@ -1485,6 +1673,7 @@ function normalizeMatchValues(values) {
     scout_name: String(values.scout_name ?? MATCH_DEFAULTS.scout_name).trim(),
     team_number: normalizeNumericDraftValue(values.team_number),
     match_number: normalizeNumericDraftValue(values.match_number),
+    shift_1_alliance: String(values.shift_1_alliance ?? MATCH_DEFAULTS.shift_1_alliance),
     station: String(values.station ?? MATCH_DEFAULTS.station),
     auto_fuel: toNonNegativeInteger(values.auto_fuel),
     transition_fuel: toNonNegativeInteger(values.transition_fuel),
@@ -1512,6 +1701,12 @@ function normalizePitValues(values) {
       values.fuel_scoring_capability ?? PIT_DEFAULTS.fuel_scoring_capability
     ).trim(),
     tower_capability: String(values.tower_capability ?? PIT_DEFAULTS.tower_capability).trim(),
+    cycle_time: String(values.cycle_time ?? "").trim(),
+    scoring_speed: String(values.scoring_speed ?? PIT_DEFAULTS.scoring_speed).trim(),
+    intake_style: String(values.intake_style ?? PIT_DEFAULTS.intake_style).trim(),
+    shooter_type: String(values.shooter_type ?? PIT_DEFAULTS.shooter_type).trim(),
+    hopper_size: String(values.hopper_size ?? "").trim(),
+    climb_level: String(values.climb_level ?? "").trim(),
     auto_summary: String(values.auto_summary ?? "").trim(),
     defense_capability: String(values.defense_capability ?? PIT_DEFAULTS.defense_capability).trim(),
     preferred_strategy: String(values.preferred_strategy ?? "").trim(),
@@ -1533,6 +1728,60 @@ function toPositiveInteger(value) {
 function toNonNegativeInteger(value) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function getShiftAlliance(shiftNumber, shift1Alliance) {
+  const normalized = String(shift1Alliance || "Blue");
+  const oddAlliance = normalized === "Red" ? "Red" : "Blue";
+  const evenAlliance = oddAlliance === "Blue" ? "Red" : "Blue";
+  return shiftNumber % 2 === 1 ? oddAlliance : evenAlliance;
+}
+
+function updateShiftFieldAvailability() {
+  if (!elements.matchForm) return;
+
+  const selectedAlliance = readRadioValue(elements.matchForm, "alliance_color", "Blue");
+  const shift1Alliance = readRadioValue(elements.matchForm, "shift_1_alliance", "Blue");
+  let valuesChanged = false;
+
+  [1, 2, 3, 4].forEach((shiftNumber) => {
+    const owningAlliance = getShiftAlliance(shiftNumber, shift1Alliance);
+    const active = owningAlliance === selectedAlliance;
+    const card = elements.matchForm.querySelector(`[data-shift-card="${shiftNumber}"]`);
+    const label = document.getElementById(`shift-${shiftNumber}-label`);
+    const note = document.getElementById(`shift-${shiftNumber}-note`);
+    const input = document.getElementById(`match-shift_${shiftNumber}_fuel`);
+    const buttons = elements.matchForm.querySelectorAll(
+      `[data-counter-target="match-shift_${shiftNumber}_fuel"]`
+    );
+
+    if (label) label.textContent = `Shift ${shiftNumber} · ${owningAlliance}`;
+    if (note) note.textContent = active ? "Your scoring shift" : "Opposing scoring shift";
+    if (card) card.classList.toggle("counter-card--disabled", !active);
+
+    if (input) {
+      input.disabled = !active;
+      if (!active && Number(input.value || 0) !== 0) {
+        input.value = "0";
+        valuesChanged = true;
+      }
+    }
+
+    buttons.forEach((button) => {
+      button.disabled = !active;
+    });
+  });
+
+  if (valuesChanged) {
+    saveStoredJson(STORAGE_KEYS.matchDraft, collectMatchValues());
+  }
+}
+
+function normalizeShiftFuel(shiftNumber, values) {
+  const fieldName = `shift_${shiftNumber}_fuel`;
+  const shiftOwner = getShiftAlliance(shiftNumber, values.shift_1_alliance);
+  if (shiftOwner !== values.alliance_color) return 0;
+  return toNonNegativeInteger(values[fieldName]);
 }
 
 function clampInteger(value, min, max) {
@@ -1588,6 +1837,43 @@ function formatDateRange(startDate, endDate) {
 
 function normalizeError(error, fallback) {
   return String(error?.message || fallback).trim();
+}
+
+function shouldQueueSyncError(error) {
+  const message = normalizeError(error, "").toLowerCase();
+  return (
+    !message ||
+    message.includes("offline") ||
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed") ||
+    message.includes("load failed") ||
+    message.includes("timed out")
+  );
+}
+
+function isUniqueConflictError(error) {
+  return error?.code === "23505";
+}
+
+function extractMissingColumnName(error, payload) {
+  const message = normalizeError(error, "");
+  const patterns = [
+    /could not find the ['"]([^'"]+)['"] column/i,
+    /column ['"]([^'"]+)['"] of relation/i,
+    /column ['"]([^'"]+)['"] does not exist/i,
+    /unknown column ['"]([^'"]+)['"]/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    const columnName = match?.[1];
+    if (columnName && Object.prototype.hasOwnProperty.call(payload, columnName)) {
+      return columnName;
+    }
+  }
+
+  return "";
 }
 
 function loadStoredValue(key, fallback = "") {
