@@ -300,16 +300,15 @@
                 </div>
                 <div class="field">
                   <span>Shift Pattern</span>
-                  <div class="segmented segmented--2" data-segmented>
-                    <label>
-                      <input type="radio" name="shift_pattern" value="team" checked />
-                      <span>Shift 1 is ours</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="shift_pattern" value="alternate" />
-                      <span>Alternate shifts</span>
-                    </label>
-                  </div>
+                  <input id="shiftPatternInput" name="shift_pattern" type="hidden" value="team" />
+                  <button
+                    id="shiftPatternToggle"
+                    class="shift-toggle"
+                    type="button"
+                    aria-pressed="false"
+                  >
+                    Alternate shifts
+                  </button>
                 </div>
                 <div class="field">
                   <span>Driver Station</span>
@@ -591,6 +590,53 @@
                     <button id="autoPathClearButton" type="button" class="btn secondary auto-path-button">Clear</button>
                   </div>
                 </div>
+                <div class="auto-path-settings" aria-label="Drawing settings">
+                  <label class="field auto-path-control" for="autoPathColorInput">
+                    <span>Pen Color</span>
+                    <div class="auto-path-color-row">
+                      <input
+                        id="autoPathColorInput"
+                        class="auto-path-color-input"
+                        type="color"
+                        value="#ff7f00"
+                        aria-label="Pen color"
+                      />
+                      <span id="autoPathColorValue" class="auto-path-setting-value">#FF7F00</span>
+                    </div>
+                  </label>
+                  <label class="field auto-path-control" for="autoPathDrawSizeInput">
+                    <span>Pen Thickness</span>
+                    <div class="auto-path-range-row">
+                      <input
+                        id="autoPathDrawSizeInput"
+                        class="auto-path-range-input"
+                        type="range"
+                        min="2"
+                        max="18"
+                        step="1"
+                        value="5"
+                        aria-label="Pen thickness"
+                      />
+                      <span id="autoPathDrawSizeValue" class="auto-path-setting-value">5 px</span>
+                    </div>
+                  </label>
+                  <label class="field auto-path-control" for="autoPathEraseSizeInput">
+                    <span>Eraser Size</span>
+                    <div class="auto-path-range-row">
+                      <input
+                        id="autoPathEraseSizeInput"
+                        class="auto-path-range-input"
+                        type="range"
+                        min="8"
+                        max="48"
+                        step="1"
+                        value="18"
+                        aria-label="Eraser size"
+                      />
+                      <span id="autoPathEraseSizeValue" class="auto-path-setting-value">18 px</span>
+                    </div>
+                  </label>
+                </div>
                 <input id="autoPathDrawingInput" name="auto_path_drawing" type="hidden" value="" />
                 <div id="autoPathBoard" class="auto-path-board">
                   <img
@@ -602,7 +648,7 @@
                   <canvas id="autoPathCanvas" class="auto-path-canvas"></canvas>
                 </div>
                 <p class="muted auto-path-help">
-                  Draw the robot's autonomous route on the field image. Use Draw or Erase, then Undo or Clear if needed.
+                  Draw the robot's autonomous route on the field image. Adjust pen color, pen thickness, and eraser size as needed, then use Undo or Clear for corrections.
                 </p>
               </div>
               <label class="field">

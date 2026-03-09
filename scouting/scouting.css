@@ -432,14 +432,16 @@ code {
 
 .field.is-invalid input:not([type="radio"]):not([type="checkbox"]),
 .field.is-invalid textarea,
-.field.is-invalid .custom-select__trigger {
+.field.is-invalid .custom-select__trigger,
+.field.is-invalid .shift-toggle {
   border-color: rgba(191, 43, 43, 0.52);
   box-shadow: 0 0 0 1px rgba(191, 43, 43, 0.24);
 }
 
 .field.is-valid input:not([type="radio"]):not([type="checkbox"]),
 .field.is-valid textarea,
-.field.is-valid .custom-select__trigger {
+.field.is-valid .custom-select__trigger,
+.field.is-valid .shift-toggle {
   border-color: rgba(31, 143, 73, 0.48);
   box-shadow: 0 0 0 1px rgba(31, 143, 73, 0.2);
 }
@@ -578,7 +580,6 @@ code {
   top: calc(100% + 0.55rem);
   left: 0;
   right: 0;
-  display: grid;
   gap: 0.3rem;
   padding: 0.4rem;
   border-radius: 18px;
@@ -592,6 +593,14 @@ code {
   box-shadow: 0 22px 42px rgba(0, 0, 0, 0.24);
   max-height: 280px;
   overflow: auto;
+}
+
+.custom-select__menu[hidden] {
+  display: none;
+}
+
+.custom-select__menu:not([hidden]) {
+  display: grid;
 }
 
 [data-theme="dark"] .custom-select__menu {
@@ -885,6 +894,42 @@ code {
   box-shadow: var(--shadow);
 }
 
+.shift-toggle {
+  width: 100%;
+  min-height: 52px;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text);
+  text-align: center;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+[data-theme="dark"] .shift-toggle {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.shift-toggle:hover {
+  border-color: rgba(255, 174, 66, 0.34);
+}
+
+.shift-toggle:focus-visible {
+  border-color: rgba(255, 127, 0, 0.45);
+  box-shadow: var(--ring);
+  outline: none;
+}
+
+.shift-toggle.is-active {
+  color: #ffffff;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  box-shadow: var(--shadow);
+}
+
 .counter-grid {
   display: grid;
   gap: 1rem;
@@ -989,6 +1034,55 @@ code {
   gap: 0.55rem;
 }
 
+.auto-path-settings {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.auto-path-control {
+  padding: 0.85rem 0.95rem;
+  border-radius: 16px;
+  border: 1px solid var(--panel-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.12)),
+    rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .auto-path-control {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.02);
+}
+
+.auto-path-color-row,
+.auto-path-range-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.auto-path-range-input {
+  flex: 1 1 auto;
+  accent-color: var(--brand);
+}
+
+.auto-path-color-input {
+  width: 3.25rem;
+  min-width: 3.25rem;
+  height: 2.6rem;
+  padding: 0.25rem;
+  cursor: pointer;
+}
+
+.auto-path-setting-value {
+  min-width: 4.6rem;
+  text-align: right;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 .auto-path-button {
   min-height: 42px;
   padding: 0.72rem 0.95rem;
@@ -1037,6 +1131,10 @@ code {
 .auto-path-canvas {
   z-index: 1;
   cursor: crosshair;
+}
+
+.auto-path-canvas.is-erasing {
+  cursor: cell;
 }
 
 .auto-path-help {

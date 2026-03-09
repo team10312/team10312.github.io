@@ -24,6 +24,16 @@ const STORAGE_KEYS = {
   pitDraftSavedAt: "bf-scouting-pit-draft-saved-v1"
 };
 
+const AUTO_PATH_DEFAULTS = Object.freeze({
+  drawColor: "#ff7f00",
+  drawSize: 5,
+  eraseSize: 18,
+  minDrawSize: 2,
+  maxDrawSize: 18,
+  minEraseSize: 8,
+  maxEraseSize: 48
+});
+
 const MATCH_DEFAULTS = Object.freeze({
   scout_name: "",
   team_number: "",
@@ -113,6 +123,9 @@ let activeCustomSelect = null;
 let customSelectEventsBound = false;
 const autoPathState = {
   mode: "draw",
+  drawColor: AUTO_PATH_DEFAULTS.drawColor,
+  drawSize: AUTO_PATH_DEFAULTS.drawSize,
+  eraseSize: AUTO_PATH_DEFAULTS.eraseSize,
   strokes: [],
   activeStroke: null,
   pointerId: null,
@@ -206,6 +219,8 @@ function cacheDom() {
   elements.matchSubmitButton = document.getElementById("matchSubmitButton");
   elements.matchDraftStamp = document.getElementById("matchDraftStamp");
   elements.matchFormMessage = document.getElementById("matchFormMessage");
+  elements.shiftPatternInput = document.getElementById("shiftPatternInput");
+  elements.shiftPatternToggle = document.getElementById("shiftPatternToggle");
   elements.pitForm = document.getElementById("pitForm");
   elements.pitSaveDraftButton = document.getElementById("pitSaveDraftButton");
   elements.pitSubmitButton = document.getElementById("pitSubmitButton");
@@ -218,6 +233,12 @@ function cacheDom() {
   elements.autoPathDrawingInput = document.getElementById("autoPathDrawingInput");
   elements.autoPathDrawButton = document.getElementById("autoPathDrawButton");
   elements.autoPathEraseButton = document.getElementById("autoPathEraseButton");
+  elements.autoPathColorInput = document.getElementById("autoPathColorInput");
+  elements.autoPathColorValue = document.getElementById("autoPathColorValue");
+  elements.autoPathDrawSizeInput = document.getElementById("autoPathDrawSizeInput");
+  elements.autoPathDrawSizeValue = document.getElementById("autoPathDrawSizeValue");
+  elements.autoPathEraseSizeInput = document.getElementById("autoPathEraseSizeInput");
+  elements.autoPathEraseSizeValue = document.getElementById("autoPathEraseSizeValue");
   elements.autoPathUndoButton = document.getElementById("autoPathUndoButton");
   elements.autoPathClearButton = document.getElementById("autoPathClearButton");
   elements.exportMatchButton = document.getElementById("exportMatchButton");
@@ -348,6 +369,27 @@ function initAutoPathBoard() {
     });
   }
 
+  if (elements.autoPathColorInput) {
+    elements.autoPathColorInput.addEventListener("input", (event) => {
+      autoPathState.drawColor = sanitizeAutoPathColor(event.target.value);
+      syncAutoPathToolSettings();
+    });
+  }
+
+  if (elements.autoPathDrawSizeInput) {
+    elements.autoPathDrawSizeInput.addEventListener("input", (event) => {
+      autoPathState.drawSize = normalizeAutoPathStrokeSize("draw", event.target.value);
+      syncAutoPathToolSettings();
+    });
+  }
+
+  if (elements.autoPathEraseSizeInput) {
+    elements.autoPathEraseSizeInput.addEventListener("input", (event) => {
+      autoPathState.eraseSize = normalizeAutoPathStrokeSize("erase", event.target.value);
+      syncAutoPathToolSettings();
+    });
+  }
+
   if (elements.autoPathUndoButton) {
     elements.autoPathUndoButton.addEventListener("click", () => {
       if (!autoPathState.strokes.length) return;
@@ -359,7 +401,13 @@ function initAutoPathBoard() {
 
   if (elements.autoPathClearButton) {
     elements.autoPathClearButton.addEventListener("click", () => {
+      if (!autoPathState.strokes.length && !autoPathState.activeStroke) return;
+      const confirmed = window.confirm("Clear the entire auto path drawing?");
+      if (!confirmed) return;
+
       autoPathState.strokes = [];
+      autoPathState.activeStroke = null;
+      autoPathState.pointerId = null;
       persistAutoPathDrawing();
       renderAutoPathCanvas();
     });
@@ -399,6 +447,59 @@ function setAutoPathMode(mode) {
   if (elements.autoPathEraseButton) {
     elements.autoPathEraseButton.classList.toggle("is-active", autoPathState.mode === "erase");
   }
+
+  syncAutoPathToolSettings();
+}
+
+function syncAutoPathToolSettings() {
+  autoPathState.drawColor = sanitizeAutoPathColor(autoPathState.drawColor);
+  autoPathState.drawSize = normalizeAutoPathStrokeSize("draw", autoPathState.drawSize);
+  autoPathState.eraseSize = normalizeAutoPathStrokeSize("erase", autoPathState.eraseSize);
+
+  if (elements.autoPathColorInput) {
+    elements.autoPathColorInput.value = autoPathState.drawColor;
+  }
+
+  if (elements.autoPathColorValue) {
+    elements.autoPathColorValue.textContent = autoPathState.drawColor.toUpperCase();
+  }
+
+  if (elements.autoPathDrawSizeInput) {
+    elements.autoPathDrawSizeInput.value = String(autoPathState.drawSize);
+  }
+
+  if (elements.autoPathDrawSizeValue) {
+    elements.autoPathDrawSizeValue.textContent = `${autoPathState.drawSize} px`;
+  }
+
+  if (elements.autoPathEraseSizeInput) {
+    elements.autoPathEraseSizeInput.value = String(autoPathState.eraseSize);
+  }
+
+  if (elements.autoPathEraseSizeValue) {
+    elements.autoPathEraseSizeValue.textContent = `${autoPathState.eraseSize} px`;
+  }
+
+  updateAutoPathCursor();
+}
+
+function updateAutoPathCursor() {
+  if (!elements.autoPathCanvas) return;
+
+  const isErasing = autoPathState.mode === "erase";
+  elements.autoPathCanvas.classList.toggle("is-erasing", isErasing);
+  elements.autoPathCanvas.style.cursor = isErasing
+    ? buildAutoPathEraserCursor(autoPathState.eraseSize)
+    : "crosshair";
+}
+
+function buildAutoPathEraserCursor(size) {
+  const diameter = normalizeAutoPathStrokeSize("erase", size);
+  const cursorSize = clampInteger(Math.max(diameter + 12, 24), 24, 64);
+  const center = Math.round(cursorSize / 2);
+  const radius = Math.max(4, Math.min(center - 3, Math.round(diameter / 2)));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cursorSize}" height="${cursorSize}" viewBox="0 0 ${cursorSize} ${cursorSize}"><circle cx="${center}" cy="${center}" r="${radius}" fill="#ffffff" fill-opacity="0.14" stroke="#ff7f00" stroke-width="2"/><circle cx="${center}" cy="${center}" r="1.5" fill="#ff7f00"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${center} ${center}, crosshair`;
 }
 
 function syncAutoPathCanvasSize() {
@@ -430,6 +531,11 @@ function handleAutoPathPointerDown(event) {
   autoPathState.pointerId = event.pointerId;
   autoPathState.activeStroke = {
     mode: autoPathState.mode,
+    color: autoPathState.mode === "erase" ? "" : autoPathState.drawColor,
+    size:
+      autoPathState.mode === "erase"
+        ? normalizeAutoPathStrokeSize("erase", autoPathState.eraseSize)
+        : normalizeAutoPathStrokeSize("draw", autoPathState.drawSize),
     points: [point]
   };
 
@@ -515,12 +621,16 @@ function drawAutoPathStroke(context, stroke, width, height) {
   const points = Array.isArray(stroke?.points) ? stroke.points : [];
   if (!points.length) return;
 
+  const isErasing = stroke.mode === "erase";
+  const strokeColor = isErasing ? "#000000" : sanitizeAutoPathColor(stroke.color);
+  const strokeSize = normalizeAutoPathStrokeSize(stroke.mode, stroke.size);
+
   context.save();
-  context.strokeStyle = stroke.mode === "erase" ? "rgba(0, 0, 0, 1)" : "#ff7f00";
-  context.globalCompositeOperation = stroke.mode === "erase" ? "destination-out" : "source-over";
-  context.lineWidth = stroke.mode === "erase" ? 18 : 5;
-  context.shadowBlur = stroke.mode === "erase" ? 0 : 14;
-  context.shadowColor = stroke.mode === "erase" ? "transparent" : "rgba(255, 127, 0, 0.35)";
+  context.strokeStyle = isErasing ? "rgba(0, 0, 0, 1)" : strokeColor;
+  context.globalCompositeOperation = isErasing ? "destination-out" : "source-over";
+  context.lineWidth = strokeSize;
+  context.shadowBlur = isErasing ? 0 : 14;
+  context.shadowColor = isErasing ? "transparent" : hexToRgba(strokeColor, 0.35);
 
   context.beginPath();
   context.moveTo(points[0].x * width, points[0].y * height);
@@ -570,10 +680,15 @@ function parseAutoPathDrawing(serialized) {
     if (!Array.isArray(parsed)) return [];
 
     return parsed
-      .map((stroke) => ({
-        mode: stroke?.mode === "erase" ? "erase" : "draw",
-        points: normalizeStrokePoints(Array.isArray(stroke?.points) ? stroke.points : [])
-      }))
+      .map((stroke) => {
+        const mode = stroke?.mode === "erase" ? "erase" : "draw";
+        return {
+          mode,
+          color: mode === "erase" ? "" : sanitizeAutoPathColor(stroke?.color),
+          size: normalizeAutoPathStrokeSize(mode, stroke?.size),
+          points: normalizeStrokePoints(Array.isArray(stroke?.points) ? stroke.points : [])
+        };
+      })
       .filter((stroke) => stroke.points.length);
   } catch (error) {
     return [];
@@ -655,10 +770,14 @@ function openCustomSelect(select) {
 }
 
 function closeCustomSelect(select) {
-  if (!select || activeCustomSelect !== select) return;
-  activeCustomSelect = null;
   const refs = customSelectRegistry.get(select);
-  if (refs) refs.highlightedIndex = -1;
+  if (!refs) return;
+
+  if (activeCustomSelect === select) {
+    activeCustomSelect = null;
+  }
+
+  refs.highlightedIndex = -1;
   syncCustomSelect(select);
 }
 
@@ -777,6 +896,29 @@ function findSelectableOptionIndex(options, startIndex, step) {
 
 function isSelectableOption(options, index) {
   return index >= 0 && index < options.length && !options[index].disabled;
+}
+
+function normalizeAutoPathStrokeSize(mode, value) {
+  const isErasing = mode === "erase";
+  const fallback = isErasing ? AUTO_PATH_DEFAULTS.eraseSize : AUTO_PATH_DEFAULTS.drawSize;
+  const min = isErasing ? AUTO_PATH_DEFAULTS.minEraseSize : AUTO_PATH_DEFAULTS.minDrawSize;
+  const max = isErasing ? AUTO_PATH_DEFAULTS.maxEraseSize : AUTO_PATH_DEFAULTS.maxDrawSize;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return clampInteger(parsed, min, max);
+}
+
+function sanitizeAutoPathColor(value) {
+  const normalized = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(normalized) ? normalized.toLowerCase() : AUTO_PATH_DEFAULTS.drawColor;
+}
+
+function hexToRgba(color, alpha = 1) {
+  const normalized = sanitizeAutoPathColor(color).slice(1);
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${clampNumber(alpha, 0, 1)})`;
 }
 
 function bindEvents() {
@@ -1040,10 +1182,23 @@ function hydrateDraftForms() {
 function bindShiftAvailability() {
   if (!elements.matchForm) return;
 
+  if (elements.shiftPatternToggle) {
+    elements.shiftPatternToggle.addEventListener("click", () => {
+      const nextValue = getMatchShiftPatternValue(elements.matchForm) === "alternate" ? "team" : "alternate";
+      setMatchShiftPatternValue(nextValue, { dispatch: true });
+      updateShiftFieldAvailability();
+    });
+  }
+
+  elements.matchForm.querySelectorAll('[name="alliance_color"]').forEach((field) => {
+    field.addEventListener("change", () => {
+      updateShiftFieldAvailability();
+    });
+  });
+
   elements.matchForm.querySelectorAll('[name="shift_pattern"]').forEach((field) => {
     field.addEventListener("change", () => {
       updateShiftFieldAvailability();
-      persistDraft("match");
     });
   });
 }
@@ -1936,7 +2091,7 @@ function collectMatchValues() {
     match_number: readFieldValue(form, "match_number"),
     match_type: readFieldValue(form, "match_type"),
     alliance_color: readRadioValue(form, "alliance_color", "Blue"),
-    shift_pattern: readRadioValue(form, "shift_pattern", "team"),
+    shift_pattern: getMatchShiftPatternValue(form),
     station: readRadioValue(form, "station", "1"),
     auto_fuel: readFieldValue(form, "auto_fuel"),
     auto_tower_result: readFieldValue(form, "auto_tower_result"),
@@ -2452,6 +2607,11 @@ function setCounterCardsValidationState(form, valid, active) {
 function focusFormValidationTarget(form, name) {
   if (!name) return;
 
+  if (name === "shift_pattern" && elements.shiftPatternToggle) {
+    elements.shiftPatternToggle.focus();
+    return;
+  }
+
   const field = form?.querySelector(`[name="${name}"]`);
   if (!field) return;
 
@@ -2617,6 +2777,40 @@ function getOpposingAlliance(allianceColor) {
   return normalizeAllianceColor(allianceColor) === "Red" ? "Blue" : "Red";
 }
 
+function getMatchShiftPatternValue(form = elements.matchForm) {
+  const hiddenField = form?.querySelector('[name="shift_pattern"]');
+  if (hiddenField) {
+    return normalizeShiftPattern(hiddenField.value);
+  }
+
+  return normalizeShiftPattern(readRadioValue(form, "shift_pattern", MATCH_DEFAULTS.shift_pattern));
+}
+
+function setMatchShiftPatternValue(value, { dispatch = false } = {}) {
+  const normalized = normalizeShiftPattern(value);
+
+  if (elements.shiftPatternInput) {
+    elements.shiftPatternInput.value = normalized;
+  }
+
+  syncShiftPatternToggle(normalized);
+
+  if (dispatch && elements.shiftPatternInput) {
+    elements.shiftPatternInput.dispatchEvent(new Event("input", { bubbles: true }));
+    elements.shiftPatternInput.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  return normalized;
+}
+
+function syncShiftPatternToggle(value = getMatchShiftPatternValue(elements.matchForm)) {
+  if (!elements.shiftPatternToggle) return;
+
+  const isAlternate = normalizeShiftPattern(value) === "alternate";
+  elements.shiftPatternToggle.classList.toggle("is-active", isAlternate);
+  elements.shiftPatternToggle.setAttribute("aria-pressed", isAlternate ? "true" : "false");
+}
+
 function getShift1Alliance(allianceColor, shiftPattern) {
   const selectedAlliance = normalizeAllianceColor(allianceColor);
   return shiftPattern === "alternate" ? getOpposingAlliance(selectedAlliance) : selectedAlliance;
@@ -2630,11 +2824,16 @@ function isTrackedShift(shiftNumber, shiftPattern) {
 function updateShiftFieldAvailability() {
   if (!elements.matchForm) return;
 
-  const shiftPattern = readRadioValue(elements.matchForm, "shift_pattern", "team");
+  const shiftPattern = getMatchShiftPatternValue(elements.matchForm);
+  const selectedAlliance = readRadioValue(elements.matchForm, "alliance_color", MATCH_DEFAULTS.alliance_color);
+  const shift1Alliance = getShift1Alliance(selectedAlliance, shiftPattern);
   let valuesChanged = false;
+
+  syncShiftPatternToggle(shiftPattern);
 
   [1, 2, 3, 4].forEach((shiftNumber) => {
     const active = isTrackedShift(shiftNumber, shiftPattern);
+    const shiftAlliance = shiftNumber % 2 === 1 ? shift1Alliance : getOpposingAlliance(shift1Alliance);
     const card = elements.matchForm.querySelector(`[data-shift-card="${shiftNumber}"]`);
     const label = document.getElementById(`shift-${shiftNumber}-label`);
     const note = document.getElementById(`shift-${shiftNumber}-note`);
@@ -2643,7 +2842,7 @@ function updateShiftFieldAvailability() {
       `[data-counter-target="match-shift_${shiftNumber}_fuel"]`
     );
 
-    if (label) label.textContent = `Shift ${shiftNumber}`;
+    if (label) label.textContent = `Shift ${shiftNumber} · ${shiftAlliance}`;
     if (note) note.textContent = active ? "Your scoring shift" : "Opposing scoring shift";
     if (card) card.classList.toggle("counter-card--disabled", !active);
 
