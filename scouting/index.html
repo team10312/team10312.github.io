@@ -261,6 +261,13 @@
                 <span class="muted form-context">2026 REBUILT match breakdown</span>
               </div>
 
+              <label class="field">
+                <span>Load Past Match Scout</span>
+                <select id="matchEntryLoadSelect" aria-label="Load past match scout">
+                  <option value="">No past match scouts for this event</option>
+                </select>
+              </label>
+
               <div class="form-grid form-grid--wide">
                 <label class="field">
                   <span>Scout Name</span>
@@ -468,6 +475,13 @@
                 <span class="muted form-context">Robot capabilities and repair risk</span>
               </div>
 
+              <label class="field">
+                <span>Load Past Pit Scout</span>
+                <select id="pitEntryLoadSelect" aria-label="Load past pit scout">
+                  <option value="">No past pit scouts for this event</option>
+                </select>
+              </label>
+
               <div class="form-grid form-grid--wide">
                 <label class="field">
                   <span>Scout Name</span>
@@ -506,15 +520,6 @@
                     inputmode="numeric"
                     placeholder="60"
                   />
-                </label>
-                <label class="field">
-                  <span>Tower Capability</span>
-                  <select name="tower_capability">
-                    <option>Consistent</option>
-                    <option>Sometimes</option>
-                    <option>Rarely</option>
-                    <option>None</option>
-                  </select>
                 </label>
                 <label class="field">
                   <span>Defense Capability</span>
@@ -572,14 +577,15 @@
                 </label>
                 <label class="field">
                   <span>Climb Level</span>
-                  <input name="climb_level" type="text" maxlength="60" placeholder="None, low, mid, high, or specific level" />
+                  <select name="climb_level">
+                    <option value="">Select level</option>
+                    <option>Level 1</option>
+                    <option>Level 2</option>
+                    <option>Level 3</option>
+                  </select>
                 </label>
               </div>
 
-              <label class="field">
-                <span>Auto Summary</span>
-                <textarea name="auto_summary" rows="3" placeholder="Starting spots, auto fuel routes, tower routine"></textarea>
-              </label>
               <div id="autoPathField" class="field auto-path-field">
                 <div class="auto-path-head">
                   <span>Auto Path Drawing</span>

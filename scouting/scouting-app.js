@@ -64,7 +64,6 @@ const PIT_DEFAULTS = Object.freeze({
   drivetrain: "Swerve",
   fuel_scoring_capability: "High volume",
   estimated_fuel_per_match: "",
-  tower_capability: "Consistent",
   cycle_time: "",
   scoring_speed: "Unknown",
   intake_style: "Unknown",
@@ -215,6 +214,7 @@ function cacheDom() {
   elements.summaryCount = document.getElementById("summaryCount");
   elements.summaryTableBody = document.getElementById("summaryTableBody");
   elements.matchForm = document.getElementById("matchForm");
+  elements.matchEntryLoadSelect = document.getElementById("matchEntryLoadSelect");
   elements.matchSaveDraftButton = document.getElementById("matchSaveDraftButton");
   elements.matchSubmitButton = document.getElementById("matchSubmitButton");
   elements.matchDraftStamp = document.getElementById("matchDraftStamp");
@@ -222,6 +222,7 @@ function cacheDom() {
   elements.shiftPatternInput = document.getElementById("shiftPatternInput");
   elements.shiftPatternToggle = document.getElementById("shiftPatternToggle");
   elements.pitForm = document.getElementById("pitForm");
+  elements.pitEntryLoadSelect = document.getElementById("pitEntryLoadSelect");
   elements.pitSaveDraftButton = document.getElementById("pitSaveDraftButton");
   elements.pitSubmitButton = document.getElementById("pitSubmitButton");
   elements.pitDraftStamp = document.getElementById("pitDraftStamp");
@@ -967,6 +968,18 @@ function bindEvents() {
     elements.teamSearch.addEventListener("input", renderSummaryTable);
   }
 
+  if (elements.matchEntryLoadSelect) {
+    elements.matchEntryLoadSelect.addEventListener("change", () => {
+      handleScoutReload("match");
+    });
+  }
+
+  if (elements.pitEntryLoadSelect) {
+    elements.pitEntryLoadSelect.addEventListener("change", () => {
+      handleScoutReload("pit");
+    });
+  }
+
   elements.tabButtons.forEach((button) => {
     button.addEventListener("click", () => {
       showTab(button.dataset.tab || "overview");
@@ -1626,6 +1639,7 @@ function renderAll() {
   renderStats();
   renderOutbox();
   renderSummaryTable();
+  renderScoutReloadOptions();
   renderDraftStamp("match");
   renderDraftStamp("pit");
   renderFormAvailability();
@@ -1862,6 +1876,123 @@ function renderFormAvailability() {
   if (elements.exportSummaryButton) elements.exportSummaryButton.disabled = !state.teamSummary.length;
 }
 
+function renderScoutReloadOptions() {
+  renderScoutReloadSelect("match", state.matchEntries);
+  renderScoutReloadSelect("pit", state.pitEntries);
+}
+
+function renderScoutReloadSelect(kind, entries) {
+  const select = kind === "match" ? elements.matchEntryLoadSelect : elements.pitEntryLoadSelect;
+  if (!select) return;
+
+  const event = getActiveEvent();
+  const rows = !state.isRefreshing && state.session && event && Array.isArray(entries) ? entries : [];
+  const placeholder = buildScoutReloadPlaceholder(kind, rows.length > 0);
+
+  select.innerHTML = "";
+
+  const placeholderOption = document.createElement("option");
+  placeholderOption.value = "";
+  placeholderOption.textContent = placeholder;
+  select.appendChild(placeholderOption);
+
+  rows.forEach((entry) => {
+    const option = document.createElement("option");
+    option.value = getScoutReloadEntryValue(entry, kind);
+    option.textContent = formatScoutReloadOptionLabel(entry, kind);
+    select.appendChild(option);
+  });
+
+  select.disabled = !rows.length;
+  select.value = "";
+  refreshCustomSelect(select);
+}
+
+function buildScoutReloadPlaceholder(kind, hasEntries) {
+  const label = kind === "match" ? "match scout" : "pit scout";
+
+  if (!state.session) {
+    return `Sign in to load past ${label}s`;
+  }
+
+  if (!getActiveEvent()) {
+    return "Select an event first";
+  }
+
+  if (state.isRefreshing) {
+    return `Refreshing past ${label}s...`;
+  }
+
+  if (!hasEntries) {
+    return `No past ${label}s for this event`;
+  }
+
+  return `Select a past ${label}`;
+}
+
+function formatScoutReloadOptionLabel(entry, kind) {
+  if (kind === "match") {
+    return [
+      `Team ${entry.team_number || "?"}`,
+      `${entry.match_type || "Match"} ${entry.match_number || ""}`.trim(),
+      entry.scout_name || "",
+      formatDateTime(entry.created_at)
+    ]
+      .filter(Boolean)
+      .join(" • ");
+  }
+
+  return [
+    `Team ${entry.team_number || "?"}`,
+    entry.scout_name || "",
+    formatDateTime(entry.created_at)
+  ]
+    .filter(Boolean)
+    .join(" • ");
+}
+
+function getScoutReloadEntryValue(entry, kind) {
+  const fallback =
+    kind === "match"
+      ? `match:${entry.team_number || ""}:${entry.match_number || ""}:${entry.created_at || ""}`
+      : `pit:${entry.team_number || ""}:${entry.created_at || ""}`;
+  return String(entry?.id || fallback);
+}
+
+function handleScoutReload(kind) {
+  const isMatch = kind === "match";
+  const select = isMatch ? elements.matchEntryLoadSelect : elements.pitEntryLoadSelect;
+  const form = isMatch ? elements.matchForm : elements.pitForm;
+  const messageTarget = isMatch ? elements.matchFormMessage : elements.pitFormMessage;
+  const entries = isMatch ? state.matchEntries : state.pitEntries;
+  const selectedValue = String(select?.value || "");
+
+  if (!selectedValue) return;
+
+  const entry = entries.find((row) => getScoutReloadEntryValue(row, kind) === selectedValue);
+  resetScoutReloadSelect(select);
+
+  if (!entry) {
+    setFormMessage(messageTarget, "That scout entry is no longer available.", "warn");
+    return;
+  }
+
+  setFormValues(form, isMatch ? normalizeMatchValues(entry) : normalizePitValues(entry));
+  deactivateFormValidation(form);
+  persistDraft(kind);
+
+  const detail = isMatch
+    ? `Team ${entry.team_number || "?"}, ${entry.match_type || "Match"} ${entry.match_number || ""}`.trim()
+    : `Team ${entry.team_number || "?"}`;
+  setFormMessage(messageTarget, `Loaded past ${kind} scout for ${detail}.`, "success");
+}
+
+function resetScoutReloadSelect(select) {
+  if (!select) return;
+  select.value = "";
+  refreshCustomSelect(select);
+}
+
 function persistDraft(kind, { manual = false } = {}) {
   const isMatch = kind === "match";
   const storageKey = isMatch ? STORAGE_KEYS.matchDraft : STORAGE_KEYS.pitDraft;
@@ -1950,7 +2081,7 @@ function buildPitPayload() {
     fuel_scoring_capability: values.fuel_scoring_capability,
     estimated_fuel_per_match: toNonNegativeInteger(values.estimated_fuel_per_match),
     auto_path_drawing: values.auto_path_drawing,
-    tower_capability: values.tower_capability,
+    tower_capability: "",
     cycle_time: values.cycle_time,
     scoring_speed: values.scoring_speed,
     intake_style: values.intake_style,
@@ -2040,7 +2171,7 @@ function validatePitForm({ apply = false } = {}) {
 
   checkField("scout_name", Boolean(values.scout_name), "Scout name is required.");
   checkField("team_number", toPositiveInteger(values.team_number) > 0, "Enter a valid team number.");
-  checkField("cycle_time", hasMeaningfulText(values.cycle_time, 3), "Add the team's cycle time.");
+  checkField("cycle_time", Boolean(values.cycle_time), "Add the team's cycle time.");
   checkField(
     "estimated_fuel_per_match",
     toNonNegativeInteger(values.estimated_fuel_per_match) > 0,
@@ -2061,18 +2192,17 @@ function validatePitForm({ apply = false } = {}) {
     Boolean(values.shooter_type) && values.shooter_type !== "Unknown",
     "Choose the team's shooter type."
   );
-  const hasAutoDetail = hasMeaningfulText(values.auto_summary, 8) || hasAutoPathDrawing(values.auto_path_drawing);
+  const hasAutoDetail = hasAutoPathDrawing(values.auto_path_drawing);
   if (apply) {
-    setFieldValidationState(form, "auto_summary", hasAutoDetail, showState);
     setFieldValidationState(form, "auto_path_drawing", hasAutoDetail, showState);
   }
   if (!hasAutoDetail && !message) {
-    message = "Add a short auto summary or draw the team's auto path.";
-    focusName = "auto_summary";
+    message = "Draw the team's auto path.";
+    focusName = "auto_path_drawing";
   }
   checkField(
     "preferred_strategy",
-    hasMeaningfulText(values.preferred_strategy, 8),
+    Boolean(values.preferred_strategy),
     "Add the team's preferred strategy."
   );
 
@@ -2118,7 +2248,6 @@ function collectPitValues() {
     drivetrain: readFieldValue(form, "drivetrain"),
     fuel_scoring_capability: readFieldValue(form, "fuel_scoring_capability"),
     estimated_fuel_per_match: readFieldValue(form, "estimated_fuel_per_match"),
-    tower_capability: readFieldValue(form, "tower_capability"),
     cycle_time: readFieldValue(form, "cycle_time"),
     scoring_speed: readFieldValue(form, "scoring_speed"),
     intake_style: readFieldValue(form, "intake_style"),
@@ -2236,7 +2365,6 @@ function buildTeamSummary(matchEntries, pitEntries) {
       drivetrain: pit?.drivetrain || "",
       fuel_scoring_capability: pit?.fuel_scoring_capability || "",
       estimated_fuel_per_match: Number(pit?.estimated_fuel_per_match || 0),
-      tower_capability: pit?.tower_capability || "",
       cycle_time: pit?.cycle_time || "",
       scoring_speed: pit?.scoring_speed || "",
       intake_style: pit?.intake_style || "",
@@ -2265,7 +2393,6 @@ function normalizeSummaryRow(row) {
     drivetrain: row.drivetrain || "",
     fuel_scoring_capability: row.fuel_scoring_capability || "",
     estimated_fuel_per_match: Number(row.estimated_fuel_per_match || 0),
-    tower_capability: row.tower_capability || "",
     cycle_time: row.cycle_time || "",
     scoring_speed: row.scoring_speed || "",
     intake_style: row.intake_style || "",
@@ -2345,7 +2472,6 @@ function exportPitCsv() {
     drivetrain: entry.drivetrain,
     fuel_scoring_capability: entry.fuel_scoring_capability,
     estimated_fuel_per_match: Number(entry.estimated_fuel_per_match || 0),
-    tower_capability: entry.tower_capability,
     cycle_time: entry.cycle_time,
     scoring_speed: entry.scoring_speed,
     intake_style: entry.intake_style,
@@ -2381,7 +2507,6 @@ function exportSummaryCsv() {
     drivetrain: row.drivetrain,
     fuel_scoring_capability: row.fuel_scoring_capability,
     estimated_fuel_per_match: row.estimated_fuel_per_match,
-    tower_capability: row.tower_capability,
     cycle_time: row.cycle_time,
     scoring_speed: row.scoring_speed,
     intake_style: row.intake_style,
@@ -2726,7 +2851,6 @@ function normalizePitValues(values) {
       values.fuel_scoring_capability ?? PIT_DEFAULTS.fuel_scoring_capability
     ).trim(),
     estimated_fuel_per_match: normalizeNumericDraftValue(values.estimated_fuel_per_match),
-    tower_capability: String(values.tower_capability ?? PIT_DEFAULTS.tower_capability).trim(),
     cycle_time: String(values.cycle_time ?? "").trim(),
     scoring_speed: String(values.scoring_speed ?? PIT_DEFAULTS.scoring_speed).trim(),
     intake_style: String(values.intake_style ?? PIT_DEFAULTS.intake_style).trim(),
