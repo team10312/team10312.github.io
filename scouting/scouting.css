@@ -304,7 +304,7 @@ code {
 }
 
 .section {
-  padding: 1.2rem 0 3rem;
+  padding: 1.5rem 0 3.4rem;
 }
 
 .card {
@@ -346,7 +346,12 @@ code {
 
 .app-container {
   display: grid;
-  gap: 1.35rem;
+  gap: 1.8rem;
+}
+
+.app-shell {
+  display: grid;
+  gap: 1.65rem;
 }
 
 .setup-banner {
@@ -417,7 +422,8 @@ code {
 
 .app-toolbar {
   display: grid;
-  gap: 0.9rem;
+  gap: 1.2rem;
+  padding: 1.65rem;
 }
 
 .toolbar-head,
@@ -426,14 +432,14 @@ code {
 .footer-bottom {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1.2rem 1.4rem;
   align-items: flex-start;
   flex-wrap: wrap;
 }
 
 .toolbar-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.9rem;
   align-items: flex-end;
   flex-wrap: wrap;
 }
@@ -443,8 +449,13 @@ code {
 .export-actions,
 .footer-links {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.toolbar-copy {
+  margin: 0;
+  line-height: 1.6;
 }
 
 .tab-button {
@@ -452,7 +463,7 @@ code {
   border: 1px solid var(--panel-border);
   border-radius: 999px;
   background: var(--panel);
-  padding: 0.85rem 1rem;
+  padding: 0.95rem 1.2rem;
   cursor: pointer;
   font-weight: 700;
   color: var(--muted);
@@ -468,7 +479,7 @@ code {
 
 .tab-panel {
   display: grid;
-  gap: 1.35rem;
+  gap: 1.6rem;
 }
 
 .hidden {
@@ -477,28 +488,53 @@ code {
 
 .stat-grid {
   display: grid;
-  gap: 1.15rem;
+  gap: 1.3rem;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.stat-card {
+  padding: 1.55rem;
+  min-height: 12.6rem;
 }
 
 .stat-card strong {
   display: block;
   font-size: clamp(2rem, 4vw, 2.8rem);
-  margin: 0.35rem 0 0.4rem;
+  margin: 0.45rem 0 0.65rem;
+}
+
+.stat-card p {
+  margin: 0;
+  line-height: 1.55;
 }
 
 .overview-grid {
   display: grid;
-  gap: 1.15rem;
+  gap: 1.3rem;
   grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
   align-items: start;
+}
+
+.overview-grid > :only-child {
+  grid-column: 1 / -1;
 }
 
 .queue-card,
 .summary-card,
 .export-card {
   display: grid;
-  gap: 0.8rem;
+  gap: 1rem;
+}
+
+.summary-count {
+  margin: 0.1rem 0 0.2rem;
+}
+
+.table-wrap {
+  margin-top: 0.15rem;
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid var(--panel-border);
 }
 
 .outbox-list {
@@ -527,16 +563,6 @@ code {
   border-radius: 14px;
   padding: 1rem;
   color: var(--muted);
-}
-
-.summary-count {
-  margin: 0;
-}
-
-.table-wrap {
-  overflow: auto;
-  border-radius: 14px;
-  border: 1px solid var(--panel-border);
 }
 
 .summary-table {

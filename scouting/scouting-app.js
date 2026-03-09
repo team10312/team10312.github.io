@@ -974,6 +974,10 @@ function renderStats() {
 }
 
 function renderOutbox() {
+  if (!elements.outboxList || !elements.outboxEmpty) {
+    return;
+  }
+
   elements.outboxList.innerHTML = "";
   elements.outboxEmpty.classList.toggle("hidden", state.outbox.length > 0);
 
