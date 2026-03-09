@@ -107,26 +107,26 @@
             and export a clean event dataset for strategy review.
           </p>
           <div class="hero-highlights">
-            <div class="highlight-pill">Fast match logging</div>
-            <div class="highlight-pill">Pit notes ready</div>
-            <div class="highlight-pill">Works without signal</div>
-            <div class="highlight-pill">Alliance prep exports</div>
+            <div class="highlight-pill">Overview dashboard</div>
+            <div class="highlight-pill">Match scouting</div>
+            <div class="highlight-pill">Pit scouting</div>
+            <div class="highlight-pill">CSV exports</div>
           </div>
         </div>
         <div class="card hero-sidecard">
-          <h2>Event-day workflow</h2>
+          <h2>How the team uses this</h2>
           <div class="mini-list">
             <div>
-              <strong>1. Unlock once</strong>
-              <p class="muted">A Google sign-in session persists on each device until the scout signs out.</p>
+              <strong>1. Pit scout in the pits</strong>
+              <p class="muted">Use Pit Scouting to record other teams' drivetrain, intake, auto paths, strengths, and repair risks.</p>
             </div>
             <div>
-              <strong>2. Log fast</strong>
-              <p class="muted">Large counters and compact selectors keep input usable between cycles.</p>
+              <strong>2. Match scout from the stands</strong>
+              <p class="muted">Use Match Scouting to follow one robot each match and log scoring, defense, fouls, breakdowns, and notes.</p>
             </div>
             <div>
-              <strong>3. Recover offline</strong>
-              <p class="muted">Failed syncs stay in a local outbox until you retry from the overview tab.</p>
+              <strong>3. Review before strategy talks</strong>
+              <p class="muted">Use Team Summary and exports to compare teams, spot trends, and prep for alliance selection or match planning.</p>
             </div>
           </div>
         </div>
@@ -299,15 +299,15 @@
                   </div>
                 </div>
                 <div class="field">
-                  <span>Shift 1 Starts With</span>
+                  <span>Shift Pattern</span>
                   <div class="segmented segmented--2" data-segmented>
                     <label>
-                      <input type="radio" name="shift_1_alliance" value="Blue" checked />
-                      <span>Blue</span>
+                      <input type="radio" name="shift_pattern" value="team" checked />
+                      <span>Shift 1 is ours</span>
                     </label>
                     <label>
-                      <input type="radio" name="shift_1_alliance" value="Red" />
-                      <span>Red</span>
+                      <input type="radio" name="shift_pattern" value="alternate" />
+                      <span>Alternate shifts</span>
                     </label>
                   </div>
                 </div>
@@ -499,6 +499,16 @@
                   </select>
                 </label>
                 <label class="field">
+                  <span>Estimated Total Fuel / Match</span>
+                  <input
+                    name="estimated_fuel_per_match"
+                    type="number"
+                    min="0"
+                    inputmode="numeric"
+                    placeholder="60"
+                  />
+                </label>
+                <label class="field">
                   <span>Tower Capability</span>
                   <select name="tower_capability">
                     <option>Consistent</option>
@@ -571,6 +581,30 @@
                 <span>Auto Summary</span>
                 <textarea name="auto_summary" rows="3" placeholder="Starting spots, auto fuel routes, tower routine"></textarea>
               </label>
+              <div id="autoPathField" class="field auto-path-field">
+                <div class="auto-path-head">
+                  <span>Auto Path Drawing</span>
+                  <div class="auto-path-actions">
+                    <button id="autoPathDrawButton" type="button" class="btn secondary auto-path-button is-active">Draw</button>
+                    <button id="autoPathEraseButton" type="button" class="btn secondary auto-path-button">Erase</button>
+                    <button id="autoPathUndoButton" type="button" class="btn secondary auto-path-button">Undo</button>
+                    <button id="autoPathClearButton" type="button" class="btn secondary auto-path-button">Clear</button>
+                  </div>
+                </div>
+                <input id="autoPathDrawingInput" name="auto_path_drawing" type="hidden" value="" />
+                <div id="autoPathBoard" class="auto-path-board">
+                  <img
+                    id="autoPathFieldImage"
+                    class="auto-path-image"
+                    src="/scouting/FE-2026-_REBUILT_Playing_Field_With_Fuel_With_Background.png"
+                    alt="2026 REBUILT playing field for drawing autonomous paths"
+                  />
+                  <canvas id="autoPathCanvas" class="auto-path-canvas"></canvas>
+                </div>
+                <p class="muted auto-path-help">
+                  Draw the robot's autonomous route on the field image. Use Draw or Erase, then Undo or Clear if needed.
+                </p>
+              </div>
               <label class="field">
                 <span>Preferred Strategy</span>
                 <textarea name="preferred_strategy" rows="3" placeholder="Cycle focus, feeder side, defense pairings, or endgame plan"></textarea>

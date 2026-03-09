@@ -30,7 +30,7 @@ const MATCH_DEFAULTS = Object.freeze({
   match_number: "",
   match_type: "Qualification",
   alliance_color: "Blue",
-  shift_1_alliance: "Blue",
+  shift_pattern: "team",
   station: "1",
   auto_fuel: 0,
   auto_tower_result: "None",
@@ -53,6 +53,7 @@ const PIT_DEFAULTS = Object.freeze({
   team_number: "",
   drivetrain: "Swerve",
   fuel_scoring_capability: "High volume",
+  estimated_fuel_per_match: "",
   tower_capability: "Consistent",
   cycle_time: "",
   scoring_speed: "Unknown",
@@ -107,6 +108,17 @@ const state = {
 };
 
 const elements = {};
+const customSelectRegistry = new WeakMap();
+let activeCustomSelect = null;
+let customSelectEventsBound = false;
+const autoPathState = {
+  mode: "draw",
+  strokes: [],
+  activeStroke: null,
+  pointerId: null,
+  initialized: false,
+  resizeObserver: null
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   void init();
@@ -114,6 +126,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function init() {
   cacheDom();
+  initCustomSelects();
+  initAutoPathBoard();
   state.config = normalizeConfig(window.SCOUTING_CONFIG || {});
 
   applyYear();
@@ -197,9 +211,572 @@ function cacheDom() {
   elements.pitSubmitButton = document.getElementById("pitSubmitButton");
   elements.pitDraftStamp = document.getElementById("pitDraftStamp");
   elements.pitFormMessage = document.getElementById("pitFormMessage");
+  elements.autoPathField = document.getElementById("autoPathField");
+  elements.autoPathBoard = document.getElementById("autoPathBoard");
+  elements.autoPathCanvas = document.getElementById("autoPathCanvas");
+  elements.autoPathFieldImage = document.getElementById("autoPathFieldImage");
+  elements.autoPathDrawingInput = document.getElementById("autoPathDrawingInput");
+  elements.autoPathDrawButton = document.getElementById("autoPathDrawButton");
+  elements.autoPathEraseButton = document.getElementById("autoPathEraseButton");
+  elements.autoPathUndoButton = document.getElementById("autoPathUndoButton");
+  elements.autoPathClearButton = document.getElementById("autoPathClearButton");
   elements.exportMatchButton = document.getElementById("exportMatchButton");
   elements.exportPitButton = document.getElementById("exportPitButton");
   elements.exportSummaryButton = document.getElementById("exportSummaryButton");
+}
+
+function initCustomSelects(root = document) {
+  root.querySelectorAll("select").forEach((select) => {
+    if (customSelectRegistry.has(select)) {
+      refreshCustomSelect(select);
+      return;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "custom-select";
+
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "custom-select__trigger";
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-expanded", "false");
+    const labelText =
+      select.getAttribute("aria-label") ||
+      select.closest(".field, label")?.querySelector("span")?.textContent?.trim() ||
+      select.name ||
+      "Select option";
+    trigger.setAttribute("aria-label", labelText);
+
+    const value = document.createElement("span");
+    value.className = "custom-select__value";
+    trigger.appendChild(value);
+
+    const menu = document.createElement("div");
+    menu.className = "custom-select__menu";
+    menu.setAttribute("role", "listbox");
+    menu.hidden = true;
+
+    const menuId = `custom-select-${createId()}`;
+    menu.id = menuId;
+    trigger.setAttribute("aria-controls", menuId);
+
+    select.parentNode.insertBefore(wrapper, select);
+    wrapper.append(select, trigger, menu);
+
+    select.classList.add("custom-select__native");
+    select.tabIndex = -1;
+    select.setAttribute("aria-hidden", "true");
+
+    customSelectRegistry.set(select, {
+      wrapper,
+      trigger,
+      value,
+      menu,
+      highlightedIndex: -1
+    });
+
+    trigger.addEventListener("click", () => {
+      if (isCustomSelectOpen(select)) {
+        closeCustomSelect(select);
+      } else {
+        openCustomSelect(select);
+      }
+    });
+
+    trigger.addEventListener("keydown", (event) => {
+      handleCustomSelectKeydown(event, select);
+    });
+
+    menu.addEventListener("click", (event) => {
+      const optionButton = event.target.closest(".custom-select__option");
+      if (!optionButton) return;
+      chooseCustomSelectOption(select, Number(optionButton.dataset.optionIndex));
+    });
+
+    select.addEventListener("change", () => {
+      syncCustomSelect(select);
+    });
+
+    select.addEventListener("input", () => {
+      syncCustomSelect(select);
+    });
+
+    refreshCustomSelect(select);
+  });
+
+  if (customSelectEventsBound) return;
+  customSelectEventsBound = true;
+
+  document.addEventListener("click", (event) => {
+    if (!activeCustomSelect) return;
+    const refs = customSelectRegistry.get(activeCustomSelect);
+    if (!refs || refs.wrapper.contains(event.target)) return;
+    closeCustomSelect(activeCustomSelect);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !activeCustomSelect) return;
+    closeCustomSelect(activeCustomSelect);
+  });
+
+  window.addEventListener("blur", () => {
+    closeCustomSelect(activeCustomSelect);
+  });
+}
+
+function initAutoPathBoard() {
+  if (
+    autoPathState.initialized ||
+    !elements.autoPathBoard ||
+    !elements.autoPathCanvas ||
+    !elements.autoPathDrawingInput
+  ) {
+    return;
+  }
+
+  autoPathState.initialized = true;
+
+  if (elements.autoPathDrawButton) {
+    elements.autoPathDrawButton.addEventListener("click", () => {
+      setAutoPathMode("draw");
+    });
+  }
+
+  if (elements.autoPathEraseButton) {
+    elements.autoPathEraseButton.addEventListener("click", () => {
+      setAutoPathMode("erase");
+    });
+  }
+
+  if (elements.autoPathUndoButton) {
+    elements.autoPathUndoButton.addEventListener("click", () => {
+      if (!autoPathState.strokes.length) return;
+      autoPathState.strokes.pop();
+      persistAutoPathDrawing();
+      renderAutoPathCanvas();
+    });
+  }
+
+  if (elements.autoPathClearButton) {
+    elements.autoPathClearButton.addEventListener("click", () => {
+      autoPathState.strokes = [];
+      persistAutoPathDrawing();
+      renderAutoPathCanvas();
+    });
+  }
+
+  elements.autoPathCanvas.addEventListener("pointerdown", handleAutoPathPointerDown);
+  elements.autoPathCanvas.addEventListener("pointermove", handleAutoPathPointerMove);
+  elements.autoPathCanvas.addEventListener("pointerup", handleAutoPathPointerEnd);
+  elements.autoPathCanvas.addEventListener("pointerleave", handleAutoPathPointerEnd);
+  elements.autoPathCanvas.addEventListener("pointercancel", handleAutoPathPointerEnd);
+
+  if (typeof ResizeObserver !== "undefined") {
+    autoPathState.resizeObserver = new ResizeObserver(() => {
+      syncAutoPathCanvasSize();
+    });
+    autoPathState.resizeObserver.observe(elements.autoPathBoard);
+  }
+
+  if (elements.autoPathFieldImage && !elements.autoPathFieldImage.complete) {
+    elements.autoPathFieldImage.addEventListener("load", () => {
+      syncAutoPathCanvasSize();
+    });
+  }
+
+  setAutoPathMode("draw");
+  syncAutoPathCanvasSize();
+  loadAutoPathDrawing("");
+}
+
+function setAutoPathMode(mode) {
+  autoPathState.mode = mode === "erase" ? "erase" : "draw";
+
+  if (elements.autoPathDrawButton) {
+    elements.autoPathDrawButton.classList.toggle("is-active", autoPathState.mode === "draw");
+  }
+
+  if (elements.autoPathEraseButton) {
+    elements.autoPathEraseButton.classList.toggle("is-active", autoPathState.mode === "erase");
+  }
+}
+
+function syncAutoPathCanvasSize() {
+  const canvas = elements.autoPathCanvas;
+  const board = elements.autoPathBoard;
+  if (!canvas || !board) return;
+
+  const rect = board.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  const ratio = window.devicePixelRatio || 1;
+
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  renderAutoPathCanvas();
+}
+
+function handleAutoPathPointerDown(event) {
+  if (!elements.autoPathCanvas) return;
+  event.preventDefault();
+
+  const point = getAutoPathPoint(event);
+  autoPathState.pointerId = event.pointerId;
+  autoPathState.activeStroke = {
+    mode: autoPathState.mode,
+    points: [point]
+  };
+
+  elements.autoPathCanvas.setPointerCapture?.(event.pointerId);
+  renderAutoPathCanvas();
+}
+
+function handleAutoPathPointerMove(event) {
+  if (autoPathState.pointerId !== event.pointerId || !autoPathState.activeStroke) return;
+  event.preventDefault();
+
+  autoPathState.activeStroke.points.push(getAutoPathPoint(event));
+  renderAutoPathCanvas();
+}
+
+function handleAutoPathPointerEnd(event) {
+  if (autoPathState.pointerId !== event.pointerId || !autoPathState.activeStroke) return;
+  event.preventDefault();
+
+  const stroke = {
+    ...autoPathState.activeStroke,
+    points: normalizeStrokePoints(autoPathState.activeStroke.points)
+  };
+
+  if (stroke.points.length >= 1) {
+    autoPathState.strokes.push(stroke);
+    persistAutoPathDrawing();
+  }
+
+  autoPathState.pointerId = null;
+  autoPathState.activeStroke = null;
+  renderAutoPathCanvas();
+}
+
+function getAutoPathPoint(event) {
+  const rect = elements.autoPathCanvas.getBoundingClientRect();
+  const x = rect.width ? (event.clientX - rect.left) / rect.width : 0;
+  const y = rect.height ? (event.clientY - rect.top) / rect.height : 0;
+
+  return {
+    x: clampNumber(x, 0, 1),
+    y: clampNumber(y, 0, 1)
+  };
+}
+
+function normalizeStrokePoints(points) {
+  const normalized = [];
+
+  points.forEach((point) => {
+    const x = clampNumber(point.x, 0, 1);
+    const y = clampNumber(point.y, 0, 1);
+    const lastPoint = normalized[normalized.length - 1];
+    if (lastPoint && Math.abs(lastPoint.x - x) < 0.0015 && Math.abs(lastPoint.y - y) < 0.0015) {
+      return;
+    }
+    normalized.push({ x, y });
+  });
+
+  return normalized;
+}
+
+function renderAutoPathCanvas() {
+  const canvas = elements.autoPathCanvas;
+  const context = canvas?.getContext("2d");
+  if (!canvas || !context) return;
+
+  const width = canvas.clientWidth || 1;
+  const height = canvas.clientHeight || 1;
+  context.clearRect(0, 0, width, height);
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  autoPathState.strokes.forEach((stroke) => {
+    drawAutoPathStroke(context, stroke, width, height);
+  });
+
+  if (autoPathState.activeStroke) {
+    drawAutoPathStroke(context, autoPathState.activeStroke, width, height);
+  }
+}
+
+function drawAutoPathStroke(context, stroke, width, height) {
+  const points = Array.isArray(stroke?.points) ? stroke.points : [];
+  if (!points.length) return;
+
+  context.save();
+  context.strokeStyle = stroke.mode === "erase" ? "rgba(0, 0, 0, 1)" : "#ff7f00";
+  context.globalCompositeOperation = stroke.mode === "erase" ? "destination-out" : "source-over";
+  context.lineWidth = stroke.mode === "erase" ? 18 : 5;
+  context.shadowBlur = stroke.mode === "erase" ? 0 : 14;
+  context.shadowColor = stroke.mode === "erase" ? "transparent" : "rgba(255, 127, 0, 0.35)";
+
+  context.beginPath();
+  context.moveTo(points[0].x * width, points[0].y * height);
+
+  if (points.length === 1) {
+    context.lineTo(points[0].x * width + 0.01, points[0].y * height + 0.01);
+  } else {
+    points.slice(1).forEach((point) => {
+      context.lineTo(point.x * width, point.y * height);
+    });
+  }
+
+  context.stroke();
+  context.restore();
+}
+
+function persistAutoPathDrawing() {
+  if (!elements.autoPathDrawingInput) return;
+
+  elements.autoPathDrawingInput.value = autoPathState.strokes.length
+    ? JSON.stringify(autoPathState.strokes)
+    : "";
+  elements.autoPathDrawingInput.dispatchEvent(new Event("input", { bubbles: true }));
+  elements.autoPathDrawingInput.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function loadAutoPathDrawing(serialized) {
+  autoPathState.strokes = parseAutoPathDrawing(serialized);
+  autoPathState.activeStroke = null;
+  autoPathState.pointerId = null;
+  if (elements.autoPathDrawingInput) {
+    elements.autoPathDrawingInput.value = serialized || "";
+  }
+  renderAutoPathCanvas();
+}
+
+function syncAutoPathBoardFromField() {
+  if (!elements.autoPathDrawingInput) return;
+  loadAutoPathDrawing(elements.autoPathDrawingInput.value || "");
+}
+
+function parseAutoPathDrawing(serialized) {
+  if (!serialized) return [];
+
+  try {
+    const parsed = JSON.parse(serialized);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((stroke) => ({
+        mode: stroke?.mode === "erase" ? "erase" : "draw",
+        points: normalizeStrokePoints(Array.isArray(stroke?.points) ? stroke.points : [])
+      }))
+      .filter((stroke) => stroke.points.length);
+  } catch (error) {
+    return [];
+  }
+}
+
+function refreshCustomSelect(select) {
+  const refs = customSelectRegistry.get(select);
+  if (!refs) return;
+
+  refs.menu.innerHTML = "";
+
+  Array.from(select.options).forEach((option, index) => {
+    const optionButton = document.createElement("button");
+    optionButton.type = "button";
+    optionButton.className = "custom-select__option";
+    optionButton.dataset.optionIndex = String(index);
+    optionButton.setAttribute("role", "option");
+    optionButton.textContent = option.textContent || option.label || option.value || "Untitled option";
+    optionButton.disabled = option.disabled;
+    refs.menu.appendChild(optionButton);
+  });
+
+  syncCustomSelect(select);
+}
+
+function syncCustomSelect(select) {
+  const refs = customSelectRegistry.get(select);
+  if (!refs) return;
+
+  const options = Array.from(select.options);
+  if ((select.disabled || !options.length) && activeCustomSelect === select) {
+    activeCustomSelect = null;
+  }
+  const selectedOption =
+    options[select.selectedIndex] || options.find((option) => option.selected) || options[0] || null;
+  const open = activeCustomSelect === select;
+
+  refs.value.textContent = selectedOption
+    ? selectedOption.textContent || selectedOption.label || selectedOption.value
+    : "No options available";
+
+  if (!options.length || select.disabled) {
+    refs.highlightedIndex = -1;
+  } else if (open && !isSelectableOption(options, refs.highlightedIndex)) {
+    refs.highlightedIndex = findSelectableOptionIndex(options, Math.max(select.selectedIndex, 0), 1);
+  }
+
+  refs.wrapper.classList.toggle("is-open", open);
+  refs.wrapper.classList.toggle("is-disabled", Boolean(select.disabled || !options.length));
+  refs.trigger.disabled = Boolean(select.disabled || !options.length);
+  refs.trigger.setAttribute("aria-expanded", open ? "true" : "false");
+  refs.menu.hidden = !open;
+
+  Array.from(refs.menu.children).forEach((optionButton, index) => {
+    const option = options[index];
+    const selected = index === select.selectedIndex;
+    const highlighted = open && index === refs.highlightedIndex;
+    optionButton.classList.toggle("is-selected", selected);
+    optionButton.classList.toggle("is-highlighted", highlighted);
+    optionButton.setAttribute("aria-selected", selected ? "true" : "false");
+    optionButton.disabled = Boolean(option?.disabled);
+  });
+}
+
+function openCustomSelect(select) {
+  const refs = customSelectRegistry.get(select);
+  if (!refs || refs.trigger.disabled) return;
+
+  if (activeCustomSelect && activeCustomSelect !== select) {
+    closeCustomSelect(activeCustomSelect);
+  }
+
+  activeCustomSelect = select;
+  const options = Array.from(select.options);
+  refs.highlightedIndex = findSelectableOptionIndex(options, Math.max(select.selectedIndex, 0), 1);
+  syncCustomSelect(select);
+  scrollCustomSelectOptionIntoView(select, refs.highlightedIndex);
+}
+
+function closeCustomSelect(select) {
+  if (!select || activeCustomSelect !== select) return;
+  activeCustomSelect = null;
+  const refs = customSelectRegistry.get(select);
+  if (refs) refs.highlightedIndex = -1;
+  syncCustomSelect(select);
+}
+
+function isCustomSelectOpen(select) {
+  return activeCustomSelect === select;
+}
+
+function chooseCustomSelectOption(select, index) {
+  const option = select.options[index];
+  if (!option || option.disabled) return;
+
+  const refs = customSelectRegistry.get(select);
+  if (refs) refs.highlightedIndex = index;
+
+  select.selectedIndex = index;
+  closeCustomSelect(select);
+  syncCustomSelect(select);
+  select.dispatchEvent(new Event("input", { bubbles: true }));
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+
+  if (refs) refs.trigger.focus();
+}
+
+function handleCustomSelectKeydown(event, select) {
+  const options = Array.from(select.options);
+  if (!options.length || select.disabled) return;
+
+  switch (event.key) {
+    case "ArrowDown":
+      event.preventDefault();
+      if (!isCustomSelectOpen(select)) openCustomSelect(select);
+      moveCustomSelectHighlight(select, 1);
+      break;
+    case "ArrowUp":
+      event.preventDefault();
+      if (!isCustomSelectOpen(select)) openCustomSelect(select);
+      moveCustomSelectHighlight(select, -1);
+      break;
+    case "Home":
+      event.preventDefault();
+      if (!isCustomSelectOpen(select)) openCustomSelect(select);
+      setCustomSelectHighlight(select, findSelectableOptionIndex(options, 0, 1));
+      break;
+    case "End":
+      event.preventDefault();
+      if (!isCustomSelectOpen(select)) openCustomSelect(select);
+      setCustomSelectHighlight(select, findSelectableOptionIndex(options, options.length - 1, -1));
+      break;
+    case "Enter":
+    case " ":
+      event.preventDefault();
+      if (!isCustomSelectOpen(select)) {
+        openCustomSelect(select);
+        break;
+      }
+      chooseCustomSelectOption(select, getCustomSelectHighlightedIndex(select));
+      break;
+    case "Tab":
+      closeCustomSelect(select);
+      break;
+    default:
+      break;
+  }
+}
+
+function moveCustomSelectHighlight(select, delta) {
+  const refs = customSelectRegistry.get(select);
+  if (!refs) return;
+
+  const options = Array.from(select.options);
+  const currentIndex = refs.highlightedIndex >= 0 ? refs.highlightedIndex : select.selectedIndex;
+  const startIndex = currentIndex >= 0 ? currentIndex + delta : delta > 0 ? 0 : options.length - 1;
+  const nextIndex = findSelectableOptionIndex(options, startIndex, delta);
+  if (nextIndex < 0) return;
+
+  refs.highlightedIndex = nextIndex;
+  syncCustomSelect(select);
+  scrollCustomSelectOptionIntoView(select, nextIndex);
+}
+
+function setCustomSelectHighlight(select, index) {
+  if (index < 0) return;
+  const refs = customSelectRegistry.get(select);
+  if (!refs) return;
+
+  refs.highlightedIndex = index;
+  syncCustomSelect(select);
+  scrollCustomSelectOptionIntoView(select, index);
+}
+
+function getCustomSelectHighlightedIndex(select) {
+  const refs = customSelectRegistry.get(select);
+  if (!refs) return -1;
+  if (refs.highlightedIndex >= 0) return refs.highlightedIndex;
+  return findSelectableOptionIndex(Array.from(select.options), Math.max(select.selectedIndex, 0), 1);
+}
+
+function scrollCustomSelectOptionIntoView(select, index) {
+  const refs = customSelectRegistry.get(select);
+  const optionButton = refs?.menu.querySelector(`[data-option-index="${index}"]`);
+  if (!optionButton) return;
+  optionButton.scrollIntoView({ block: "nearest" });
+}
+
+function findSelectableOptionIndex(options, startIndex, step) {
+  if (!options.length) return -1;
+
+  let index = startIndex;
+  while (index >= 0 && index < options.length) {
+    if (isSelectableOption(options, index)) return index;
+    index += step;
+  }
+
+  return -1;
+}
+
+function isSelectableOption(options, index) {
+  return index >= 0 && index < options.length && !options[index].disabled;
 }
 
 function bindEvents() {
@@ -258,6 +835,8 @@ function bindEvents() {
   bindDraftPersistence(elements.matchForm, "match");
   bindDraftPersistence(elements.pitForm, "pit");
   bindShiftAvailability();
+  bindFormValidation(elements.matchForm, "match");
+  bindFormValidation(elements.pitForm, "pit");
 
   if (elements.matchSaveDraftButton) {
     elements.matchSaveDraftButton.addEventListener("click", () => {
@@ -324,6 +903,7 @@ function bindCounterButtons() {
       const current = Math.max(0, Number(input.value || 0));
       const next = Math.max(0, current + step);
       input.value = String(next);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
       const form = input.form;
       if (form === elements.matchForm) persistDraft("match");
       if (form === elements.pitForm) persistDraft("pit");
@@ -460,14 +1040,12 @@ function hydrateDraftForms() {
 function bindShiftAvailability() {
   if (!elements.matchForm) return;
 
-  elements.matchForm
-    .querySelectorAll('[name="alliance_color"], [name="shift_1_alliance"]')
-    .forEach((field) => {
-      field.addEventListener("change", () => {
-        updateShiftFieldAvailability();
-        persistDraft("match");
-      });
+  elements.matchForm.querySelectorAll('[name="shift_pattern"]').forEach((field) => {
+    field.addEventListener("change", () => {
+      updateShiftFieldAvailability();
+      persistDraft("match");
     });
+  });
 }
 
 async function handleGoogleSignIn() {
@@ -565,7 +1143,7 @@ async function loadEvents() {
 
   let events = Array.isArray(data) ? data : [];
   events = await ensureDefaultScoutingEvents(events);
-  state.events = events;
+  state.events = events.filter((event) => !isHiddenScoutingEvent(event));
 
   const currentStillExists = state.events.some((event) => event.id === state.activeEventId);
   if (!currentStillExists) {
@@ -618,6 +1196,21 @@ async function ensureDefaultScoutingEvents(existingEvents) {
   const refreshed = await fetchScoutingEvents();
   if (refreshed.error) throw refreshed.error;
   return Array.isArray(refreshed.data) ? refreshed.data : existingEvents;
+}
+
+function isHiddenScoutingEvent(event) {
+  const values = [event?.name, event?.event_code, event?.slug]
+    .map((value) => String(value || "").trim().toLowerCase());
+
+  return values.some((value) => {
+    return (
+      value === "sample" ||
+      value === "sample event" ||
+      value.includes("sample event") ||
+      value.startsWith("sample-") ||
+      value.endsWith("-sample")
+    );
+  });
 }
 
 async function loadEntriesForActiveEvent() {
@@ -693,13 +1286,15 @@ async function submitMatchForm() {
     return;
   }
 
-  const payload = buildMatchPayload();
-  const validationError = validateMatchPayload(payload);
-  if (validationError) {
-    setFormMessage(elements.matchFormMessage, validationError, "danger");
+  activateFormValidation(elements.matchForm);
+  const validation = validateMatchForm({ apply: true });
+  if (!validation.valid) {
+    setFormMessage(elements.matchFormMessage, validation.message, "danger");
+    focusFormValidationTarget(elements.matchForm, validation.focusName);
     return;
   }
 
+  const payload = buildMatchPayload();
   setFormMessage(elements.matchFormMessage, "Submitting match entry...", "success");
   elements.matchSubmitButton.disabled = true;
 
@@ -715,12 +1310,10 @@ async function submitMatchForm() {
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
     setFormMessage(elements.matchFormMessage, "Match entry synced.", "success");
-    setAppMessage(
-      result.missingColumns.length
-        ? `Match entry saved, but Supabase is missing: ${result.missingColumns.join(", ")}.`
-        : "Match entry saved to Supabase.",
-      result.missingColumns.length ? "warn" : "success"
-    );
+    if (result.missingColumns.length) {
+      console.warn("Match entry saved with legacy schema fallback:", result.missingColumns);
+    }
+    setAppMessage("Match entry saved.", "success");
   } catch (error) {
     if (shouldQueueSyncError(error)) {
       enqueueOutbox("match", payload);
@@ -746,13 +1339,15 @@ async function submitPitForm() {
     return;
   }
 
-  const payload = buildPitPayload();
-  const validationError = validatePitPayload(payload);
-  if (validationError) {
-    setFormMessage(elements.pitFormMessage, validationError, "danger");
+  activateFormValidation(elements.pitForm);
+  const validation = validatePitForm({ apply: true });
+  if (!validation.valid) {
+    setFormMessage(elements.pitFormMessage, validation.message, "danger");
+    focusFormValidationTarget(elements.pitForm, validation.focusName);
     return;
   }
 
+  const payload = buildPitPayload();
   setFormMessage(elements.pitFormMessage, "Submitting pit entry...", "success");
   elements.pitSubmitButton.disabled = true;
 
@@ -768,12 +1363,10 @@ async function submitPitForm() {
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
     setFormMessage(elements.pitFormMessage, "Pit entry synced.", "success");
-    setAppMessage(
-      result.missingColumns.length
-        ? `Pit entry saved, but Supabase is missing: ${result.missingColumns.join(", ")}.`
-        : "Pit entry saved to Supabase.",
-      result.missingColumns.length ? "warn" : "success"
-    );
+    if (result.missingColumns.length) {
+      console.warn("Pit entry saved with legacy schema fallback:", result.missingColumns);
+    }
+    setAppMessage("Pit entry saved.", "success");
   } catch (error) {
     if (shouldQueueSyncError(error)) {
       enqueueOutbox("pit", payload);
@@ -861,6 +1454,12 @@ function showTab(tabName) {
     const isActive = panel.id === `panel-${validTab}`;
     panel.classList.toggle("hidden", !isActive);
   });
+
+  if (validTab === "pit") {
+    requestAnimationFrame(() => {
+      syncAutoPathCanvasSize();
+    });
+  }
 }
 
 function renderAll() {
@@ -912,6 +1511,7 @@ function renderEventOptions() {
     select.appendChild(option);
     select.value = "";
     select.disabled = true;
+    refreshCustomSelect(select);
     return;
   }
 
@@ -924,6 +1524,7 @@ function renderEventOptions() {
 
   select.disabled = false;
   select.value = state.activeEventId;
+  refreshCustomSelect(select);
 }
 
 function renderCurrentEvent() {
@@ -1014,6 +1615,18 @@ function renderOutbox() {
       item.type === "match"
         ? `${payload.alliance_color || "Alliance"} ${payload.station || ""} • Defense ${payload.defense_rating ?? "-"}`
         : `${payload.drivetrain || "Drive unknown"} • ${payload.fuel_scoring_capability || "Fuel unknown"}`;
+
+    if (item.type !== "match") {
+      detail.textContent = [
+        payload.drivetrain || "Drive unknown",
+        payload.fuel_scoring_capability || "Fuel unknown",
+        Number(payload.estimated_fuel_per_match || 0) > 0
+          ? `Fuel ${payload.estimated_fuel_per_match}/match`
+          : ""
+      ]
+        .filter(Boolean)
+        .join(" â€¢ ");
+    }
 
     wrapper.append(heading, meta, detail);
     fragment.appendChild(wrapper);
@@ -1130,6 +1743,7 @@ function resetMatchDraft(scoutName) {
   saveStoredJson(STORAGE_KEYS.matchDraft, next);
   removeStoredValue(STORAGE_KEYS.matchDraftSavedAt);
   setFormValues(elements.matchForm, next);
+  deactivateFormValidation(elements.matchForm);
   renderDraftStamp("match");
 }
 
@@ -1138,12 +1752,13 @@ function resetPitDraft(scoutName) {
   saveStoredJson(STORAGE_KEYS.pitDraft, next);
   removeStoredValue(STORAGE_KEYS.pitDraftSavedAt);
   setFormValues(elements.pitForm, next);
+  deactivateFormValidation(elements.pitForm);
   renderDraftStamp("pit");
 }
 
 function buildMatchPayload() {
   const values = collectMatchValues();
-  const shift1Alliance = values.shift_1_alliance;
+  const shift1Alliance = getShift1Alliance(values.alliance_color, values.shift_pattern);
   return {
     event_id: state.activeEventId,
     scout_name: values.scout_name,
@@ -1178,6 +1793,8 @@ function buildPitPayload() {
     team_number: toPositiveInteger(values.team_number),
     drivetrain: values.drivetrain,
     fuel_scoring_capability: values.fuel_scoring_capability,
+    estimated_fuel_per_match: toNonNegativeInteger(values.estimated_fuel_per_match),
+    auto_path_drawing: values.auto_path_drawing,
     tower_capability: values.tower_capability,
     cycle_time: values.cycle_time,
     scoring_speed: values.scoring_speed,
@@ -1193,21 +1810,122 @@ function buildPitPayload() {
   };
 }
 
-function validateMatchPayload(payload) {
-  if (!payload.event_id) return "Select an active event before scouting.";
-  if (!payload.scout_name) return "Scout name is required.";
-  if (!payload.team_number) return "Enter a valid team number.";
-  if (!payload.match_number) return "Enter a valid match number.";
-  if (!payload.match_type) return "Match type is required.";
-  if (!payload.alliance_color) return "Alliance color is required.";
-  return "";
+function validateMatchForm({ apply = false } = {}) {
+  const form = elements.matchForm;
+  const values = collectMatchValues();
+  const showState = apply && isFormValidationActive(form);
+  let message = "";
+  let focusName = "";
+
+  if (!state.activeEventId) {
+    message = "Select an active event before scouting.";
+  }
+
+  const checkField = (name, valid, nextMessage) => {
+    if (apply) {
+      setFieldValidationState(form, name, valid, showState);
+    }
+    if (!valid && !message) {
+      message = nextMessage;
+      focusName = name;
+    }
+  };
+
+  checkField("scout_name", Boolean(values.scout_name), "Scout name is required.");
+  checkField("team_number", toPositiveInteger(values.team_number) > 0, "Enter a valid team number.");
+  checkField("match_number", toPositiveInteger(values.match_number) > 0, "Enter a valid match number.");
+  checkField("match_type", Boolean(values.match_type), "Match type is required.");
+  checkField("alliance_color", Boolean(values.alliance_color), "Alliance color is required.");
+  checkField("shift_pattern", Boolean(values.shift_pattern), "Choose the shift pattern.");
+  checkField("station", ["1", "2", "3"].includes(String(values.station)), "Choose a driver station.");
+
+  const hasObservation = hasMatchObservation(values);
+  if (apply) {
+    setFieldValidationState(form, "auto_tower_result", hasObservation, showState);
+    setFieldValidationState(form, "endgame_tower_result", hasObservation, showState);
+    setFieldValidationState(form, "defense_rating", hasObservation, showState);
+    setFieldValidationState(form, "notes", hasObservation, showState);
+    setToggleValidationState(form, "breakdown", hasObservation, showState);
+    setToggleValidationState(form, "no_show", hasObservation, showState);
+    setCounterCardsValidationState(form, hasObservation, showState);
+  }
+
+  if (!hasObservation && !message) {
+    message = "Add at least one real match observation before submitting.";
+    focusName = "notes";
+  }
+
+  return {
+    valid: !message,
+    message,
+    focusName
+  };
 }
 
-function validatePitPayload(payload) {
-  if (!payload.event_id) return "Select an active event before scouting.";
-  if (!payload.scout_name) return "Scout name is required.";
-  if (!payload.team_number) return "Enter a valid team number.";
-  return "";
+function validatePitForm({ apply = false } = {}) {
+  const form = elements.pitForm;
+  const values = collectPitValues();
+  const showState = apply && isFormValidationActive(form);
+  let message = "";
+  let focusName = "";
+
+  if (!state.activeEventId) {
+    message = "Select an active event before scouting.";
+  }
+
+  const checkField = (name, valid, nextMessage) => {
+    if (apply) {
+      setFieldValidationState(form, name, valid, showState);
+    }
+    if (!valid && !message) {
+      message = nextMessage;
+      focusName = name;
+    }
+  };
+
+  checkField("scout_name", Boolean(values.scout_name), "Scout name is required.");
+  checkField("team_number", toPositiveInteger(values.team_number) > 0, "Enter a valid team number.");
+  checkField("cycle_time", hasMeaningfulText(values.cycle_time, 3), "Add the team's cycle time.");
+  checkField(
+    "estimated_fuel_per_match",
+    toNonNegativeInteger(values.estimated_fuel_per_match) > 0,
+    "Add the team's estimated total fuel per match."
+  );
+  checkField(
+    "scoring_speed",
+    Boolean(values.scoring_speed) && values.scoring_speed !== "Unknown",
+    "Choose the team's scoring speed."
+  );
+  checkField(
+    "intake_style",
+    Boolean(values.intake_style) && values.intake_style !== "Unknown",
+    "Choose the team's intake style."
+  );
+  checkField(
+    "shooter_type",
+    Boolean(values.shooter_type) && values.shooter_type !== "Unknown",
+    "Choose the team's shooter type."
+  );
+  const hasAutoDetail = hasMeaningfulText(values.auto_summary, 8) || hasAutoPathDrawing(values.auto_path_drawing);
+  if (apply) {
+    setFieldValidationState(form, "auto_summary", hasAutoDetail, showState);
+    setFieldValidationState(form, "auto_path_drawing", hasAutoDetail, showState);
+  }
+  if (!hasAutoDetail && !message) {
+    message = "Add a short auto summary or draw the team's auto path.";
+    focusName = "auto_summary";
+  }
+  checkField(
+    "preferred_strategy",
+    hasMeaningfulText(values.preferred_strategy, 8),
+    "Add the team's preferred strategy."
+  );
+
+  return {
+    valid: !message,
+    message,
+    focusName
+  };
 }
 
 function collectMatchValues() {
@@ -1218,7 +1936,7 @@ function collectMatchValues() {
     match_number: readFieldValue(form, "match_number"),
     match_type: readFieldValue(form, "match_type"),
     alliance_color: readRadioValue(form, "alliance_color", "Blue"),
-    shift_1_alliance: readRadioValue(form, "shift_1_alliance", "Blue"),
+    shift_pattern: readRadioValue(form, "shift_pattern", "team"),
     station: readRadioValue(form, "station", "1"),
     auto_fuel: readFieldValue(form, "auto_fuel"),
     auto_tower_result: readFieldValue(form, "auto_tower_result"),
@@ -1244,6 +1962,7 @@ function collectPitValues() {
     team_number: readFieldValue(form, "team_number"),
     drivetrain: readFieldValue(form, "drivetrain"),
     fuel_scoring_capability: readFieldValue(form, "fuel_scoring_capability"),
+    estimated_fuel_per_match: readFieldValue(form, "estimated_fuel_per_match"),
     tower_capability: readFieldValue(form, "tower_capability"),
     cycle_time: readFieldValue(form, "cycle_time"),
     scoring_speed: readFieldValue(form, "scoring_speed"),
@@ -1252,6 +1971,7 @@ function collectPitValues() {
     hopper_size: readFieldValue(form, "hopper_size"),
     climb_level: readFieldValue(form, "climb_level"),
     auto_summary: readFieldValue(form, "auto_summary"),
+    auto_path_drawing: readFieldValue(form, "auto_path_drawing"),
     defense_capability: readFieldValue(form, "defense_capability"),
     preferred_strategy: readFieldValue(form, "preferred_strategy"),
     reliability_notes: readFieldValue(form, "reliability_notes"),
@@ -1360,6 +2080,7 @@ function buildTeamSummary(matchEntries, pitEntries) {
       breakdown_count: matchSummary?.breakdown_count || 0,
       drivetrain: pit?.drivetrain || "",
       fuel_scoring_capability: pit?.fuel_scoring_capability || "",
+      estimated_fuel_per_match: Number(pit?.estimated_fuel_per_match || 0),
       tower_capability: pit?.tower_capability || "",
       cycle_time: pit?.cycle_time || "",
       scoring_speed: pit?.scoring_speed || "",
@@ -1388,6 +2109,7 @@ function normalizeSummaryRow(row) {
     breakdown_count: Number(row.breakdown_count || 0),
     drivetrain: row.drivetrain || "",
     fuel_scoring_capability: row.fuel_scoring_capability || "",
+    estimated_fuel_per_match: Number(row.estimated_fuel_per_match || 0),
     tower_capability: row.tower_capability || "",
     cycle_time: row.cycle_time || "",
     scoring_speed: row.scoring_speed || "",
@@ -1408,6 +2130,7 @@ function buildPitSnapshot(row) {
     row.drivetrain,
     row.shooter_type,
     row.intake_style,
+    row.estimated_fuel_per_match ? `Fuel ${row.estimated_fuel_per_match}/match` : "",
     row.cycle_time ? `Cycle ${row.cycle_time}` : "",
     row.scoring_speed,
     row.climb_level ? `Climb ${row.climb_level}` : "",
@@ -1466,6 +2189,7 @@ function exportPitCsv() {
     scout_name: entry.scout_name,
     drivetrain: entry.drivetrain,
     fuel_scoring_capability: entry.fuel_scoring_capability,
+    estimated_fuel_per_match: Number(entry.estimated_fuel_per_match || 0),
     tower_capability: entry.tower_capability,
     cycle_time: entry.cycle_time,
     scoring_speed: entry.scoring_speed,
@@ -1501,6 +2225,7 @@ function exportSummaryCsv() {
     breakdown_count: row.breakdown_count,
     drivetrain: row.drivetrain,
     fuel_scoring_capability: row.fuel_scoring_capability,
+    estimated_fuel_per_match: row.estimated_fuel_per_match,
     tower_capability: row.tower_capability,
     cycle_time: row.cycle_time,
     scoring_speed: row.scoring_speed,
@@ -1646,12 +2371,140 @@ function setFormValues(form, values) {
       return;
     }
 
+    if (fields[0].tagName === "SELECT") {
+      fields[0].value = String(value ?? "");
+      syncCustomSelect(fields[0]);
+      return;
+    }
+
     fields[0].value = String(value ?? "");
   });
 
   if (form === elements.matchForm) {
     updateShiftFieldAvailability();
+  } else if (form === elements.pitForm) {
+    syncAutoPathBoardFromField();
   }
+}
+
+function bindFormValidation(form, kind) {
+  if (!form) return;
+
+  const validate = () => {
+    if (!isFormValidationActive(form)) return;
+    if (kind === "match") validateMatchForm({ apply: true });
+    else validatePitForm({ apply: true });
+  };
+
+  form.addEventListener("input", validate);
+  form.addEventListener("change", validate);
+}
+
+function activateFormValidation(form) {
+  if (!form) return;
+  form.dataset.validationActive = "true";
+}
+
+function deactivateFormValidation(form) {
+  if (!form) return;
+  delete form.dataset.validationActive;
+  clearValidationState(form);
+}
+
+function isFormValidationActive(form) {
+  return form?.dataset.validationActive === "true";
+}
+
+function clearValidationState(form) {
+  if (!form) return;
+  form
+    .querySelectorAll(".field, .counter-card, .toggle-card")
+    .forEach((target) => target.classList.remove("is-valid", "is-invalid"));
+}
+
+function setValidationState(target, valid, active) {
+  if (!target) return;
+  target.classList.remove("is-valid", "is-invalid");
+  if (!active) return;
+  target.classList.add(valid ? "is-valid" : "is-invalid");
+}
+
+function getFieldContainer(form, name) {
+  const field = form?.querySelector(`[name="${name}"]`);
+  return field?.closest(".field") || null;
+}
+
+function setFieldValidationState(form, name, valid, active) {
+  setValidationState(getFieldContainer(form, name), valid, active);
+}
+
+function setToggleValidationState(form, name, valid, active) {
+  const toggle = form?.querySelector(`[name="${name}"]`)?.closest(".toggle-card");
+  setValidationState(toggle, valid, active);
+}
+
+function setCounterCardsValidationState(form, valid, active) {
+  form?.querySelectorAll(".counter-card").forEach((card) => {
+    setValidationState(card, valid, active);
+  });
+}
+
+function focusFormValidationTarget(form, name) {
+  if (!name) return;
+
+  const field = form?.querySelector(`[name="${name}"]`);
+  if (!field) return;
+
+  if (field.tagName === "SELECT") {
+    customSelectRegistry.get(field)?.trigger?.focus();
+    return;
+  }
+
+  if (field.type === "radio" || field.type === "checkbox") {
+    field.focus();
+    return;
+  }
+
+  field.focus();
+}
+
+function hasMeaningfulText(value, minLength = 6) {
+  return String(value || "").trim().length >= minLength;
+}
+
+function hasAutoPathDrawing(serialized) {
+  return parseAutoPathDrawing(serialized).length > 0;
+}
+
+function hasMatchObservation(values) {
+  const numericObservationFields = [
+    "auto_fuel",
+    "transition_fuel",
+    "shift_1_fuel",
+    "shift_2_fuel",
+    "shift_3_fuel",
+    "shift_4_fuel",
+    "endgame_fuel",
+    "penalty_count"
+  ];
+
+  if (numericObservationFields.some((field) => toNonNegativeInteger(values[field]) > 0)) {
+    return true;
+  }
+
+  if (values.auto_tower_result !== "None" || values.endgame_tower_result !== "None") {
+    return true;
+  }
+
+  if (clampInteger(values.defense_rating, 0, 5) !== MATCH_DEFAULTS.defense_rating) {
+    return true;
+  }
+
+  if (values.breakdown || values.no_show) {
+    return true;
+  }
+
+  return hasMeaningfulText(values.notes, 6);
 }
 
 function readFieldValue(form, name) {
@@ -1671,13 +2524,21 @@ function readCheckboxValue(form, name) {
 }
 
 function normalizeMatchValues(values) {
+  const allianceColor = normalizeAllianceColor(values.alliance_color ?? MATCH_DEFAULTS.alliance_color);
+  const shiftPattern = normalizeShiftPattern(
+    values.shift_pattern,
+    values.shift_1_alliance,
+    allianceColor
+  );
+
   return {
     ...MATCH_DEFAULTS,
     ...values,
     scout_name: String(values.scout_name ?? MATCH_DEFAULTS.scout_name).trim(),
     team_number: normalizeNumericDraftValue(values.team_number),
     match_number: normalizeNumericDraftValue(values.match_number),
-    shift_1_alliance: String(values.shift_1_alliance ?? MATCH_DEFAULTS.shift_1_alliance),
+    alliance_color: allianceColor,
+    shift_pattern: shiftPattern,
     station: String(values.station ?? MATCH_DEFAULTS.station),
     auto_fuel: toNonNegativeInteger(values.auto_fuel),
     transition_fuel: toNonNegativeInteger(values.transition_fuel),
@@ -1704,6 +2565,7 @@ function normalizePitValues(values) {
     fuel_scoring_capability: String(
       values.fuel_scoring_capability ?? PIT_DEFAULTS.fuel_scoring_capability
     ).trim(),
+    estimated_fuel_per_match: normalizeNumericDraftValue(values.estimated_fuel_per_match),
     tower_capability: String(values.tower_capability ?? PIT_DEFAULTS.tower_capability).trim(),
     cycle_time: String(values.cycle_time ?? "").trim(),
     scoring_speed: String(values.scoring_speed ?? PIT_DEFAULTS.scoring_speed).trim(),
@@ -1712,6 +2574,7 @@ function normalizePitValues(values) {
     hopper_size: String(values.hopper_size ?? "").trim(),
     climb_level: String(values.climb_level ?? "").trim(),
     auto_summary: String(values.auto_summary ?? "").trim(),
+    auto_path_drawing: String(values.auto_path_drawing ?? ""),
     defense_capability: String(values.defense_capability ?? PIT_DEFAULTS.defense_capability).trim(),
     preferred_strategy: String(values.preferred_strategy ?? "").trim(),
     reliability_notes: String(values.reliability_notes ?? "").trim(),
@@ -1734,23 +2597,44 @@ function toNonNegativeInteger(value) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
-function getShiftAlliance(shiftNumber, shift1Alliance) {
-  const normalized = String(shift1Alliance || "Blue");
-  const oddAlliance = normalized === "Red" ? "Red" : "Blue";
-  const evenAlliance = oddAlliance === "Blue" ? "Red" : "Blue";
-  return shiftNumber % 2 === 1 ? oddAlliance : evenAlliance;
+function normalizeAllianceColor(value) {
+  return String(value || "").trim().toLowerCase() === "red" ? "Red" : "Blue";
+}
+
+function normalizeShiftPattern(value, legacyShift1Alliance, allianceColor) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "alternate") return "alternate";
+  if (normalized === "team") return "team";
+
+  if (legacyShift1Alliance) {
+    return normalizeAllianceColor(legacyShift1Alliance) === allianceColor ? "team" : "alternate";
+  }
+
+  return MATCH_DEFAULTS.shift_pattern;
+}
+
+function getOpposingAlliance(allianceColor) {
+  return normalizeAllianceColor(allianceColor) === "Red" ? "Blue" : "Red";
+}
+
+function getShift1Alliance(allianceColor, shiftPattern) {
+  const selectedAlliance = normalizeAllianceColor(allianceColor);
+  return shiftPattern === "alternate" ? getOpposingAlliance(selectedAlliance) : selectedAlliance;
+}
+
+function isTrackedShift(shiftNumber, shiftPattern) {
+  const startOnTeam = normalizeShiftPattern(shiftPattern) === "team";
+  return shiftNumber % 2 === 1 ? startOnTeam : !startOnTeam;
 }
 
 function updateShiftFieldAvailability() {
   if (!elements.matchForm) return;
 
-  const selectedAlliance = readRadioValue(elements.matchForm, "alliance_color", "Blue");
-  const shift1Alliance = readRadioValue(elements.matchForm, "shift_1_alliance", "Blue");
+  const shiftPattern = readRadioValue(elements.matchForm, "shift_pattern", "team");
   let valuesChanged = false;
 
   [1, 2, 3, 4].forEach((shiftNumber) => {
-    const owningAlliance = getShiftAlliance(shiftNumber, shift1Alliance);
-    const active = owningAlliance === selectedAlliance;
+    const active = isTrackedShift(shiftNumber, shiftPattern);
     const card = elements.matchForm.querySelector(`[data-shift-card="${shiftNumber}"]`);
     const label = document.getElementById(`shift-${shiftNumber}-label`);
     const note = document.getElementById(`shift-${shiftNumber}-note`);
@@ -1759,7 +2643,7 @@ function updateShiftFieldAvailability() {
       `[data-counter-target="match-shift_${shiftNumber}_fuel"]`
     );
 
-    if (label) label.textContent = `Shift ${shiftNumber} · ${owningAlliance}`;
+    if (label) label.textContent = `Shift ${shiftNumber}`;
     if (note) note.textContent = active ? "Your scoring shift" : "Opposing scoring shift";
     if (card) card.classList.toggle("counter-card--disabled", !active);
 
@@ -1783,13 +2667,18 @@ function updateShiftFieldAvailability() {
 
 function normalizeShiftFuel(shiftNumber, values) {
   const fieldName = `shift_${shiftNumber}_fuel`;
-  const shiftOwner = getShiftAlliance(shiftNumber, values.shift_1_alliance);
-  if (shiftOwner !== values.alliance_color) return 0;
+  if (!isTrackedShift(shiftNumber, values.shift_pattern)) return 0;
   return toNonNegativeInteger(values[fieldName]);
 }
 
 function clampInteger(value, min, max) {
   const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return min;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function clampNumber(value, min, max) {
+  const parsed = Number(value);
   if (!Number.isFinite(parsed)) return min;
   return Math.min(max, Math.max(min, parsed));
 }

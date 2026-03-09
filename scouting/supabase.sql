@@ -83,6 +83,7 @@ create table if not exists public.pit_scout_entries (
   scout_name text not null,
   drivetrain text not null,
   fuel_scoring_capability text not null,
+  estimated_fuel_per_match integer not null default 0 check (estimated_fuel_per_match >= 0),
   tower_capability text not null,
   cycle_time text not null default '',
   scoring_speed text not null default '',
@@ -91,6 +92,7 @@ create table if not exists public.pit_scout_entries (
   hopper_size text not null default '',
   climb_level text not null default '',
   auto_summary text not null default '',
+  auto_path_drawing text not null default '',
   defense_capability text not null,
   preferred_strategy text not null default '',
   reliability_notes text not null default '',
@@ -100,6 +102,13 @@ create table if not exists public.pit_scout_entries (
 
 create index if not exists pit_scout_entries_event_team_idx
   on public.pit_scout_entries (event_id, team_number, created_at desc);
+
+alter table if exists public.pit_scout_entries
+  add column if not exists estimated_fuel_per_match integer not null default 0
+  check (estimated_fuel_per_match >= 0);
+
+alter table if exists public.pit_scout_entries
+  add column if not exists auto_path_drawing text not null default '';
 
 alter table if exists public.pit_scout_entries
   add column if not exists cycle_time text not null default '';
@@ -119,7 +128,11 @@ alter table if exists public.pit_scout_entries
 alter table if exists public.pit_scout_entries
   add column if not exists climb_level text not null default '';
 
-create or replace view public.team_summary_2026
+-- Recreate the view so schema changes do not fail on column-order
+-- differences from previous versions.
+drop view if exists public.team_summary_2026;
+
+create view public.team_summary_2026
 with (security_invoker = true) as
 with match_agg as (
   select
@@ -153,6 +166,7 @@ pit_latest as (
     team_number,
     drivetrain,
     fuel_scoring_capability,
+    estimated_fuel_per_match,
     tower_capability,
     cycle_time,
     scoring_speed,
@@ -191,7 +205,8 @@ select
   pit_latest.defense_capability,
   pit_latest.preferred_strategy,
   pit_latest.reliability_notes,
-  pit_latest.pit_notes
+  pit_latest.pit_notes,
+  pit_latest.estimated_fuel_per_match
 from match_agg
 full outer join pit_latest
   on match_agg.event_id = pit_latest.event_id
