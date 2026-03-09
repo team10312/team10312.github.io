@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scouting — Byte Force Robotics · Team 10312</title>
+  <meta
+    name="description"
+    content="Password-protected 2026 REBUILT scouting workspace for Byte Force Robotics."
+  />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/x-icon" href="/favicons/favicon.ico?v=light" id="favicon" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="team10312" />
+  <link rel="manifest" href="/favicons/site.webmanifest" />
+  <script>
+    (function () {
+      var link = document.getElementById("favicon");
+      if (!link) return;
+
+      function isDarkMode() {
+        var html = document.documentElement;
+        var dt = (html.getAttribute("data-theme") || "").toLowerCase();
+        if (dt === "dark") return true;
+        if (dt === "light") return false;
+        try {
+          var stored = localStorage.getItem("bf-theme");
+          if (stored === "dark") return true;
+          if (stored === "light") return false;
+        } catch (error) {
+          // localStorage unavailable
+        }
+        if (window.matchMedia) {
+          return window.matchMedia("(prefers-color-scheme: dark)").matches;
+        }
+        return false;
+      }
+
+      function setFavicon() {
+        var href = isDarkMode()
+          ? "/favicons/favicon-dark.ico?v=dark"
+          : "/favicons/favicon.ico?v=light";
+        if (link.getAttribute("href") === href) return;
+        var newLink = link.cloneNode(false);
+        newLink.setAttribute("href", href);
+        newLink.setAttribute("id", "favicon");
+        link.parentNode.replaceChild(newLink, link);
+        link = newLink;
+      }
+
+      setFavicon();
+      try {
+        var obs = new MutationObserver(setFavicon);
+        obs.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ["class", "data-theme"]
+        });
+      } catch (error) {
+        // ignore
+      }
+      if (window.matchMedia) {
+        var mq = window.matchMedia("(prefers-color-scheme: dark)");
+        if (mq.addEventListener) mq.addEventListener("change", setFavicon);
+        else if (mq.addListener) mq.addListener(setFavicon);
+      }
+      window.addEventListener("storage", setFavicon);
+    })();
+  </script>
+  <link rel="stylesheet" href="../responsive.css" />
+  <link rel="stylesheet" href="./scouting.css" />
+</head>
+<body>
+  <div class="liquid-bg" aria-hidden="true"></div>
+
+  <header class="liquid-glass-header">
+    <div class="container nav">
+      <div class="nav-left">
+        <a class="logo" data-link="home" href="/">
+          <img src="/blacklogo.png" alt="Team 10312 Logo" />
+          <span></span>
+        </a>
+        <nav class="nav-links">
+          <a data-link="about" href="/about/">About</a>
+          <a data-link="team" href="/team/">Team</a>
+          <a data-link="robots" href="/robots/">Robots</a>
+          <a data-link="scouting" href="/scouting/">Scouting</a>
+          <a data-link="sponsors" href="/sponsors/">Sponsors</a>
+          <a data-link="media" href="/media/">Media</a>
+          <a data-link="contact" href="/contact/">Contact</a>
+        </nav>
+      </div>
+      <div class="nav-cta">
+        <button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button>
+        <a id="link-get-involved" class="btn glass-button" data-link="home" href="/">Main Site</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">FIRST Robotics Competition · 2026 REBUILT</span>
+          <h1 class="headline">Secure scouting for match play, pits, and alliance prep.</h1>
+          <p class="muted hero-text">
+            Track performance live from the stands, queue entries offline when the venue network drops,
+            and export a clean event dataset for strategy review.
+          </p>
+          <div class="hero-highlights">
+            <div class="highlight-pill">Password locked</div>
+            <div class="highlight-pill">Supabase synced</div>
+            <div class="highlight-pill">Offline outbox</div>
+            <div class="highlight-pill">CSV export</div>
+          </div>
+        </div>
+        <div class="card hero-sidecard">
+          <h2>Event-day workflow</h2>
+          <div class="mini-list">
+            <div>
+              <strong>1. Unlock once</strong>
+              <p class="muted">A Google sign-in session persists on each device until the scout signs out.</p>
+            </div>
+            <div>
+              <strong>2. Log fast</strong>
+              <p class="muted">Large counters and compact selectors keep input usable between cycles.</p>
+            </div>
+            <div>
+              <strong>3. Recover offline</strong>
+              <p class="muted">Failed syncs stay in a local outbox until you retry from the overview tab.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container app-container">
+        <div id="setupBanner" class="setup-banner hidden" role="status" aria-live="polite"></div>
+
+        <div id="lockView" class="lock-shell">
+          <div class="card lock-card">
+            <span class="section-label">Access</span>
+            <h2 class="section-title">Unlock the scouting workspace</h2>
+            <p class="muted lock-copy">
+              Scouts must sign in with Google using a <code>team10312.com</code> account. The page rejects any
+              other email, and the Supabase policies enforce that same domain on reads and inserts.
+            </p>
+            <form id="unlockForm" class="unlock-form">
+              <button id="googleSignInButton" type="submit" class="btn glass-button">Sign In With Google</button>
+            </form>
+            <p id="authMessage" class="form-message" aria-live="polite"></p>
+          </div>
+
+          <div class="card setup-card">
+            <span class="section-label">Setup</span>
+            <h2 class="section-title">Before first use</h2>
+            <div class="setup-checklist">
+              <div class="setup-item">
+                <strong>1. Enable Google in Supabase Auth</strong>
+                <p class="muted">Turn on the Google provider and add your Google OAuth client credentials.</p>
+              </div>
+              <div class="setup-item">
+                <strong>2. Add the redirect URL</strong>
+                <p class="muted">Allow your production scouting URL in Supabase Auth redirect settings.</p>
+              </div>
+              <div class="setup-item">
+                <strong>3. Run the SQL</strong>
+                <p class="muted">Use <code>/scouting/supabase.sql</code> to create tables, the view, grants, and RLS.</p>
+              </div>
+              <div class="setup-item">
+                <strong>4. Fill the frontend config</strong>
+                <p class="muted">Edit <code>/scouting/config.js</code> with your project URL, anon key, and allowed domain.</p>
+              </div>
+              <div class="setup-item">
+                <strong>5. Seed at least one event</strong>
+                <p class="muted">Add an active row to <code>scouting_events</code> so the app has an event context.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="appView" class="app-shell hidden">
+          <div class="card app-toolbar">
+            <div class="toolbar-head">
+              <div>
+                <span class="section-label">Workspace</span>
+                <h2 id="currentEventName" class="section-title">No active event selected</h2>
+                <p id="currentEventMeta" class="muted toolbar-copy">
+                  Select an event to load scouting entries and exports.
+                </p>
+              </div>
+              <div class="toolbar-actions">
+                <label class="field field--compact">
+                  <span>Active Event</span>
+                  <select id="eventSelect" aria-label="Active event"></select>
+                </label>
+                <button id="refreshButton" type="button" class="btn secondary">Refresh Data</button>
+                <button id="retryOutboxButton" type="button" class="btn secondary">Retry Outbox</button>
+                <button id="signOutButton" type="button" class="btn secondary">Sign Out</button>
+              </div>
+            </div>
+            <div class="status-strip">
+              <span id="authPill" class="status-pill">Locked</span>
+              <span id="connectionPill" class="status-pill">Checking network</span>
+              <span id="syncPill" class="status-pill">Waiting for data</span>
+              <span id="queuePill" class="status-pill">Outbox: 0</span>
+            </div>
+            <p id="appMessage" class="form-message form-message--soft" aria-live="polite"></p>
+          </div>
+
+          <div class="tab-bar" role="tablist" aria-label="Scouting sections">
+            <button class="tab-button active" type="button" data-tab="overview" role="tab" aria-selected="true">
+              Overview
+            </button>
+            <button class="tab-button" type="button" data-tab="match" role="tab" aria-selected="false">
+              Match Scouting
+            </button>
+            <button class="tab-button" type="button" data-tab="pit" role="tab" aria-selected="false">
+              Pit Scouting
+            </button>
+            <button class="tab-button" type="button" data-tab="export" role="tab" aria-selected="false">
+              Export
+            </button>
+          </div>
+
+          <section id="panel-overview" class="tab-panel">
+            <div class="stat-grid">
+              <div class="card stat-card">
+                <span class="section-label">Teams</span>
+                <strong id="statTeams">0</strong>
+                <p class="muted">Unique teams in the current event dataset.</p>
+              </div>
+              <div class="card stat-card">
+                <span class="section-label">Match Entries</span>
+                <strong id="statMatches">0</strong>
+                <p class="muted">Scouted matches synced for the selected event.</p>
+              </div>
+              <div class="card stat-card">
+                <span class="section-label">Pit Entries</span>
+                <strong id="statPits">0</strong>
+                <p class="muted">Latest pit records available for comparison.</p>
+              </div>
+              <div class="card stat-card">
+                <span class="section-label">Queued</span>
+                <strong id="statQueued">0</strong>
+                <p class="muted">Entries waiting in the local outbox for manual retry.</p>
+              </div>
+            </div>
+
+            <div class="overview-grid">
+              <div class="card queue-card">
+                <div class="panel-head">
+                  <div>
+                    <span class="section-label">Sync status</span>
+                    <h3>Outbox</h3>
+                  </div>
+                  <button id="retryOutboxInline" type="button" class="btn secondary">Retry Now</button>
+                </div>
+                <p class="muted">
+                  When an insert fails, the entry stays on this device until the scout retries the queue.
+                </p>
+                <div id="outboxEmpty" class="empty-state">No queued entries. Live sync is clear.</div>
+                <div id="outboxList" class="outbox-list"></div>
+              </div>
+
+              <div class="card summary-card">
+                <div class="panel-head">
+                  <div>
+                    <span class="section-label">Alliance prep</span>
+                    <h3>Team summary</h3>
+                  </div>
+                  <label class="field field--compact search-field">
+                    <span>Search team</span>
+                    <input id="teamSearch" type="search" placeholder="10312" />
+                  </label>
+                </div>
+                <p id="summaryCount" class="muted summary-count">0 teams visible</p>
+                <div class="table-wrap">
+                  <table class="summary-table">
+                    <thead>
+                      <tr>
+                        <th>Team</th>
+                        <th>Matches</th>
+                        <th>Auto Fuel</th>
+                        <th>Total Fuel</th>
+                        <th>Tower %</th>
+                        <th>Defense</th>
+                        <th>Breakdowns</th>
+                        <th>Pit Snapshot</th>
+                      </tr>
+                    </thead>
+                    <tbody id="summaryTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="panel-match" class="tab-panel hidden">
+            <form id="matchForm" class="card scout-form">
+              <div class="panel-head">
+                <div>
+                  <span class="section-label">Entry form</span>
+                  <h3>Match scouting</h3>
+                </div>
+                <span class="muted form-context">2026 REBUILT match breakdown</span>
+              </div>
+
+              <div class="form-grid form-grid--wide">
+                <label class="field">
+                  <span>Scout Name</span>
+                  <input name="scout_name" type="text" maxlength="80" placeholder="Initials or name" required />
+                </label>
+                <label class="field">
+                  <span>Team Number</span>
+                  <input name="team_number" type="number" min="1" inputmode="numeric" placeholder="10312" required />
+                </label>
+                <label class="field">
+                  <span>Match Number</span>
+                  <input name="match_number" type="number" min="1" inputmode="numeric" placeholder="12" required />
+                </label>
+                <label class="field">
+                  <span>Match Type</span>
+                  <select name="match_type">
+                    <option>Qualification</option>
+                    <option>Practice</option>
+                    <option>Playoff</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="form-grid form-grid--dual">
+                <div class="field">
+                  <span>Alliance</span>
+                  <div class="segmented segmented--2" data-segmented>
+                    <label>
+                      <input type="radio" name="alliance_color" value="Blue" checked />
+                      <span>Blue</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="alliance_color" value="Red" />
+                      <span>Red</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="field">
+                  <span>Driver Station</span>
+                  <div class="segmented segmented--3" data-segmented>
+                    <label>
+                      <input type="radio" name="station" value="1" checked />
+                      <span>1</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="station" value="2" />
+                      <span>2</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="station" value="3" />
+                      <span>3</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="counter-grid">
+                <div class="counter-card">
+                  <span class="section-label">Auto</span>
+                  <strong>Fuel</strong>
+                  <div class="counter-controls">
+                    <button type="button" class="counter-button" data-counter-target="match-auto_fuel" data-counter-step="-1">-</button>
+                    <input id="match-auto_fuel" class="counter-value" name="auto_fuel" type="number" min="0" value="0" inputmode="numeric" />
+                    <button type="button" class="counter-button" data-counter-target="match-auto_fuel" data-counter-step="1">+</button>
+                  </div>
+                </div>
+                <div class="counter-card">
+                  <span class="section-label">Transition</span>
+                  <strong>Fuel</strong>
+                  <div class="counter-controls">
+                    <button type="button" class="counter-button" data-counter-target="match-transition_fuel" data-counter-step="-1">-</button>
+                    <input id="match-transition_fuel" class="counter-value" name="transition_fuel" type="number" min="0" value="0" inputmode="numeric" />
+                    <button type="button" class="counter-button" data-counter-target="match-transition_fuel" data-counter-step="1">+</button>
+                  </div>
+                </div>
+                <div class="counter-card">
+                  <span class="section-label">Shift 1</span>
+                  <strong>Fuel</strong>
+                  <div class="counter-controls">
+                    <button type="button" class="counter-button" data-counter-target="match-shift_1_fuel" data-counter-step="-1">-</button>
+                    <input id="match-shift_1_fuel" class="counter-value" name="shift_1_fuel" type="number" min="0" value="0" inputmode="numeric" />
+                    <button type="button" class="counter-button" data-counter-target="match-shift_1_fuel" data-counter-step="1">+</button>
+                  </div>
+                </div>
+                <div class="counter-card">
+                  <span class="section-label">Shift 2</span>
+                  <strong>Fuel</strong>
+                  <div class="counter-controls">
+                    <button type="button" class="counter-button" data-counter-target="match-shift_2_fuel" data-counter-step="-1">-</button>
+                    <input id="match-shift_2_fuel" class="counter-value" name="shift_2_fuel" type="number" min="0" value="0" inputmode="numeric" />
+                    <button type="button" class="counter-button" data-counter-target="match-shift_2_fuel" data-counter-step="1">+</button>
+                  </div>
+                </div>
+                <div class="counter-card">
+                  <span class="section-label">Shift 3</span>
+                  <strong>Fuel</strong>
+                  <div class="counter-controls">
+                    <button type="button" class="counter-button" data-counter-target="match-shift_3_fuel" data-counter-step="-1">-</button>
+                    <input id="match-shift_3_fuel" class="counter-value" name="shift_3_fuel" type="number" min="0" value="0" inputmode="numeric" />
+                    <button type="button" class="counter-button" data-counter-target="match-shift_3_fuel" data-counter-step="1">+</button>
+                  </div>
+                </div>
+                <div class="counter-card">
+                  <span class="section-label">Shift 4</span>
+                  <strong>Fuel</strong>
+                  <div class="counter-controls">
+                    <button type="button" class="counter-button" data-counter-target="match-shift_4_fuel" data-counter-step="-1">-</button>
+                    <input id="match-shift_4_fuel" class="counter-value" name="shift_4_fuel" type="number" min="0" value="0" inputmode="numeric" />
+                    <button type="button" class="counter-button" data-counter-target="match-shift_4_fuel" data-counter-step="1">+</button>
+                  </div>
+                </div>
+                <div class="counter-card">
+                  <span class="section-label">Endgame</span>
+                  <strong>Fuel</strong>
+                  <div class="counter-controls">
+                    <button type="button" class="counter-button" data-counter-target="match-endgame_fuel" data-counter-step="-1">-</button>
+                    <input id="match-endgame_fuel" class="counter-value" name="endgame_fuel" type="number" min="0" value="0" inputmode="numeric" />
+                    <button type="button" class="counter-button" data-counter-target="match-endgame_fuel" data-counter-step="1">+</button>
+                  </div>
+                </div>
+                <div class="counter-card">
+                  <span class="section-label">Fouls</span>
+                  <strong>Penalty Count</strong>
+                  <div class="counter-controls">
+                    <button type="button" class="counter-button" data-counter-target="match-penalty_count" data-counter-step="-1">-</button>
+                    <input id="match-penalty_count" class="counter-value" name="penalty_count" type="number" min="0" value="0" inputmode="numeric" />
+                    <button type="button" class="counter-button" data-counter-target="match-penalty_count" data-counter-step="1">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-grid form-grid--triple">
+                <label class="field">
+                  <span>Auto Tower Result</span>
+                  <select name="auto_tower_result">
+                    <option>None</option>
+                    <option>Partial</option>
+                    <option>Complete</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Endgame Tower Result</span>
+                  <select name="endgame_tower_result">
+                    <option>None</option>
+                    <option>Partial</option>
+                    <option>Complete</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Defense Rating (0-5)</span>
+                  <input name="defense_rating" type="number" min="0" max="5" value="3" inputmode="numeric" />
+                </label>
+              </div>
+
+              <div class="toggle-grid">
+                <label class="toggle-card">
+                  <input type="checkbox" name="breakdown" />
+                  <span>Breakdown / major robot failure</span>
+                </label>
+                <label class="toggle-card">
+                  <input type="checkbox" name="no_show" />
+                  <span>No show / never entered the match</span>
+                </label>
+              </div>
+
+              <label class="field">
+                <span>Notes</span>
+                <textarea name="notes" rows="4" placeholder="Cycle speed, driver tendencies, defense notes, or strategy changes"></textarea>
+              </label>
+
+              <div class="form-actions">
+                <div>
+                  <button id="matchSaveDraftButton" type="button" class="btn secondary">Save Draft</button>
+                  <span id="matchDraftStamp" class="draft-stamp"></span>
+                </div>
+                <button id="matchSubmitButton" type="submit" class="btn glass-button">Submit Match Entry</button>
+              </div>
+              <p id="matchFormMessage" class="form-message" aria-live="polite"></p>
+            </form>
+          </section>
+
+          <section id="panel-pit" class="tab-panel hidden">
+            <form id="pitForm" class="card scout-form">
+              <div class="panel-head">
+                <div>
+                  <span class="section-label">Entry form</span>
+                  <h3>Pit scouting</h3>
+                </div>
+                <span class="muted form-context">Robot capabilities and repair risk</span>
+              </div>
+
+              <div class="form-grid form-grid--wide">
+                <label class="field">
+                  <span>Scout Name</span>
+                  <input name="scout_name" type="text" maxlength="80" placeholder="Initials or name" required />
+                </label>
+                <label class="field">
+                  <span>Team Number</span>
+                  <input name="team_number" type="number" min="1" inputmode="numeric" placeholder="10312" required />
+                </label>
+                <label class="field">
+                  <span>Drivetrain</span>
+                  <select name="drivetrain">
+                    <option>Swerve</option>
+                    <option>Tank</option>
+                    <option>Mecanum</option>
+                    <option>West Coast</option>
+                    <option>Other</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Fuel Scoring Capability</span>
+                  <select name="fuel_scoring_capability">
+                    <option>High volume</option>
+                    <option>Steady</option>
+                    <option>Situational</option>
+                    <option>Minimal</option>
+                    <option>Unknown</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Tower Capability</span>
+                  <select name="tower_capability">
+                    <option>Consistent</option>
+                    <option>Sometimes</option>
+                    <option>Rarely</option>
+                    <option>None</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Defense Capability</span>
+                  <select name="defense_capability">
+                    <option>Strong</option>
+                    <option>Balanced</option>
+                    <option>Light</option>
+                    <option>Unknown</option>
+                  </select>
+                </label>
+              </div>
+
+              <label class="field">
+                <span>Auto Summary</span>
+                <textarea name="auto_summary" rows="3" placeholder="Starting spots, auto fuel routes, tower routine"></textarea>
+              </label>
+              <label class="field">
+                <span>Preferred Strategy</span>
+                <textarea name="preferred_strategy" rows="3" placeholder="Cycle focus, feeder side, defense pairings, or endgame plan"></textarea>
+              </label>
+              <label class="field">
+                <span>Reliability Notes</span>
+                <textarea name="reliability_notes" rows="3" placeholder="Repairs, brownouts, chain issues, or maintenance concerns"></textarea>
+              </label>
+              <label class="field">
+                <span>Additional Notes</span>
+                <textarea name="notes" rows="4" placeholder="Drive coach comments, constraints, or standout strengths"></textarea>
+              </label>
+
+              <div class="form-actions">
+                <div>
+                  <button id="pitSaveDraftButton" type="button" class="btn secondary">Save Draft</button>
+                  <span id="pitDraftStamp" class="draft-stamp"></span>
+                </div>
+                <button id="pitSubmitButton" type="submit" class="btn glass-button">Submit Pit Entry</button>
+              </div>
+              <p id="pitFormMessage" class="form-message" aria-live="polite"></p>
+            </form>
+          </section>
+
+          <section id="panel-export" class="tab-panel hidden">
+            <div class="export-grid">
+              <div class="card export-card">
+                <span class="section-label">Download</span>
+                <h3>CSV exports</h3>
+                <p class="muted">
+                  Every export is filtered to the current event selector so drive team review stays event-specific.
+                </p>
+                <div class="export-actions">
+                  <button id="exportMatchButton" type="button" class="btn glass-button">Export Match CSV</button>
+                  <button id="exportPitButton" type="button" class="btn secondary">Export Pit CSV</button>
+                  <button id="exportSummaryButton" type="button" class="btn secondary">Export Summary CSV</button>
+                </div>
+              </div>
+
+              <div class="card export-card">
+                <span class="section-label">Data rules</span>
+                <h3>What exports include</h3>
+                <ul class="export-list">
+                  <li>Match exports include raw per-match counts and notes.</li>
+                  <li>Pit exports include the latest submitted pit entry rows.</li>
+                  <li>Summary exports include aggregate fuel, tower, defense, and breakdown metrics.</li>
+                </ul>
+                <p class="muted">
+                  Queued outbox items are stored locally until they sync. Retry the outbox before exporting if you need the newest rows.
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container foot-grid">
+      <div>
+        <div class="logo">
+          <img src="/blacklogo.png" alt="Team 10312 Logo" style="height: 28px" />
+        </div>
+        <p class="muted" style="margin-top: 0.6rem; max-width: 46ch">Orange • White • Black.</p>
+      </div>
+      <div>
+        <h4>Explore</h4>
+        <a class="muted" data-link="team" href="/team/">Team</a><br />
+        <a class="muted" data-link="robots" href="/robots/">Robots</a><br />
+        <a class="muted" data-link="scouting" href="/scouting/">Scouting</a><br />
+        <a class="muted" data-link="media" href="/media/">Media</a>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <a class="muted" data-link="sponsors" href="/sponsors/">Sponsors</a><br />
+        <a class="muted" data-link="contact" href="/contact/">Contact</a>
+      </div>
+      <div>
+        <h4>Follow</h4>
+        <a class="muted" href="#">YouTube</a><br />
+        <a class="muted" href="#">Instagram</a>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span class="muted">© <span id="year"></span> Byte Force Robotics — Team 10312</span>
+      <div class="footer-links">
+        <a class="muted" href="/privacy/">Privacy</a>
+        <a class="muted" href="/terms/">Terms</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../responsive.js" defer></script>
+  <script src="./config.js"></script>
+  <script type="module" src="./scouting-app.js"></script>
+</body>
+</html>
