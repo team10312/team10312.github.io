@@ -92,6 +92,7 @@ async function init() {
   wireLinks();
   setActive();
   initTheme();
+  initLogoSwap();
   initPointerRipples();
   hydrateDraftForms();
   bindEvents();
@@ -130,7 +131,6 @@ async function init() {
 function cacheDom() {
   elements.year = document.getElementById("year");
   elements.themeToggle = document.getElementById("themeToggle");
-  elements.setupBanner = document.getElementById("setupBanner");
   elements.lockView = document.getElementById("lockView");
   elements.appView = document.getElementById("appView");
   elements.unlockForm = document.getElementById("unlockForm");
@@ -360,6 +360,55 @@ function setThemeLabel() {
   elements.themeToggle.textContent = isDark ? "Light" : "Dark";
 }
 
+function initLogoSwap() {
+  function forEachLogo(fn) {
+    const images = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
+    images.forEach(fn);
+  }
+
+  function isDarkMode() {
+    const html = document.documentElement;
+    const theme = (html.getAttribute("data-theme") || "").toLowerCase();
+    if (theme === "dark") return true;
+    if (theme === "light") return false;
+    if (html.classList.contains("dark") || html.classList.contains("theme-dark")) return true;
+    if (html.classList.contains("light") || html.classList.contains("theme-light")) return false;
+    if (window.matchMedia) {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    }
+    return false;
+  }
+
+  function setLogoByTheme() {
+    const dark = isDarkMode();
+    forEachLogo((image) => {
+      const current = image.getAttribute("src") || "";
+      const desired = current.replace(/(white|black)logo\.png$/i, dark ? "whitelogo.png" : "blacklogo.png");
+      if (desired !== current) image.setAttribute("src", desired);
+    });
+  }
+
+  setLogoByTheme();
+
+  try {
+    const observer = new MutationObserver(setLogoByTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme"]
+    });
+
+    if (window.matchMedia) {
+      const query = window.matchMedia("(prefers-color-scheme: dark)");
+      if (query.addEventListener) query.addEventListener("change", setLogoByTheme);
+      else if (query.addListener) query.addListener(setLogoByTheme);
+    }
+
+    window.addEventListener("storage", setLogoByTheme);
+  } catch (error) {
+    // ignore unsupported observer APIs
+  }
+}
+
 function initPointerRipples() {
   document.querySelectorAll(".btn, .glass-button, .tab-button").forEach((button) => {
     button.addEventListener("mousemove", (event) => {
@@ -380,7 +429,7 @@ function hydrateDraftForms() {
 
 async function handleGoogleSignIn() {
   if (!state.client || !configReady()) {
-    setAuthMessage("Configure the Supabase URL and anon key before signing in.", "warn");
+    setAuthMessage("Scouting sign-in is unavailable right now.", "warn");
     return;
   }
 
@@ -732,18 +781,6 @@ function renderConfigState() {
   if (elements.googleSignInButton) {
     elements.googleSignInButton.disabled = !configured;
   }
-
-  if (!elements.setupBanner) return;
-
-  if (configured) {
-    elements.setupBanner.classList.add("hidden");
-    elements.setupBanner.textContent = "";
-    return;
-  }
-
-  elements.setupBanner.classList.remove("hidden");
-  elements.setupBanner.textContent =
-    "Scouting is not configured yet. Update /scouting/config.js with your Supabase URL and anon key, enable Google Auth, and allow the scouting page redirect URL.";
 }
 
 function renderAuthState() {

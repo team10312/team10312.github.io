@@ -6,7 +6,7 @@
   <title>Scouting — Byte Force Robotics · Team 10312</title>
   <meta
     name="description"
-    content="Password-protected 2026 REBUILT scouting workspace for Byte Force Robotics."
+    content="Google-gated 2026 REBUILT scouting workspace for Byte Force Robotics."
   />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" type="image/x-icon" href="/favicons/favicon.ico?v=light" id="favicon" />
@@ -66,8 +66,8 @@
       window.addEventListener("storage", setFavicon);
     })();
   </script>
-  <link rel="stylesheet" href="../responsive.css" />
-  <link rel="stylesheet" href="./scouting.css" />
+  <link rel="stylesheet" href="/responsive.css" />
+  <link rel="stylesheet" href="/scouting/scouting.css" />
 </head>
 <body>
   <div class="liquid-bg" aria-hidden="true"></div>
@@ -83,10 +83,10 @@
           <a data-link="about" href="/about/">About</a>
           <a data-link="team" href="/team/">Team</a>
           <a data-link="robots" href="/robots/">Robots</a>
-          <a data-link="scouting" href="/scouting/">Scouting</a>
           <a data-link="sponsors" href="/sponsors/">Sponsors</a>
           <a data-link="media" href="/media/">Media</a>
           <a data-link="contact" href="/contact/">Contact</a>
+          <a data-link="scouting" href="/scouting/">Scouting</a>
         </nav>
       </div>
       <div class="nav-cta">
@@ -107,7 +107,7 @@
             and export a clean event dataset for strategy review.
           </p>
           <div class="hero-highlights">
-            <div class="highlight-pill">Password locked</div>
+            <div class="highlight-pill">Google gated</div>
             <div class="highlight-pill">Supabase synced</div>
             <div class="highlight-pill">Offline outbox</div>
             <div class="highlight-pill">CSV export</div>
@@ -135,47 +135,17 @@
 
     <section class="section">
       <div class="container app-container">
-        <div id="setupBanner" class="setup-banner hidden" role="status" aria-live="polite"></div>
-
         <div id="lockView" class="lock-shell">
           <div class="card lock-card">
             <span class="section-label">Access</span>
             <h2 class="section-title">Unlock the scouting workspace</h2>
             <p class="muted lock-copy">
-              Scouts must sign in with Google using a <code>team10312.com</code> account. The page rejects any
-              other email, and the Supabase policies enforce that same domain on reads and inserts.
+              Scouts must sign in with Google using a <code>team10312.com</code> account.
             </p>
             <form id="unlockForm" class="unlock-form">
               <button id="googleSignInButton" type="submit" class="btn glass-button">Sign In With Google</button>
             </form>
             <p id="authMessage" class="form-message" aria-live="polite"></p>
-          </div>
-
-          <div class="card setup-card">
-            <span class="section-label">Setup</span>
-            <h2 class="section-title">Before first use</h2>
-            <div class="setup-checklist">
-              <div class="setup-item">
-                <strong>1. Enable Google in Supabase Auth</strong>
-                <p class="muted">Turn on the Google provider and add your Google OAuth client credentials.</p>
-              </div>
-              <div class="setup-item">
-                <strong>2. Add the redirect URL</strong>
-                <p class="muted">Allow your production scouting URL in Supabase Auth redirect settings.</p>
-              </div>
-              <div class="setup-item">
-                <strong>3. Run the SQL</strong>
-                <p class="muted">Use <code>/scouting/supabase.sql</code> to create tables, the view, grants, and RLS.</p>
-              </div>
-              <div class="setup-item">
-                <strong>4. Fill the frontend config</strong>
-                <p class="muted">Edit <code>/scouting/config.js</code> with your project URL, anon key, and allowed domain.</p>
-              </div>
-              <div class="setup-item">
-                <strong>5. Seed at least one event</strong>
-                <p class="muted">Add an active row to <code>scouting_events</code> so the app has an event context.</p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -643,8 +613,8 @@
     </div>
   </footer>
 
-  <script src="../responsive.js" defer></script>
-  <script src="./config.js"></script>
-  <script type="module" src="./scouting-app.js"></script>
+  <script src="/responsive.js" defer></script>
+  <script src="/scouting/config.js"></script>
+  <script type="module" src="/scouting/scouting-app.js"></script>
 </body>
 </html>
