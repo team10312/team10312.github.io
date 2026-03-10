@@ -73,6 +73,7 @@ const PIT_DEFAULTS = Object.freeze({
   hopper_size: "",
   climb_level: "",
   auto_summary: "",
+  auto_path_drawing: "",
   defense_capability: "Balanced",
   preferred_strategy: "",
   reliability_notes: "",
