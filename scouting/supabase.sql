@@ -214,8 +214,8 @@ full outer join pit_latest
 
 grant usage on schema public to authenticated, anon;
 grant select, insert on public.scouting_events to authenticated;
-grant select, insert on public.match_scout_entries to authenticated;
-grant select, insert on public.pit_scout_entries to authenticated;
+grant select, insert, update on public.match_scout_entries to authenticated;
+grant select, insert, update on public.pit_scout_entries to authenticated;
 grant select on public.team_summary_2026 to authenticated;
 
 alter table public.scouting_events enable row level security;
@@ -250,6 +250,14 @@ create policy "team domain insert match scout entries"
   to authenticated
   with check (lower(coalesce(auth.jwt() ->> 'email', '')) like '%@team10312.com');
 
+drop policy if exists "team domain update match scout entries" on public.match_scout_entries;
+create policy "team domain update match scout entries"
+  on public.match_scout_entries
+  for update
+  to authenticated
+  using (lower(coalesce(auth.jwt() ->> 'email', '')) like '%@team10312.com')
+  with check (lower(coalesce(auth.jwt() ->> 'email', '')) like '%@team10312.com');
+
 drop policy if exists "team domain read pit scout entries" on public.pit_scout_entries;
 create policy "team domain read pit scout entries"
   on public.pit_scout_entries
@@ -262,6 +270,14 @@ create policy "team domain insert pit scout entries"
   on public.pit_scout_entries
   for insert
   to authenticated
+  with check (lower(coalesce(auth.jwt() ->> 'email', '')) like '%@team10312.com');
+
+drop policy if exists "team domain update pit scout entries" on public.pit_scout_entries;
+create policy "team domain update pit scout entries"
+  on public.pit_scout_entries
+  for update
+  to authenticated
+  using (lower(coalesce(auth.jwt() ->> 'email', '')) like '%@team10312.com')
   with check (lower(coalesce(auth.jwt() ->> 'email', '')) like '%@team10312.com');
 
 insert into public.scouting_events (slug, name, event_code, location, start_date, end_date, is_active)

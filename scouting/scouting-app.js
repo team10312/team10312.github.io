@@ -117,6 +117,10 @@ const state = {
     match: SCOUT_RELOAD_NEW_VALUE,
     pit: SCOUT_RELOAD_NEW_VALUE
   },
+  editingEntryIds: {
+    match: "",
+    pit: ""
+  },
   connectionOnline: navigator.onLine,
   isRefreshing: false,
   pendingAuthMessage: "",
@@ -1396,7 +1400,7 @@ async function loadEntriesForActiveEvent() {
     return;
   }
 
-  const [matchResponse, pitResponse, summaryResponse] = await Promise.all([
+  const [matchResponse, pitResponse] = await Promise.all([
     state.client
       .from("match_scout_entries")
       .select("*")
@@ -1406,33 +1410,26 @@ async function loadEntriesForActiveEvent() {
       .from("pit_scout_entries")
       .select("*")
       .eq("event_id", state.activeEventId)
-      .order("created_at", { ascending: false }),
-    state.client
-      .from("team_summary_2026")
-      .select("*")
-      .eq("event_id", state.activeEventId)
-      .order("team_number", { ascending: true })
+      .order("created_at", { ascending: false })
   ]);
 
   if (matchResponse.error) throw matchResponse.error;
   if (pitResponse.error) throw pitResponse.error;
 
-  state.matchEntries = Array.isArray(matchResponse.data) ? matchResponse.data : [];
-  state.pitEntries = Array.isArray(pitResponse.data) ? pitResponse.data : [];
-
-  if (summaryResponse.error) {
-    state.teamSummary = buildTeamSummary(state.matchEntries, state.pitEntries);
-    return;
-  }
-
-  const summaryRows = Array.isArray(summaryResponse.data) ? summaryResponse.data : [];
-  state.teamSummary = summaryRows.length
-    ? summaryRows.map(normalizeSummaryRow).sort((left, right) => left.team_number - right.team_number)
-    : buildTeamSummary(state.matchEntries, state.pitEntries);
+  state.matchEntries = dedupeScoutingEntries(Array.isArray(matchResponse.data) ? matchResponse.data : [], "match");
+  state.pitEntries = dedupeScoutingEntries(Array.isArray(pitResponse.data) ? pitResponse.data : [], "pit");
+  state.teamSummary = buildTeamSummary(state.matchEntries, state.pitEntries);
 }
 
 async function handleEventChange(eventId) {
   state.activeEventId = eventId;
+  state.matchEntries = [];
+  state.pitEntries = [];
+  state.teamSummary = [];
+  clearEditingEntryId("match");
+  clearEditingEntryId("pit");
+  setScoutReloadSelection("match", SCOUT_RELOAD_NEW_VALUE);
+  setScoutReloadSelection("pit", SCOUT_RELOAD_NEW_VALUE);
   saveStoredValue(STORAGE_KEYS.activeEventId, state.activeEventId);
 
   if (!state.session) {
@@ -1470,6 +1467,7 @@ async function submitMatchForm() {
   }
 
   const payload = buildMatchPayload();
+  const saveTarget = resolveMatchSaveTarget(payload);
   setFormMessage(elements.matchFormMessage, "Submitting match entry...", "success");
   elements.matchSubmitButton.disabled = true;
 
@@ -1478,20 +1476,24 @@ async function submitMatchForm() {
       throw new Error("Device is offline.");
     }
 
-    const result = await insertMatchEntry(payload);
+    const result = await saveMatchEntry(payload, saveTarget);
 
     resetMatchDraft(payload.scout_name);
     await loadEntriesForActiveEvent();
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
-    setFormMessage(elements.matchFormMessage, "Match entry synced.", "success");
+    setFormMessage(
+      elements.matchFormMessage,
+      result.action === "update" ? "Match entry updated." : "Match entry synced.",
+      "success"
+    );
     if (result.missingColumns.length) {
       console.warn("Match entry saved with legacy schema fallback:", result.missingColumns);
     }
-    setAppMessage("Match entry saved.", "success");
+    setAppMessage(result.action === "update" ? "Match entry updated." : "Match entry saved.", "success");
   } catch (error) {
     if (shouldQueueSyncError(error)) {
-      enqueueOutbox("match", payload);
+      enqueueOutbox("match", payload, { targetId: saveTarget.targetId });
       setFormMessage(
         elements.matchFormMessage,
         "Sync failed. The match entry was saved to this device outbox.",
@@ -1523,6 +1525,7 @@ async function submitPitForm() {
   }
 
   const payload = buildPitPayload();
+  const saveTarget = resolvePitSaveTarget(payload);
   setFormMessage(elements.pitFormMessage, "Submitting pit entry...", "success");
   elements.pitSubmitButton.disabled = true;
 
@@ -1531,20 +1534,24 @@ async function submitPitForm() {
       throw new Error("Device is offline.");
     }
 
-    const result = await insertPitEntry(payload);
+    const result = await savePitEntry(payload, saveTarget);
 
     resetPitDraft(payload.scout_name);
     await loadEntriesForActiveEvent();
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
-    setFormMessage(elements.pitFormMessage, "Pit entry synced.", "success");
+    setFormMessage(
+      elements.pitFormMessage,
+      result.action === "update" ? "Pit entry updated." : "Pit entry synced.",
+      "success"
+    );
     if (result.missingColumns.length) {
       console.warn("Pit entry saved with legacy schema fallback:", result.missingColumns);
     }
-    setAppMessage("Pit entry saved.", "success");
+    setAppMessage(result.action === "update" ? "Pit entry updated." : "Pit entry saved.", "success");
   } catch (error) {
     if (shouldQueueSyncError(error)) {
-      enqueueOutbox("pit", payload);
+      enqueueOutbox("pit", payload, { targetId: saveTarget.targetId });
       setFormMessage(
         elements.pitFormMessage,
         "Sync failed. The pit entry was saved to this device outbox.",
@@ -1581,9 +1588,9 @@ async function flushOutbox() {
   for (const item of state.outbox) {
     try {
       if (item.type === "match") {
-        await insertMatchEntry(item.payload);
+        await saveMatchEntry(item.payload, { targetId: item.targetId });
       } else {
-        await insertPitEntry(item.payload);
+        await savePitEntry(item.payload, { targetId: item.targetId });
       }
       syncedCount += 1;
     } catch (error) {
@@ -1881,6 +1888,12 @@ function renderFormAvailability() {
   if (elements.exportMatchButton) elements.exportMatchButton.disabled = !state.matchEntries.length;
   if (elements.exportPitButton) elements.exportPitButton.disabled = !state.pitEntries.length;
   if (elements.exportSummaryButton) elements.exportSummaryButton.disabled = !state.teamSummary.length;
+  if (elements.matchSubmitButton) {
+    elements.matchSubmitButton.textContent = getEditingEntryId("match") ? "Update Match Entry" : "Submit Match Entry";
+  }
+  if (elements.pitSubmitButton) {
+    elements.pitSubmitButton.textContent = getEditingEntryId("pit") ? "Update Pit Entry" : "Submit Pit Entry";
+  }
 }
 
 function renderScoutReloadOptions() {
@@ -1957,6 +1970,7 @@ function handleScoutReload(kind) {
 
   if (selectedValue === SCOUT_RELOAD_NEW_VALUE) {
     setScoutReloadSelection(kind, SCOUT_RELOAD_NEW_VALUE);
+    clearEditingEntryId(kind);
     if (isMatch) {
       resetMatchDraft("");
     } else {
@@ -1975,6 +1989,7 @@ function handleScoutReload(kind) {
   }
 
   setScoutReloadSelection(kind, selectedValue);
+  setEditingEntryId(kind, getEntryId(entry));
   syncScoutReloadSelect(kind);
   refreshCustomSelect(select);
   setFormValues(isMatch ? elements.matchForm : elements.pitForm, isMatch ? normalizeMatchValues(entry) : normalizePitValues(entry));
@@ -2047,6 +2062,7 @@ function resetMatchDraft(scoutName) {
   const next = { ...MATCH_DEFAULTS, scout_name: scoutName || "" };
   saveStoredJson(STORAGE_KEYS.matchDraft, next);
   removeStoredValue(STORAGE_KEYS.matchDraftSavedAt);
+  clearEditingEntryId("match");
   setFormValues(elements.matchForm, next);
   resetScoutReloadSelect("match");
   deactivateFormValidation(elements.matchForm);
@@ -2057,6 +2073,7 @@ function resetPitDraft(scoutName) {
   const next = { ...PIT_DEFAULTS, scout_name: scoutName || "" };
   saveStoredJson(STORAGE_KEYS.pitDraft, next);
   removeStoredValue(STORAGE_KEYS.pitDraftSavedAt);
+  clearEditingEntryId("pit");
   setFormValues(elements.pitForm, next);
   loadAutoPathDrawing("");
   resetScoutReloadSelect("pit");
@@ -2285,22 +2302,37 @@ function collectPitValues() {
   });
 }
 
-function enqueueOutbox(type, payload) {
+function enqueueOutbox(type, payload, { targetId = "" } = {}) {
   state.outbox.unshift({
     id: createId(),
     type,
     payload,
+    targetId: String(targetId || ""),
     created_at: new Date().toISOString()
   });
   saveStoredJson(STORAGE_KEYS.outbox, state.outbox);
 }
 
-async function insertMatchEntry(payload) {
-  return insertRowWithSchemaFallback("match_scout_entries", payload);
+async function saveMatchEntry(payload, options = {}) {
+  const target = resolveMatchSaveTarget(payload, options.targetId);
+  if (target.targetId) {
+    const result = await updateRowWithSchemaFallback("match_scout_entries", target.targetId, payload);
+    return { action: "update", targetId: target.targetId, missingColumns: result.missingColumns };
+  }
+
+  const result = await insertRowWithSchemaFallback("match_scout_entries", payload);
+  return { action: "insert", targetId: "", missingColumns: result.missingColumns };
 }
 
-async function insertPitEntry(payload) {
-  return insertRowWithSchemaFallback("pit_scout_entries", payload);
+async function savePitEntry(payload, options = {}) {
+  const target = resolvePitSaveTarget(payload, options.targetId);
+  if (target.targetId) {
+    const result = await updateRowWithSchemaFallback("pit_scout_entries", target.targetId, payload);
+    return { action: "update", targetId: target.targetId, missingColumns: result.missingColumns };
+  }
+
+  const result = await insertRowWithSchemaFallback("pit_scout_entries", payload);
+  return { action: "insert", targetId: "", missingColumns: result.missingColumns };
 }
 
 async function insertRowWithSchemaFallback(tableName, payload) {
@@ -2321,6 +2353,120 @@ async function insertRowWithSchemaFallback(tableName, payload) {
     delete legacyPayload[missingColumn];
     missingColumns.push(missingColumn);
   }
+}
+
+async function updateRowWithSchemaFallback(tableName, rowId, payload) {
+  const legacyPayload = { ...payload };
+  const missingColumns = [];
+
+  while (true) {
+    const { data, error } = await state.client.from(tableName).update(legacyPayload).eq("id", rowId).select("id").maybeSingle();
+    if (!error) {
+      if (data?.id) {
+        return { missingColumns };
+      }
+      throw new Error("Unable to locate the existing entry to update.");
+    }
+
+    const missingColumn = extractMissingColumnName(error, legacyPayload);
+    if (!missingColumn || missingColumns.includes(missingColumn)) {
+      throw error;
+    }
+
+    delete legacyPayload[missingColumn];
+    missingColumns.push(missingColumn);
+  }
+}
+
+function resolveMatchSaveTarget(payload, preferredTargetId = "") {
+  const editingId = String(preferredTargetId || getEditingEntryId("match"));
+  if (editingId) {
+    return { targetId: editingId };
+  }
+
+  return { targetId: getEntryId(findExistingMatchEntry(payload)) };
+}
+
+function resolvePitSaveTarget(payload, preferredTargetId = "") {
+  const editingId = String(preferredTargetId || getEditingEntryId("pit"));
+  if (editingId) {
+    return { targetId: editingId };
+  }
+
+  return { targetId: getEntryId(findExistingPitEntry(payload)) };
+}
+
+function findExistingMatchEntry(payload) {
+  const eventId = String(payload?.event_id || "");
+  const teamNumber = toPositiveInteger(payload?.team_number);
+  const matchNumber = toPositiveInteger(payload?.match_number);
+  const matchType = String(payload?.match_type || "");
+
+  return (
+    state.matchEntries.find((entry) => {
+      return (
+        String(entry?.event_id || "") === eventId &&
+        toPositiveInteger(entry?.team_number) === teamNumber &&
+        toPositiveInteger(entry?.match_number) === matchNumber &&
+        String(entry?.match_type || "") === matchType
+      );
+    }) || null
+  );
+}
+
+function findExistingPitEntry(payload) {
+  const eventId = String(payload?.event_id || "");
+  const teamNumber = toPositiveInteger(payload?.team_number);
+
+  return (
+    state.pitEntries.find((entry) => {
+      return String(entry?.event_id || "") === eventId && toPositiveInteger(entry?.team_number) === teamNumber;
+    }) || null
+  );
+}
+
+function dedupeScoutingEntries(entries, kind) {
+  const seen = new Set();
+  const rows = Array.isArray(entries) ? entries : [];
+
+  return rows.filter((entry) => {
+    const key = kind === "match" ? getMatchEntryKey(entry) : getPitEntryKey(entry);
+    if (!key || seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function getMatchEntryKey(entry) {
+  return [
+    String(entry?.event_id || ""),
+    toPositiveInteger(entry?.team_number),
+    String(entry?.match_type || ""),
+    toPositiveInteger(entry?.match_number)
+  ].join("::");
+}
+
+function getPitEntryKey(entry) {
+  return [String(entry?.event_id || ""), toPositiveInteger(entry?.team_number)].join("::");
+}
+
+function getEntryId(entry) {
+  return String(entry?.id || "");
+}
+
+function getEditingEntryId(kind) {
+  return String(state.editingEntryIds?.[kind] || "");
+}
+
+function setEditingEntryId(kind, value) {
+  state.editingEntryIds[kind] = String(value || "");
+}
+
+function clearEditingEntryId(kind) {
+  setEditingEntryId(kind, "");
 }
 
 function buildTeamSummary(matchEntries, pitEntries) {
