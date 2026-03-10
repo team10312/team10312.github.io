@@ -24,6 +24,8 @@ const STORAGE_KEYS = {
   pitDraftSavedAt: "bf-scouting-pit-draft-saved-v1"
 };
 
+const SCOUT_RELOAD_NEW_VALUE = "__new__";
+
 const AUTO_PATH_DEFAULTS = Object.freeze({
   drawColor: "#ff7f00",
   drawSize: 5,
@@ -110,6 +112,10 @@ const state = {
   outbox: loadStoredJson(STORAGE_KEYS.outbox, []),
   activeTab: loadStoredValue(STORAGE_KEYS.activeTab, "overview"),
   lastSyncAt: loadStoredValue(STORAGE_KEYS.lastSyncAt, ""),
+  scoutReloadSelections: {
+    match: SCOUT_RELOAD_NEW_VALUE,
+    pit: SCOUT_RELOAD_NEW_VALUE
+  },
   connectionOnline: navigator.onLine,
   isRefreshing: false,
   pendingAuthMessage: "",
@@ -1886,48 +1892,28 @@ function renderScoutReloadSelect(kind, entries) {
   if (!select) return;
 
   const event = getActiveEvent();
-  const rows = !state.isRefreshing && state.session && event && Array.isArray(entries) ? entries : [];
-  const placeholder = buildScoutReloadPlaceholder(kind, rows.length > 0);
+  const rows = Array.isArray(entries) ? entries : [];
+  const enabled = Boolean(state.session && event && !state.isRefreshing);
 
   select.innerHTML = "";
 
-  const placeholderOption = document.createElement("option");
-  placeholderOption.value = "";
-  placeholderOption.textContent = placeholder;
-  select.appendChild(placeholderOption);
+  const newOption = document.createElement("option");
+  newOption.value = SCOUT_RELOAD_NEW_VALUE;
+  newOption.textContent = `New ${kind} scout`;
+  select.appendChild(newOption);
 
-  rows.forEach((entry) => {
-    const option = document.createElement("option");
-    option.value = getScoutReloadEntryValue(entry, kind);
-    option.textContent = formatScoutReloadOptionLabel(entry, kind);
-    select.appendChild(option);
-  });
+  if (enabled) {
+    rows.forEach((entry) => {
+      const option = document.createElement("option");
+      option.value = getScoutReloadEntryValue(entry, kind);
+      option.textContent = formatScoutReloadOptionLabel(entry, kind);
+      select.appendChild(option);
+    });
+  }
 
-  select.disabled = !rows.length;
-  select.value = "";
+  select.disabled = !enabled;
+  syncScoutReloadSelect(kind);
   refreshCustomSelect(select);
-}
-
-function buildScoutReloadPlaceholder(kind, hasEntries) {
-  const label = kind === "match" ? "match scout" : "pit scout";
-
-  if (!state.session) {
-    return `Sign in to load past ${label}s`;
-  }
-
-  if (!getActiveEvent()) {
-    return "Select an event first";
-  }
-
-  if (state.isRefreshing) {
-    return `Refreshing past ${label}s...`;
-  }
-
-  if (!hasEntries) {
-    return `No past ${label}s for this event`;
-  }
-
-  return `Select a past ${label}`;
 }
 
 function formatScoutReloadOptionLabel(entry, kind) {
@@ -1962,23 +1948,36 @@ function getScoutReloadEntryValue(entry, kind) {
 function handleScoutReload(kind) {
   const isMatch = kind === "match";
   const select = isMatch ? elements.matchEntryLoadSelect : elements.pitEntryLoadSelect;
-  const form = isMatch ? elements.matchForm : elements.pitForm;
   const messageTarget = isMatch ? elements.matchFormMessage : elements.pitFormMessage;
   const entries = isMatch ? state.matchEntries : state.pitEntries;
   const selectedValue = String(select?.value || "");
 
   if (!selectedValue) return;
 
+  if (selectedValue === SCOUT_RELOAD_NEW_VALUE) {
+    setScoutReloadSelection(kind, SCOUT_RELOAD_NEW_VALUE);
+    if (isMatch) {
+      resetMatchDraft("");
+    } else {
+      resetPitDraft("");
+    }
+    setFormMessage(messageTarget, `Started a new ${kind} scout.`, "success");
+    return;
+  }
+
   const entry = entries.find((row) => getScoutReloadEntryValue(row, kind) === selectedValue);
-  resetScoutReloadSelect(select);
 
   if (!entry) {
+    resetScoutReloadSelect(kind);
     setFormMessage(messageTarget, "That scout entry is no longer available.", "warn");
     return;
   }
 
-  setFormValues(form, isMatch ? normalizeMatchValues(entry) : normalizePitValues(entry));
-  deactivateFormValidation(form);
+  setScoutReloadSelection(kind, selectedValue);
+  syncScoutReloadSelect(kind);
+  refreshCustomSelect(select);
+  setFormValues(isMatch ? elements.matchForm : elements.pitForm, isMatch ? normalizeMatchValues(entry) : normalizePitValues(entry));
+  deactivateFormValidation(isMatch ? elements.matchForm : elements.pitForm);
   persistDraft(kind);
 
   const detail = isMatch
@@ -1987,10 +1986,29 @@ function handleScoutReload(kind) {
   setFormMessage(messageTarget, `Loaded past ${kind} scout for ${detail}.`, "success");
 }
 
-function resetScoutReloadSelect(select) {
+function syncScoutReloadSelect(kind) {
+  const select = kind === "match" ? elements.matchEntryLoadSelect : elements.pitEntryLoadSelect;
   if (!select) return;
-  select.value = "";
-  refreshCustomSelect(select);
+
+  const selectedValue = getScoutReloadSelection(kind);
+  const availableValues = Array.from(select.options, (option) => option.value);
+  const nextValue = availableValues.includes(selectedValue) ? selectedValue : SCOUT_RELOAD_NEW_VALUE;
+  setScoutReloadSelection(kind, nextValue);
+  select.value = nextValue;
+}
+
+function resetScoutReloadSelect(kind) {
+  setScoutReloadSelection(kind, SCOUT_RELOAD_NEW_VALUE);
+  syncScoutReloadSelect(kind);
+  refreshCustomSelect(kind === "match" ? elements.matchEntryLoadSelect : elements.pitEntryLoadSelect);
+}
+
+function getScoutReloadSelection(kind) {
+  return state.scoutReloadSelections?.[kind] || SCOUT_RELOAD_NEW_VALUE;
+}
+
+function setScoutReloadSelection(kind, value) {
+  state.scoutReloadSelections[kind] = value || SCOUT_RELOAD_NEW_VALUE;
 }
 
 function persistDraft(kind, { manual = false } = {}) {
@@ -2029,6 +2047,7 @@ function resetMatchDraft(scoutName) {
   saveStoredJson(STORAGE_KEYS.matchDraft, next);
   removeStoredValue(STORAGE_KEYS.matchDraftSavedAt);
   setFormValues(elements.matchForm, next);
+  resetScoutReloadSelect("match");
   deactivateFormValidation(elements.matchForm);
   renderDraftStamp("match");
 }
@@ -2038,6 +2057,7 @@ function resetPitDraft(scoutName) {
   saveStoredJson(STORAGE_KEYS.pitDraft, next);
   removeStoredValue(STORAGE_KEYS.pitDraftSavedAt);
   setFormValues(elements.pitForm, next);
+  resetScoutReloadSelect("pit");
   deactivateFormValidation(elements.pitForm);
   renderDraftStamp("pit");
 }

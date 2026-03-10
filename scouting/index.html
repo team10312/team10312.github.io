@@ -253,20 +253,20 @@
 
           <section id="panel-match" class="tab-panel hidden">
             <form id="matchForm" class="card scout-form">
-              <div class="panel-head">
-                <div>
+              <div class="panel-head panel-head--scout">
+                <div class="panel-head__title">
                   <span class="section-label">Entry form</span>
-                  <h3>Match scouting</h3>
+                  <div class="scout-form__title-row">
+                    <h3>Match scouting</h3>
+                    <div class="scout-loader">
+                      <select id="matchEntryLoadSelect" aria-label="Load match scout">
+                        <option value="__new__">New match scout</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
                 <span class="muted form-context">2026 REBUILT match breakdown</span>
               </div>
-
-              <label class="field">
-                <span>Load Past Match Scout</span>
-                <select id="matchEntryLoadSelect" aria-label="Load past match scout">
-                  <option value="">No past match scouts for this event</option>
-                </select>
-              </label>
 
               <div class="form-grid form-grid--wide">
                 <label class="field">
@@ -467,20 +467,20 @@
 
           <section id="panel-pit" class="tab-panel hidden">
             <form id="pitForm" class="card scout-form">
-              <div class="panel-head">
-                <div>
+              <div class="panel-head panel-head--scout">
+                <div class="panel-head__title">
                   <span class="section-label">Entry form</span>
-                  <h3>Pit scouting</h3>
+                  <div class="scout-form__title-row">
+                    <h3>Pit scouting</h3>
+                    <div class="scout-loader">
+                      <select id="pitEntryLoadSelect" aria-label="Load pit scout">
+                        <option value="__new__">New pit scout</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
                 <span class="muted form-context">Robot capabilities and repair risk</span>
               </div>
-
-              <label class="field">
-                <span>Load Past Pit Scout</span>
-                <select id="pitEntryLoadSelect" aria-label="Load past pit scout">
-                  <option value="">No past pit scouts for this event</option>
-                </select>
-              </label>
 
               <div class="form-grid form-grid--wide">
                 <label class="field">

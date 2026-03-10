@@ -387,6 +387,38 @@ code {
   font-weight: 700;
 }
 
+.panel-head__title {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.panel-head--scout {
+  align-items: center;
+}
+
+.scout-form__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem 1rem;
+  flex-wrap: wrap;
+}
+
+.scout-form__title-row h3 {
+  margin: 0;
+}
+
+.scout-loader {
+  width: min(100%, 360px);
+  flex: 0 1 360px;
+}
+
+.scout-loader .custom-select__trigger {
+  min-height: 46px;
+  padding: 0.72rem 0.95rem;
+  border-radius: 14px;
+}
+
 .field input,
 .field select,
 .field textarea,
@@ -1244,6 +1276,19 @@ footer {
   .toolbar-actions,
   .export-actions {
     width: 100%;
+  }
+
+  .panel-head--scout {
+    align-items: flex-start;
+  }
+
+  .scout-form__title-row {
+    align-items: stretch;
+  }
+
+  .scout-loader {
+    width: 100%;
+    flex-basis: 100%;
   }
 
   .field--compact {
