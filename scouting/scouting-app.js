@@ -2058,6 +2058,7 @@ function resetPitDraft(scoutName) {
   saveStoredJson(STORAGE_KEYS.pitDraft, next);
   removeStoredValue(STORAGE_KEYS.pitDraftSavedAt);
   setFormValues(elements.pitForm, next);
+  loadAutoPathDrawing("");
   resetScoutReloadSelect("pit");
   deactivateFormValidation(elements.pitForm);
   renderDraftStamp("pit");
