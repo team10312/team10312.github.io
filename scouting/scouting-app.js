@@ -66,6 +66,7 @@ const PIT_DEFAULTS = Object.freeze({
   drivetrain: "Swerve",
   fuel_scoring_capability: "High volume",
   estimated_fuel_per_match: "",
+  barge_route: "Unknown",
   cycle_time: "",
   scoring_speed: "Unknown",
   intake_style: "Unknown",
@@ -1803,6 +1804,7 @@ function renderOutbox() {
       detail.textContent = [
         payload.drivetrain || "Drive unknown",
         payload.fuel_scoring_capability || "Fuel unknown",
+        payload.barge_route && payload.barge_route !== "Unknown" ? `Barge ${payload.barge_route}` : "",
         Number(payload.estimated_fuel_per_match || 0) > 0
           ? `Fuel ${payload.estimated_fuel_per_match}/match`
           : ""
@@ -1825,6 +1827,7 @@ function renderSummaryTable() {
     return (
       row.team_number.toString().includes(query) ||
       pitSnapshot.includes(query) ||
+      (row.barge_route || "").toLowerCase().includes(query) ||
       (row.cycle_time || "").toLowerCase().includes(query) ||
       (row.scoring_speed || "").toLowerCase().includes(query) ||
       (row.intake_style || "").toLowerCase().includes(query) ||
@@ -2119,6 +2122,7 @@ function buildPitPayload() {
     drivetrain: values.drivetrain,
     fuel_scoring_capability: values.fuel_scoring_capability,
     estimated_fuel_per_match: toNonNegativeInteger(values.estimated_fuel_per_match),
+    barge_route: values.barge_route,
     auto_path_drawing: values.auto_path_drawing,
     tower_capability: "",
     cycle_time: values.cycle_time,
@@ -2287,6 +2291,7 @@ function collectPitValues() {
     drivetrain: readFieldValue(form, "drivetrain"),
     fuel_scoring_capability: readFieldValue(form, "fuel_scoring_capability"),
     estimated_fuel_per_match: readFieldValue(form, "estimated_fuel_per_match"),
+    barge_route: readFieldValue(form, "barge_route"),
     cycle_time: readFieldValue(form, "cycle_time"),
     scoring_speed: readFieldValue(form, "scoring_speed"),
     intake_style: readFieldValue(form, "intake_style"),
@@ -2533,6 +2538,7 @@ function buildTeamSummary(matchEntries, pitEntries) {
       drivetrain: pit?.drivetrain || "",
       fuel_scoring_capability: pit?.fuel_scoring_capability || "",
       estimated_fuel_per_match: Number(pit?.estimated_fuel_per_match || 0),
+      barge_route: pit?.barge_route || "",
       cycle_time: pit?.cycle_time || "",
       scoring_speed: pit?.scoring_speed || "",
       intake_style: pit?.intake_style || "",
@@ -2561,6 +2567,7 @@ function normalizeSummaryRow(row) {
     drivetrain: row.drivetrain || "",
     fuel_scoring_capability: row.fuel_scoring_capability || "",
     estimated_fuel_per_match: Number(row.estimated_fuel_per_match || 0),
+    barge_route: row.barge_route || "",
     cycle_time: row.cycle_time || "",
     scoring_speed: row.scoring_speed || "",
     intake_style: row.intake_style || "",
@@ -2581,6 +2588,7 @@ function buildPitSnapshot(row) {
     row.shooter_type,
     row.intake_style,
     row.estimated_fuel_per_match ? `Fuel ${row.estimated_fuel_per_match}/match` : "",
+    row.barge_route && row.barge_route !== "Unknown" ? `Barge ${row.barge_route}` : "",
     row.cycle_time ? `Cycle ${row.cycle_time}` : "",
     row.scoring_speed,
     row.climb_level ? `Climb ${row.climb_level}` : "",
@@ -2640,6 +2648,7 @@ function exportPitCsv() {
     drivetrain: entry.drivetrain,
     fuel_scoring_capability: entry.fuel_scoring_capability,
     estimated_fuel_per_match: Number(entry.estimated_fuel_per_match || 0),
+    barge_route: entry.barge_route,
     cycle_time: entry.cycle_time,
     scoring_speed: entry.scoring_speed,
     intake_style: entry.intake_style,
@@ -2675,6 +2684,7 @@ function exportSummaryCsv() {
     drivetrain: row.drivetrain,
     fuel_scoring_capability: row.fuel_scoring_capability,
     estimated_fuel_per_match: row.estimated_fuel_per_match,
+    barge_route: row.barge_route,
     cycle_time: row.cycle_time,
     scoring_speed: row.scoring_speed,
     intake_style: row.intake_style,
@@ -3019,6 +3029,7 @@ function normalizePitValues(values) {
       values.fuel_scoring_capability ?? PIT_DEFAULTS.fuel_scoring_capability
     ).trim(),
     estimated_fuel_per_match: normalizeNumericDraftValue(values.estimated_fuel_per_match),
+    barge_route: String(values.barge_route ?? PIT_DEFAULTS.barge_route).trim() || PIT_DEFAULTS.barge_route,
     cycle_time: String(values.cycle_time ?? "").trim(),
     scoring_speed: String(values.scoring_speed ?? PIT_DEFAULTS.scoring_speed).trim(),
     intake_style: String(values.intake_style ?? PIT_DEFAULTS.intake_style).trim(),

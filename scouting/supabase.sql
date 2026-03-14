@@ -84,6 +84,7 @@ create table if not exists public.pit_scout_entries (
   drivetrain text not null,
   fuel_scoring_capability text not null,
   estimated_fuel_per_match integer not null default 0 check (estimated_fuel_per_match >= 0),
+  barge_route text not null default 'Unknown' check (barge_route in ('Over', 'Under', 'Both', 'Neither', 'Unknown')),
   tower_capability text not null,
   cycle_time text not null default '',
   scoring_speed text not null default '',
@@ -106,6 +107,10 @@ create index if not exists pit_scout_entries_event_team_idx
 alter table if exists public.pit_scout_entries
   add column if not exists estimated_fuel_per_match integer not null default 0
   check (estimated_fuel_per_match >= 0);
+
+alter table if exists public.pit_scout_entries
+  add column if not exists barge_route text not null default 'Unknown'
+  check (barge_route in ('Over', 'Under', 'Both', 'Neither', 'Unknown'));
 
 alter table if exists public.pit_scout_entries
   add column if not exists auto_path_drawing text not null default '';
@@ -167,6 +172,7 @@ pit_latest as (
     drivetrain,
     fuel_scoring_capability,
     estimated_fuel_per_match,
+    barge_route,
     tower_capability,
     cycle_time,
     scoring_speed,
@@ -194,6 +200,7 @@ select
   coalesce(match_agg.breakdown_count, 0) as breakdown_count,
   pit_latest.drivetrain,
   pit_latest.fuel_scoring_capability,
+  pit_latest.barge_route,
   pit_latest.tower_capability,
   pit_latest.cycle_time,
   pit_latest.scoring_speed,
