@@ -1,0 +1,4 @@
+project_id = "iszqghgweaofexcrvkvd"
+
+[functions.tba-media]
+verify_jwt = false

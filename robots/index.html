@@ -151,6 +151,15 @@
     @media (max-width:1000px){.gallery{grid-template-columns:repeat(4,1fr)}} 
     @media (max-width:640px){.gallery{grid-template-columns:repeat(2,1fr)}}
     .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; }
+    .result-photo{
+      width:100%;
+      margin-top:1rem;
+      border-radius:14px;
+      border:1px solid var(--panel-border);
+      display:block;
+      object-fit:cover;
+      box-shadow: var(--shadow);
+    }
     
   </style>
 
@@ -269,6 +278,12 @@
         <p class="muted">
           Districts • Innovation in Control Award sponsored by nVent
         </p>
+        <img
+          class="result-photo"
+          src="innovation-control-award.jpg"
+          alt="Byte Force team members posing with the Innovation in Control Award"
+          loading="lazy"
+        >
       </div>
     </div>
   </div>

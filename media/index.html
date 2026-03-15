@@ -208,6 +208,7 @@
     </style>
   
   <link rel="stylesheet" href="../responsive.css" />
+  <link rel="stylesheet" href="media-videos.css" />
 </head>
 
   <body>
@@ -248,9 +249,45 @@
 
     <section class="section">
       <div class="container">
-        <h2 class="h2">Robot Reveal</h2>
-        <div class="card video">
-          <iframe width="100%" height="100%" src="https://www.thebluealliance.com/team/10312" title="Robot Reveal" frameborder="0" allowfullscreen></iframe>
+        <div class="media-video-head">
+          <div>
+            <p class="media-video-eyebrow">Competition Archive</p>
+            <h2 class="h2">Match Videos</h2>
+            <p class="muted media-video-intro">Browse Team 10312 match videos by season and competition without leaving the site.</p>
+          </div>
+          <div class="card media-video-controls">
+            <label class="media-video-field">
+              <span>Season</span>
+              <select id="videoSeasonSelect" aria-label="Select season"></select>
+            </label>
+            <label class="media-video-field">
+              <span>Competition</span>
+              <select id="videoEventSelect" aria-label="Select competition" disabled>
+                <option>Choose a season first</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="card media-video-browser">
+          <div class="media-video-meta" id="videoEventMeta" hidden>
+            <div>
+              <p class="media-video-event-name" id="videoEventName"></p>
+              <p class="muted media-video-event-subtitle" id="videoEventSubtitle"></p>
+            </div>
+            <div class="media-video-summary" id="videoEventSummary"></div>
+          </div>
+
+          <div class="media-video-status" id="videoStatus" role="status">
+            Loading match videos...
+          </div>
+
+          <div class="media-video-grid" id="videoGrid" hidden></div>
+
+          <div class="media-video-links" id="videoLinks" hidden>
+            <a class="btn secondary" id="videoEventLink" href="https://www.thebluealliance.com/team/10312" target="_blank" rel="noreferrer">Open Competition on The Blue Alliance</a>
+            <a class="btn secondary" id="videoTeamLink" href="https://www.thebluealliance.com/team/10312" target="_blank" rel="noreferrer">Open Team 10312 on The Blue Alliance</a>
+          </div>
         </div>
       </div>
     </section>
@@ -482,6 +519,8 @@
       })();
     </script>
   
+  <script src="media-config.js"></script>
+  <script src="media-videos.js" defer></script>
   <script src="../responsive.js" defer></script>
 </body>
 </html>
