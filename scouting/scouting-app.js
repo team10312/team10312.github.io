@@ -1082,7 +1082,8 @@ function bindEvents() {
   });
 
   if (elements.runPickAnalysisButton) {
-    elements.runPickAnalysisButton.addEventListener("click", () => {
+    elements.runPickAnalysisButton.addEventListener("click", (event) => {
+      event.preventDefault();
       runPickAnalysis();
     });
   }
@@ -4139,7 +4140,8 @@ function renderPickAnalysis() {
   elements.pickAnalysisBest.classList.remove("analysis-best");
 
   if (elements.runPickAnalysisButton) {
-    elements.runPickAnalysisButton.disabled = !canAnalyze || state.analysisRunning;
+    elements.runPickAnalysisButton.disabled = !canAnalyze;
+    elements.runPickAnalysisButton.setAttribute("aria-busy", state.analysisRunning ? "true" : "false");
     elements.runPickAnalysisButton.textContent = state.analysisRunning ? "Analyzing..." : "Run Analysis";
   }
 
