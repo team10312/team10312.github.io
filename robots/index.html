@@ -151,8 +151,17 @@
     @media (max-width:1000px){.gallery{grid-template-columns:repeat(4,1fr)}} 
     @media (max-width:640px){.gallery{grid-template-columns:repeat(2,1fr)}}
     .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; }
+    .robot-photo{
+      width:100%;
+      aspect-ratio:4 / 5;
+      border-radius:14px;
+      display:block;
+      object-fit:contain;
+      background: rgba(255,255,255,0.9);
+    }
     .result-photo{
       width:100%;
+      aspect-ratio:4 / 5;
       margin-top:1rem;
       border-radius:14px;
       border:1px solid var(--panel-border);
@@ -248,7 +257,7 @@
     <div class="grid-3">
       <!-- Robot -->
       <div class="card">
-        <img src="2025_robot.png" alt="2025 Robot">
+        <img class="robot-photo" src="2025_robot.png" alt="2025 Robot">
         <h3>Byte</h3>
         <p class="muted">
           Swerve drive, coral intake, reef scoring, and autonomous navigation.

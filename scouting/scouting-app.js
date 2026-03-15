@@ -28,6 +28,7 @@ const STORAGE_KEYS = {
 
 const SCOUT_RELOAD_NEW_VALUE = "__new__";
 const STATBOTICS_API_BASE = "https://api.statbotics.io/v3";
+const TBA_MEDIA_FUNCTION = "tba-media";
 const TRACKED_TEAM_NUMBER = 10312;
 const TEXAS_STATE_CODE = "TX";
 const OVERVIEW_MODE_COMPETITION = "competition";
@@ -136,6 +137,7 @@ const state = {
   overviewCompetitionRows: [],
   overviewTexasRows: [],
   overviewMatches: [],
+  overviewEventAlliances: [],
   overviewEventData: null,
   analysisResult: null,
   analysisDebugOverride: loadStoredValue(STORAGE_KEYS.analysisDebugOverride, "") === "true",
@@ -1512,6 +1514,7 @@ function resetOverviewState() {
   state.overviewCompetitionRows = [];
   state.overviewTexasRows = [];
   state.overviewMatches = [];
+  state.overviewEventAlliances = [];
   state.overviewEventData = null;
   state.analysisResult = null;
   state.analysisNeedsRefresh = true;
@@ -1544,11 +1547,12 @@ async function loadOverviewData() {
   renderOverview();
 
   try {
-    const [competitionRows, texasRows, matches, eventData] = await Promise.all([
+    const [competitionRows, texasRows, matches, eventData, allianceData] = await Promise.all([
       fetchStatbotics(`team_events?event=${encodeURIComponent(eventKey)}&limit=1000`),
       fetchStatbotics(`team_years?year=${season}&state=${encodeURIComponent(TEXAS_STATE_CODE)}&limit=500`),
       fetchStatbotics(`matches?event=${encodeURIComponent(eventKey)}&limit=${OVERVIEW_MATCH_LIMIT}`),
-      fetchStatbotics(`event/${encodeURIComponent(eventKey)}`)
+      fetchStatbotics(`event/${encodeURIComponent(eventKey)}`),
+      fetchTbaMediaProxy({ mode: "alliances", eventKey }).catch(() => ({ alliances: [] }))
     ]);
 
     if (requestToken !== overviewRequestToken) return;
@@ -1556,6 +1560,7 @@ async function loadOverviewData() {
     state.overviewCompetitionRows = sortCompetitionRows(competitionRows);
     state.overviewTexasRows = sortTexasRows(texasRows);
     state.overviewMatches = Array.isArray(matches) ? matches.slice() : [];
+    state.overviewEventAlliances = Array.isArray(allianceData?.alliances) ? allianceData.alliances.slice() : [];
     state.overviewEventData = eventData && !Array.isArray(eventData) ? eventData : null;
     state.overviewFetchedAt = new Date().toISOString();
     state.analysisNeedsRefresh = true;
@@ -1579,6 +1584,27 @@ async function fetchStatbotics(path) {
 
   if (!response.ok) {
     throw new Error(`Statbotics request failed (${response.status}).`);
+  }
+
+  return response.json();
+}
+
+async function fetchTbaMediaProxy(params) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value != null && value !== "") {
+      query.set(key, String(value));
+    }
+  });
+
+  const response = await fetch(`${state.config.supabaseUrl}/functions/v1/${TBA_MEDIA_FUNCTION}?${query.toString()}`, {
+    headers: {
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`TBA media request failed (${response.status}).`);
   }
 
   return response.json();
@@ -1732,6 +1758,11 @@ function normalizeStatboticsVideoUrl(value) {
     return `https://www.youtube.com/watch?v=${encodeURIComponent(raw)}`;
   }
   return "";
+}
+
+function normalizeTbaTeamKeyToNumber(value) {
+  const numeric = Number(String(value || "").replace(/^frc/i, "").trim());
+  return Number.isFinite(numeric) ? numeric : null;
 }
 
 function isCurrentEventOver() {
@@ -2406,7 +2437,9 @@ function buildAlliancePickAnalysis() {
   const ourRow = getTrackedEventRow();
   const ourSummary = getSummaryRow(TRACKED_TEAM_NUMBER);
   const ourRank = Number(ourRow?.record?.qual?.rank || Number.POSITIVE_INFINITY);
-  const actualAvailability = buildCompletedEventAvailabilityContext(state.overviewMatches, state.overviewCompetitionRows);
+  const actualAvailability =
+    buildOfficialAllianceAvailabilityContext(state.overviewEventAlliances, state.overviewCompetitionRows) ||
+    buildCompletedEventAvailabilityContext(state.overviewMatches, state.overviewCompetitionRows);
   const candidates = (actualAvailability?.availableRows?.length
     ? actualAvailability.availableRows
     : state.overviewCompetitionRows.filter((row) => Number(row?.team) !== TRACKED_TEAM_NUMBER)
@@ -2430,6 +2463,41 @@ function buildAlliancePickAnalysis() {
     actualAvailability,
     recommendation: shortlist[0] || null,
     shortlist
+  };
+}
+
+function buildOfficialAllianceAvailabilityContext(alliances, competitionRows) {
+  const normalizedAlliances = (Array.isArray(alliances) ? alliances : [])
+    .map((alliance, index) => normalizeOfficialAlliance(alliance, index))
+    .filter(Boolean);
+
+  if (!normalizedAlliances.length) return null;
+
+  const ourAlliance = normalizedAlliances.find((alliance) => alliance.captain === TRACKED_TEAM_NUMBER);
+  if (!ourAlliance) return null;
+
+  const unavailableTeamNumbers = new Set([TRACKED_TEAM_NUMBER]);
+  normalizedAlliances.forEach((alliance) => {
+    if (Number.isFinite(alliance.captain)) unavailableTeamNumbers.add(alliance.captain);
+    alliance.declines.forEach((teamNumber) => unavailableTeamNumbers.add(teamNumber));
+  });
+
+  normalizedAlliances.forEach((alliance) => {
+    if (alliance.seed < ourAlliance.seed && Number.isFinite(alliance.firstPick)) {
+      unavailableTeamNumbers.add(alliance.firstPick);
+    }
+  });
+
+  const availableRows = (Array.isArray(competitionRows) ? competitionRows : []).filter((row) => {
+    const teamNumber = Number(row?.team || 0);
+    return Number.isFinite(teamNumber) && !unavailableTeamNumbers.has(teamNumber);
+  });
+
+  return {
+    availableRows,
+    ourAllianceSeed: ourAlliance.seed,
+    unavailableTeamNumbers: Array.from(unavailableTeamNumbers).sort((left, right) => left - right),
+    source: "tba"
   };
 }
 
@@ -2471,8 +2539,45 @@ function buildCompletedEventAvailabilityContext(matches, competitionRows) {
   return {
     availableRows,
     ourAllianceSeed: ourAlliance.seed,
-    unavailableTeamNumbers: Array.from(unavailableTeamNumbers).sort((left, right) => left - right)
+    unavailableTeamNumbers: Array.from(unavailableTeamNumbers).sort((left, right) => left - right),
+    source: "inferred"
   };
+}
+
+function normalizeOfficialAlliance(alliance, index) {
+  const picks = (Array.isArray(alliance?.picks) ? alliance.picks : [])
+    .map((teamKey) => normalizeTbaTeamKeyToNumber(teamKey))
+    .filter((teamNumber) => Number.isFinite(teamNumber));
+  if (!picks.length) return null;
+
+  const declines = (Array.isArray(alliance?.declines) ? alliance.declines : [])
+    .map((teamKey) => normalizeTbaTeamKeyToNumber(teamKey))
+    .filter((teamNumber) => Number.isFinite(teamNumber));
+  const backupIn = normalizeTbaTeamKeyToNumber(alliance?.backup?.in);
+  if (Number.isFinite(backupIn) && !picks.includes(backupIn)) {
+    picks.push(backupIn);
+  }
+
+  return {
+    seed: getOfficialAllianceSeed(alliance, index),
+    captain: picks[0] || null,
+    firstPick: picks[1] || null,
+    secondPick: picks[2] || null,
+    teams: picks,
+    declines
+  };
+}
+
+function getOfficialAllianceSeed(alliance, index) {
+  const name = String(alliance?.name || "");
+  const match = name.match(/(\d+)/);
+  if (match) {
+    const parsed = Number(match[1]);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return Number(index + 1);
 }
 
 function registerAllianceSeed(target, seed, teamKeys) {
@@ -2892,7 +2997,7 @@ function renderPickAnalysis() {
   elements.pickAnalysisStatus.textContent = [
     `Our rank: #${state.analysisResult.ourRank || "--"}`,
     state.analysisResult.actualAvailability?.ourAllianceSeed
-      ? `Captain seed #${state.analysisResult.actualAvailability.ourAllianceSeed} actual availability`
+      ? `${state.analysisResult.actualAvailability.source === "tba" ? "Official TBA" : "Inferred"} captain seed #${state.analysisResult.actualAvailability.ourAllianceSeed} availability`
       : "Projected current availability",
     eventOver && debugOverrideEnabled ? "Debug override active on completed-event data." : "",
     state.analysisNeedsRefresh ? "Scouting changed since the last run. Press Run Analysis again." : "",

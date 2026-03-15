@@ -117,118 +117,109 @@
   background: rgba(255, 127, 0, 0.08);
 }
 
-.media-video-grid {
-  display: grid;
-  gap: 1rem;
+.media-video-table-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
 }
 
-.media-match-card {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-  padding: 1rem;
-  border-radius: 18px;
-  border: 1px solid var(--panel-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08));
-}
-
-[data-theme="dark"] .media-match-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
-}
-
-.media-match-video {
-  aspect-ratio: 16 / 9;
-  border-radius: 16px;
-  overflow: hidden;
-  background: #000;
-}
-
-.media-match-video iframe {
+.media-video-table {
   width: 100%;
-  height: 100%;
-  border: 0;
+  min-width: 880px;
+  border-collapse: collapse;
 }
 
-.media-match-fallback {
-  display: grid;
-  place-items: center;
-  padding: 1.25rem;
-  text-align: center;
-  color: #fff;
-  background:
-    radial-gradient(circle at top, rgba(255, 127, 0, 0.35), transparent 55%),
-    linear-gradient(135deg, #10131a, #050608);
+.media-video-table th,
+.media-video-table td {
+  padding: 1rem 1rem;
+  border-bottom: 1px solid var(--panel-border);
+  text-align: left;
+  vertical-align: top;
 }
 
-.media-match-copy {
-  display: grid;
-  gap: 0.8rem;
-  align-content: start;
-}
-
-.media-match-topline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  align-items: center;
-}
-
-.media-match-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 30px;
-  padding: 0.35rem 0.7rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
+.media-video-table th {
+  font-size: 0.9rem;
   font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
-.media-match-chip--label {
-  background: rgba(255, 127, 0, 0.14);
-  color: var(--brand);
-}
-
-.media-match-chip--alliance {
-  background: rgba(0, 0, 0, 0.06);
   color: var(--text);
 }
 
-.media-match-chip--alliance[data-alliance="red"] {
+.media-video-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.media-video-match {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.media-video-match strong {
+  font-size: 1.02rem;
+}
+
+.media-video-cell-subtitle {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.media-video-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.media-video-chip[data-alliance="red"] {
   background: rgba(207, 54, 76, 0.14);
   color: #cf364c;
 }
 
-.media-match-chip--alliance[data-alliance="blue"] {
+.media-video-chip[data-alliance="blue"] {
   background: rgba(57, 117, 214, 0.14);
   color: #3975d6;
 }
 
-.media-match-title {
-  margin: 0;
-  font-size: 1.15rem;
-  line-height: 1.2;
-}
-
-.media-match-summary,
-.media-match-teams {
-  margin: 0;
-  color: var(--muted);
-}
-
-.media-match-teams strong {
+.media-video-chip[data-alliance="unknown"] {
+  background: rgba(0, 0, 0, 0.06);
   color: var(--text);
 }
 
-.media-match-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
+.media-video-actual[data-tone="positive"] {
+  color: #0d8a6a;
+  font-weight: 800;
 }
 
-.media-match-actions .btn.secondary {
+[data-theme="dark"] .media-video-actual[data-tone="positive"] {
+  color: #7dd3c7;
+}
+
+.media-video-actual[data-tone="negative"] {
+  color: #c74d4d;
+  font-weight: 800;
+}
+
+[data-theme="dark"] .media-video-actual[data-tone="negative"] {
+  color: #ff9a9a;
+}
+
+.media-video-actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.media-video-actions .btn.secondary {
+  width: auto;
+  justify-self: start;
   box-shadow: none;
+  padding: 0.7rem 0.9rem;
+}
+
+.media-video-pending {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .media-video-links {
@@ -243,8 +234,7 @@
     grid-template-columns: 1fr;
   }
 
-  .media-video-meta,
-  .media-match-card {
+  .media-video-meta {
     grid-template-columns: 1fr;
   }
 
@@ -261,9 +251,5 @@
 
   .media-video-browser {
     padding: 1rem;
-  }
-
-  .media-match-card {
-    padding: 0.8rem;
   }
 }

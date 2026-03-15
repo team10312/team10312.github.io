@@ -282,7 +282,21 @@
             Loading match videos...
           </div>
 
-          <div class="media-video-grid" id="videoGrid" hidden></div>
+          <div class="media-video-table-wrap" id="videoTableWrap" hidden>
+            <table class="media-video-table">
+              <thead>
+                <tr>
+                  <th>Match</th>
+                  <th>Alliance</th>
+                  <th>Win %</th>
+                  <th>Predicted Score</th>
+                  <th>Actual</th>
+                  <th>Video</th>
+                </tr>
+              </thead>
+              <tbody id="videoTableBody"></tbody>
+            </table>
+          </div>
 
           <div class="media-video-links" id="videoLinks" hidden>
             <a class="btn secondary" id="videoEventLink" href="https://www.thebluealliance.com/team/10312" target="_blank" rel="noreferrer">Open Competition on The Blue Alliance</a>
