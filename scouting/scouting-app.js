@@ -30,6 +30,7 @@ const STATBOTICS_API_BASE = "https://api.statbotics.io/v3";
 const TBA_MEDIA_PROXY_FUNCTION = "tba-media";
 const TRACKED_TEAM_NUMBER = 10312;
 const TEXAS_STATE_CODE = "TX";
+const DEFAULT_WORKSPACE_TAB = "overview";
 const OVERVIEW_MODE_COMPETITION = "competition";
 const OVERVIEW_MODE_TEXAS = "texas";
 const OVERVIEW_MATCH_LIMIT = 100;
@@ -140,7 +141,7 @@ const state = {
   pitEntries: [],
   teamSummary: [],
   outbox: loadStoredJson(STORAGE_KEYS.outbox, []),
-  activeTab: loadStoredValue(STORAGE_KEYS.activeTab, "overview"),
+  activeTab: loadStoredValue(STORAGE_KEYS.activeTab, DEFAULT_WORKSPACE_TAB),
   authReady: false,
   authRedirecting: false,
   overviewMode: loadStoredValue(STORAGE_KEYS.overviewMode, OVERVIEW_MODE_COMPETITION),
@@ -282,12 +283,10 @@ function cacheDom() {
   elements.googleSignInButton = document.getElementById("googleSignInButton");
   elements.authMessage = document.getElementById("authMessage");
   elements.eventSelect = document.getElementById("eventSelect");
-  elements.refreshButton = document.getElementById("refreshButton");
   elements.retryOutboxInline = document.getElementById("retryOutboxInline");
   elements.signOutButton = document.getElementById("signOutButton");
   elements.authPill = document.getElementById("authPill");
   elements.connectionPill = document.getElementById("connectionPill");
-  elements.syncPill = document.getElementById("syncPill");
   elements.queuePill = document.getElementById("queuePill");
   elements.currentEventName = document.getElementById("currentEventName");
   elements.currentEventMeta = document.getElementById("currentEventMeta");
@@ -1045,12 +1044,6 @@ function bindEvents() {
     });
   }
 
-  if (elements.refreshButton) {
-    elements.refreshButton.addEventListener("click", () => {
-      void refreshData({ message: "Scouting data refreshed." });
-    });
-  }
-
   if (elements.retryOutboxInline) {
     elements.retryOutboxInline.addEventListener("click", () => {
       void flushOutbox();
@@ -1427,6 +1420,7 @@ async function syncSession(session) {
 
   state.authRedirecting = false;
   setAuthMessage(`Signed in as ${email}.`, "success");
+  showTab(DEFAULT_WORKSPACE_TAB);
   await refreshData({ message: "" });
   state.authReady = true;
   renderAll();
@@ -1450,9 +1444,11 @@ async function refreshData({ message } = {}) {
 
   try {
     await loadEvents();
-    await loadEntriesForActiveEvent();
-    await loadOverviewData();
-    await syncMatchTrackerSelection();
+    await Promise.all([
+      loadEntriesForActiveEvent(),
+      loadOverviewData()
+    ]);
+    queueMatchTrackerSync();
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
     if (typeof message === "string") {
@@ -1630,13 +1626,11 @@ async function loadOverviewData() {
   renderOverview();
 
   try {
-    const [competitionRows, texasRows, matches, eventData, allianceSelections, teamMediaMap] = await Promise.all([
+    const [competitionRows, texasRows, matches, eventData] = await Promise.all([
       fetchStatbotics(`team_events?event=${encodeURIComponent(eventKey)}&limit=1000`),
       fetchStatbotics(`team_years?year=${season}&state=${encodeURIComponent(TEXAS_STATE_CODE)}&limit=500`),
       fetchStatbotics(`matches?event=${encodeURIComponent(eventKey)}&limit=${OVERVIEW_MATCH_LIMIT}`),
-      fetchStatbotics(`event/${encodeURIComponent(eventKey)}`),
-      fetchOverviewAllianceSelections(tbaEventKey),
-      fetchOverviewTeamMedia(tbaEventKey)
+      fetchStatbotics(`event/${encodeURIComponent(eventKey)}`)
     ]);
 
     if (requestToken !== overviewRequestToken) return;
@@ -1645,28 +1639,15 @@ async function loadOverviewData() {
     state.overviewTexasRows = sortTexasRows(texasRows);
     state.overviewMatches = Array.isArray(matches) ? matches.slice() : [];
     state.overviewEventData = eventData && !Array.isArray(eventData) ? eventData : null;
-    state.overviewAllianceSelections = Array.isArray(allianceSelections) ? allianceSelections.slice() : [];
-    state.overviewTeamMediaByTeam = teamMediaMap instanceof Map ? teamMediaMap : new Map();
-    
-    // Fetch media for teams in rankings that don't have media yet
-    const allTeamNumbers = [
-      ...(Array.isArray(competitionRows) ? competitionRows.map((row) => row?.team ?? row?.teamNumber) : []),
-      ...(Array.isArray(texasRows) ? texasRows.map((row) => row?.team ?? row?.teamNumber) : [])
-    ].filter((teamNum) => Number.isFinite(Number(teamNum)) && Number(teamNum) > 0);
-    
-    const missingMediaMap = await fetchMissingTeamMedia(allTeamNumbers, state.overviewTeamMediaByTeam, season);
-    if (missingMediaMap.size > 0) {
-      missingMediaMap.forEach((src, teamNum) => {
-        state.overviewTeamMediaByTeam.set(teamNum, src);
-      });
-      // Re-render to show newly loaded logos
-      if (requestToken === overviewRequestToken) {
-        renderOverview();
-      }
-    }
-    
     state.overviewFetchedAt = new Date().toISOString();
     state.analysisNeedsRefresh = true;
+    void hydrateOverviewBlueAllianceData({
+      requestToken,
+      eventKey: tbaEventKey,
+      season,
+      competitionRows,
+      texasRows
+    });
   } catch (error) {
     if (requestToken !== overviewRequestToken) return;
     resetOverviewState();
@@ -1676,6 +1657,42 @@ async function loadOverviewData() {
     state.overviewLoading = false;
     renderOverview();
   }
+}
+
+async function hydrateOverviewBlueAllianceData({ requestToken, eventKey, season, competitionRows, texasRows }) {
+  try {
+    const teamNumbers = [
+      ...(Array.isArray(competitionRows) ? competitionRows.map((row) => row?.team ?? row?.teamNumber) : []),
+      ...(Array.isArray(texasRows) ? texasRows.map((row) => row?.team ?? row?.teamNumber) : [])
+    ].filter((teamNum) => Number.isFinite(Number(teamNum)) && Number(teamNum) > 0);
+
+    const [allianceSelections, teamMediaMap] = await Promise.all([
+      fetchOverviewAllianceSelections(eventKey),
+      fetchOverviewTeamMedia(eventKey)
+    ]);
+
+    if (requestToken !== overviewRequestToken) return;
+
+    state.overviewAllianceSelections = Array.isArray(allianceSelections) ? allianceSelections.slice() : [];
+    state.overviewTeamMediaByTeam = teamMediaMap instanceof Map ? teamMediaMap : new Map();
+    renderOverview();
+
+    const missingMediaMap = await fetchMissingTeamMedia(teamNumbers, state.overviewTeamMediaByTeam, season);
+    if (requestToken !== overviewRequestToken || !missingMediaMap.size) return;
+
+    missingMediaMap.forEach((src, teamNum) => {
+      state.overviewTeamMediaByTeam.set(teamNum, src);
+    });
+    renderOverview();
+  } catch (error) {
+    console.warn("Unable to finish background overview enrichment", error);
+  }
+}
+
+function queueMatchTrackerSync(options) {
+  void syncMatchTrackerSelection(options).catch((error) => {
+    console.warn("Unable to sync match tracker", error);
+  });
 }
 
 async function fetchStatbotics(path) {
@@ -2511,9 +2528,11 @@ async function handleEventChange(eventId) {
   try {
     state.isRefreshing = true;
     renderAll();
-    await loadEntriesForActiveEvent();
-    await loadOverviewData();
-    await syncMatchTrackerSelection({ forceActiveEvent: true });
+    await Promise.all([
+      loadEntriesForActiveEvent(),
+      loadOverviewData()
+    ]);
+    queueMatchTrackerSync({ forceActiveEvent: true });
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
     setAppMessage("Event data loaded.", "success");
@@ -2694,7 +2713,7 @@ async function flushOutbox() {
 function showTab(tabName) {
   const validTab = elements.tabButtons.some((button) => button.dataset.tab === tabName)
     ? tabName
-    : "overview";
+    : DEFAULT_WORKSPACE_TAB;
 
   state.activeTab = validTab;
   saveStoredValue(STORAGE_KEYS.activeTab, state.activeTab);
@@ -2858,16 +2877,6 @@ function renderStatusPills() {
     state.connectionOnline ? "Online" : "Offline",
     state.connectionOnline ? "success" : "danger"
   );
-
-  if (isSessionRestorePending()) {
-    setStatusPill(elements.syncPill, "Loading workspace...", "warn");
-  } else if (state.isRefreshing) {
-    setStatusPill(elements.syncPill, "Refreshing data...", "warn");
-  } else if (state.lastSyncAt) {
-    setStatusPill(elements.syncPill, `Last sync ${formatTime(state.lastSyncAt)}`, "success");
-  } else {
-    setStatusPill(elements.syncPill, "Waiting for first sync", "warn");
-  }
 
   const queueTone = state.outbox.length ? "warn" : "success";
   setStatusPill(elements.queuePill, `Outbox: ${state.outbox.length}`, queueTone);
@@ -4384,7 +4393,6 @@ function renderFormAvailability() {
   const enabled = Boolean(state.session && getActiveEvent() && !state.isRefreshing);
   const canRetry = Boolean(state.session && state.outbox.length && !state.isRefreshing);
 
-  if (elements.refreshButton) elements.refreshButton.disabled = !state.session || state.isRefreshing;
   if (elements.retryOutboxInline) elements.retryOutboxInline.disabled = !canRetry;
   if (elements.signOutButton) elements.signOutButton.disabled = !state.session;
   if (elements.matchSubmitButton) elements.matchSubmitButton.disabled = !enabled;
