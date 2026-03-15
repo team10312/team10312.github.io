@@ -1145,6 +1145,10 @@ code {
   box-shadow: none;
 }
 
+.tracker-links .btn.secondary {
+  width: 100%;
+}
+
 .summary-table--rankings {
   min-width: 760px;
 }

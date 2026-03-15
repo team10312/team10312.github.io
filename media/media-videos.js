@@ -16,7 +16,6 @@
     renderedMatches: [],
     selectedSeason: null,
     selectedEventKey: "",
-    activeMatchKey: "",
     requestToken: 0
   };
 
@@ -32,25 +31,6 @@
   let eventNameEl;
   let eventSubtitleEl;
   let eventSummaryEl;
-  let selectionEl;
-  let selectionLabelEl;
-  let selectionAllianceChipEl;
-  let selectionTitleEl;
-  let selectionSummaryEl;
-  let selectionAllianceEl;
-  let selectionOppositionEl;
-  let selectionPlayButtonEl;
-  let selectionWatchLinkEl;
-  let selectionDetailsLinkEl;
-  let linksEl;
-  let eventLinkEl;
-  let teamLinkEl;
-  let modalEl;
-  let modalFrameEl;
-  let modalTitleEl;
-  let modalSummaryEl;
-  let modalWatchLinkEl;
-  let modalCloseEl;
 
   document.addEventListener("DOMContentLoaded", initMediaVideos);
 
@@ -67,33 +47,12 @@
     eventNameEl = document.getElementById("videoEventName");
     eventSubtitleEl = document.getElementById("videoEventSubtitle");
     eventSummaryEl = document.getElementById("videoEventSummary");
-    selectionEl = document.getElementById("videoSelection");
-    selectionLabelEl = document.getElementById("videoSelectionLabel");
-    selectionAllianceChipEl = document.getElementById("videoSelectionAllianceChip");
-    selectionTitleEl = document.getElementById("videoSelectionTitle");
-    selectionSummaryEl = document.getElementById("videoSelectionSummary");
-    selectionAllianceEl = document.getElementById("videoSelectionAlliance");
-    selectionOppositionEl = document.getElementById("videoSelectionOpposition");
-    selectionPlayButtonEl = document.getElementById("videoSelectionPlayButton");
-    selectionWatchLinkEl = document.getElementById("videoSelectionWatchLink");
-    selectionDetailsLinkEl = document.getElementById("videoSelectionDetailsLink");
-    linksEl = document.getElementById("videoLinks");
-    eventLinkEl = document.getElementById("videoEventLink");
-    teamLinkEl = document.getElementById("videoTeamLink");
-    modalEl = document.getElementById("videoModal");
-    modalFrameEl = document.getElementById("videoModalFrame");
-    modalTitleEl = document.getElementById("videoModalTitle");
-    modalSummaryEl = document.getElementById("videoModalSummary");
-    modalWatchLinkEl = document.getElementById("videoModalWatchLink");
-    modalCloseEl = document.getElementById("videoModalClose");
 
-    if (!seasonSelect || !eventSelect || !statusEl || !gridEl || !teamLinkEl) {
+    if (!seasonSelect || !eventSelect || !statusEl || !gridEl) {
       return;
     }
 
     state.config = normalizeConfig(window.MEDIA_VIDEO_CONFIG || {});
-    updateTeamLink();
-    updateEventLinks("");
     renderSeasonOptions();
 
     seasonSelect.addEventListener("change", () => {
@@ -118,14 +77,6 @@
       loadEventMatches(eventKey);
     });
 
-    gridEl.addEventListener("click", (event) => {
-      const tile = event.target.closest("[data-match-key]");
-      if (!tile) return;
-      const match = setActiveMatch(tile.getAttribute("data-match-key"));
-      if (!match) return;
-      openVideoModal(match);
-    });
-
     if (viewportEl) {
       viewportEl.addEventListener("scroll", syncCarouselNav);
     }
@@ -142,37 +93,9 @@
       });
     }
 
-    if (selectionPlayButtonEl) {
-      selectionPlayButtonEl.addEventListener("click", () => {
-        const match = getActiveMatch();
-        if (match) openVideoModal(match);
-      });
-    }
-
-    if (modalEl) {
-      modalEl.addEventListener("click", (event) => {
-        if (event.target === modalEl || event.target?.hasAttribute("data-video-close")) {
-          closeVideoModal();
-        }
-      });
-    }
-
-    if (modalCloseEl) {
-      modalCloseEl.addEventListener("click", () => {
-        closeVideoModal();
-      });
-    }
-
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && modalEl && !modalEl.hidden) {
-        closeVideoModal();
-      }
-    });
-
     if (!hasSupabaseConfig()) {
       seasonSelect.disabled = false;
       eventSelect.disabled = true;
-      linksEl.hidden = false;
       setStatus("Video browser is unavailable right now.", "error");
       return;
     }
@@ -214,7 +137,6 @@
     eventSelect.disabled = true;
     eventSelect.innerHTML = '<option value="">Loading competitions...</option>';
     metaEl.hidden = true;
-    linksEl.hidden = true;
     hideGrid();
     setStatus(message, "loading");
   }
@@ -233,8 +155,6 @@
         eventSelect.disabled = true;
         eventSelect.innerHTML = '<option value="">No competitions found</option>';
         metaEl.hidden = true;
-        linksEl.hidden = false;
-        updateEventLinks("");
         hideGrid();
         setStatus(`No competitions were found for Team ${getTeamDisplayNumber()} in ${season}.`);
         return;
@@ -245,7 +165,9 @@
         return `<option value="${escapeHtml(event.key)}">${escapeHtml(event.name)}</option>`;
       }).join("");
 
-      const nextEventKey = events.some((event) => event.key === state.selectedEventKey) ? state.selectedEventKey : events[0].key;
+      const nextEventKey = events.some((event) => event.key === state.selectedEventKey)
+        ? state.selectedEventKey
+        : getDefaultEventKey(events);
       state.selectedEventKey = nextEventKey;
       eventSelect.value = nextEventKey;
       await loadEventMatches(nextEventKey, token);
@@ -257,9 +179,7 @@
       eventSelect.disabled = true;
       eventSelect.innerHTML = '<option value="">Unable to load competitions</option>';
       metaEl.hidden = true;
-      linksEl.hidden = false;
       hideGrid();
-      updateEventLinks("");
       setStatus("Unable to load competitions right now.", "error");
     }
   }
@@ -269,7 +189,6 @@
     const seasonEvents = state.eventsBySeason.get(state.selectedSeason) || [];
     const event = seasonEvents.find((entry) => entry.key === eventKey);
 
-    updateEventLinks(eventKey);
     metaEl.hidden = !event;
     if (event) {
       renderEventMeta(event, null);
@@ -290,16 +209,13 @@
         .map((match) => decorateMatch(match, state.config.teamKey))
         .filter((match) => Array.isArray(match.videos) && match.videos.length);
 
-      linksEl.hidden = false;
-
       if (!videoMatches.length) {
         hideGrid();
-        setStatus("No published match videos are available for this competition yet.");
+        setStatus("No videos available for this event.");
         return;
       }
 
       renderVideoCards(videoMatches);
-      setStatus(`${videoMatches.length} team match video${videoMatches.length === 1 ? "" : "s"} loaded from The Blue Alliance.`);
     } catch (error) {
       if (token !== state.requestToken) {
         return;
@@ -307,7 +223,6 @@
       console.error("Unable to load match videos", error);
       hideGrid();
       metaEl.hidden = !event;
-      linksEl.hidden = false;
       setStatus("Unable to load match videos right now.", "error");
     }
   }
@@ -393,135 +308,37 @@
       return;
     }
 
-    const activeKey = state.renderedMatches.some((match) => match.key === state.activeMatchKey)
-      ? state.activeMatchKey
-      : state.renderedMatches[0].key;
-    state.activeMatchKey = activeKey;
-    renderCarousel();
-    renderSelection();
-    requestAnimationFrame(() => {
-      syncCarouselNav();
-      scrollActiveTileIntoView();
-    });
-  }
-
-  function renderCarousel() {
-    if (!carouselEl || !gridEl) return;
-
-    carouselEl.hidden = false;
+    if (carouselEl) carouselEl.hidden = false;
     gridEl.hidden = false;
     gridEl.innerHTML = state.renderedMatches.map((match) => renderVideoCard(match)).join("");
+    statusEl.hidden = true;
+    requestAnimationFrame(syncCarouselNav);
   }
 
   function renderVideoCard(match) {
     const video = getPrimaryVideo(match);
-    const thumbnail = getVideoThumbnail(video);
     const subtitle = `${match.resultLine} • ${match.scoreLine}`;
-    const activeClass = match.key === state.activeMatchKey ? " is-active" : "";
-    const mediaLayer = thumbnail
-      ? `<span class="media-video-tile__image"><img src="${thumbnail}" alt="${escapeHtml(match.label)} thumbnail" loading="lazy" /></span>`
-      : `<span class="media-video-tile__fallback" aria-hidden="true"></span>`;
+    const teamSummary = `${match.allianceLabel} • ${match.teamLine}`;
+    const videoMarkup = hasPlayableEmbed(match)
+      ? `<div class="media-video-card__frame">
+          <iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(video.key)}?rel=0" title="${escapeHtml(match.label)} video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+        </div>`
+      : `<div class="media-video-card__fallback">
+          <strong>${escapeHtml(match.label)}</strong>
+          <p>Video source is available on The Blue Alliance.</p>
+          <a class="btn secondary" href="${getWatchUrl(match)}" target="_blank" rel="noreferrer">Watch Source</a>
+        </div>`;
 
     return `
-      <button class="media-video-tile${activeClass}" type="button" data-match-key="${escapeHtml(match.key)}" aria-label="Open ${escapeHtml(match.label)}">
-        ${mediaLayer}
-        <span class="media-video-tile__label">
-          <span class="media-video-tile__icon" aria-hidden="true"></span>
-          <span class="media-video-tile__title">${escapeHtml(match.label)}</span>
-        </span>
-        <span class="media-video-tile__play" aria-hidden="true"></span>
-        <span class="media-video-tile__subtitle">${escapeHtml(subtitle)}</span>
-        <span class="media-video-tile__source">${video?.type === "youtube" ? "YouTube" : "Video"}</span>
-      </button>
+      <article class="media-video-card" data-match-key="${escapeHtml(match.key)}">
+        ${videoMarkup}
+        <div class="media-video-card__body">
+          <h3 class="media-video-card__title">${escapeHtml(match.label)}</h3>
+          <p class="media-video-card__summary">${escapeHtml(subtitle)}</p>
+          <p class="media-video-card__teams">${escapeHtml(teamSummary)}</p>
+        </div>
+      </article>
     `;
-  }
-
-  function renderSelection() {
-    const match = getActiveMatch();
-    if (!selectionEl || !selectionLabelEl || !selectionAllianceChipEl || !match) {
-      if (selectionEl) selectionEl.hidden = true;
-      return;
-    }
-
-    selectionEl.hidden = false;
-    selectionLabelEl.textContent = match.label;
-    selectionAllianceChipEl.textContent = match.allianceLabel;
-    selectionAllianceChipEl.dataset.alliance = match.alliance || "";
-    if (selectionTitleEl) selectionTitleEl.textContent = match.resultLine;
-    if (selectionSummaryEl) selectionSummaryEl.textContent = match.scoreLine;
-    if (selectionAllianceEl) selectionAllianceEl.innerHTML = `<strong>Alliance:</strong> ${escapeHtml(match.teamLine)}`;
-    if (selectionOppositionEl) selectionOppositionEl.innerHTML = `<strong>Opposition:</strong> ${escapeHtml(match.opponentLine)}`;
-    if (selectionWatchLinkEl) selectionWatchLinkEl.href = getWatchUrl(match);
-    if (selectionDetailsLinkEl) selectionDetailsLinkEl.href = getMatchDetailUrl(match);
-    if (selectionPlayButtonEl) {
-      selectionPlayButtonEl.textContent = hasPlayableEmbed(match) ? "Play Video" : "Open Source";
-    }
-  }
-
-  function setActiveMatch(matchKey) {
-    const nextKey = String(matchKey || "");
-    const match = state.renderedMatches.find((entry) => entry.key === nextKey) || null;
-    if (!match) return null;
-    state.activeMatchKey = match.key;
-    renderCarousel();
-    renderSelection();
-    scrollActiveTileIntoView();
-    return match;
-  }
-
-  function getActiveMatch() {
-    return state.renderedMatches.find((match) => match.key === state.activeMatchKey) || null;
-  }
-
-  function scrollActiveTileIntoView() {
-    if (!viewportEl || !gridEl || !state.activeMatchKey) return;
-    const activeTile = gridEl.querySelector(`[data-match-key="${cssEscape(state.activeMatchKey)}"]`);
-    if (!activeTile) return;
-    activeTile.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }
-
-  function scrollCarousel(direction) {
-    if (!viewportEl) return;
-    const cardWidth = viewportEl.clientWidth * 0.8;
-    viewportEl.scrollBy({
-      left: direction * Math.max(cardWidth, 280),
-      behavior: "smooth"
-    });
-  }
-
-  function syncCarouselNav() {
-    if (!viewportEl) return;
-    const maxScrollLeft = Math.max(viewportEl.scrollWidth - viewportEl.clientWidth, 0);
-    const currentScrollLeft = viewportEl.scrollLeft;
-    if (prevButtonEl) prevButtonEl.disabled = currentScrollLeft <= 8;
-    if (nextButtonEl) nextButtonEl.disabled = currentScrollLeft >= maxScrollLeft - 8;
-  }
-
-  function openVideoModal(match) {
-    if (!match || !modalEl || !modalFrameEl) return;
-
-    const watchUrl = getWatchUrl(match);
-    if (!hasPlayableEmbed(match)) {
-      window.open(watchUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
-
-    const video = getPrimaryVideo(match);
-    modalEl.hidden = false;
-    document.body.style.overflow = "hidden";
-    modalFrameEl.innerHTML = `<iframe loading="eager" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(video.key)}?autoplay=1&rel=0" title="${escapeHtml(match.label)} video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
-    if (modalTitleEl) modalTitleEl.textContent = match.label;
-    if (modalSummaryEl) modalSummaryEl.textContent = `${match.resultLine} • ${match.scoreLine}`;
-    if (modalWatchLinkEl) modalWatchLinkEl.href = watchUrl;
-  }
-
-  function closeVideoModal() {
-    if (!modalEl || modalEl.hidden) return;
-    modalEl.hidden = true;
-    document.body.style.overflow = "";
-    if (modalFrameEl) {
-      modalFrameEl.innerHTML = "";
-    }
   }
 
   function decorateMatch(match, teamKey) {
@@ -562,14 +379,6 @@
   function getPrimaryVideo(match) {
     const videos = Array.isArray(match.videos) ? match.videos : [];
     return videos.find((video) => video && video.type === "youtube" && video.key) || videos.find((video) => video && video.key) || null;
-  }
-
-  function getVideoThumbnail(video) {
-    if (!video || !video.key) return "";
-    if (video.type === "youtube") {
-      return `https://i.ytimg.com/vi/${encodeURIComponent(video.key)}/hqdefault.jpg`;
-    }
-    return "";
   }
 
   function hasPlayableEmbed(match) {
@@ -641,6 +450,11 @@
     return (a.name || "").localeCompare(b.name || "");
   }
 
+  function getDefaultEventKey(events) {
+    const rows = Array.isArray(events) ? events : [];
+    return rows.length ? rows[rows.length - 1].key : "";
+  }
+
   function formatMatchLabel(match) {
     const base = MATCH_LEVEL_LABELS[match.comp_level] || "Match";
     if (match.comp_level === "qm") {
@@ -708,29 +522,9 @@
     return Boolean(state.config.supabaseUrl);
   }
 
-  function updateEventLinks(eventKey) {
-    if (eventLinkEl) {
-      if (eventKey) {
-        eventLinkEl.href = `https://www.thebluealliance.com/event/${encodeURIComponent(eventKey)}`;
-        eventLinkEl.textContent = "Open Competition on The Blue Alliance";
-      } else {
-        eventLinkEl.href = `https://www.thebluealliance.com/team/${encodeURIComponent(getTeamDisplayNumber())}`;
-        eventLinkEl.textContent = "Browse Team 10312 on The Blue Alliance";
-      }
-    }
-  }
-
-  function updateTeamLink() {
-    if (teamLinkEl) {
-      teamLinkEl.href = `https://www.thebluealliance.com/team/${encodeURIComponent(getTeamDisplayNumber())}`;
-    }
-  }
-
   function hideGrid() {
     state.renderedMatches = [];
-    state.activeMatchKey = "";
     if (carouselEl) carouselEl.hidden = true;
-    if (selectionEl) selectionEl.hidden = true;
     if (gridEl) {
       gridEl.hidden = true;
       gridEl.innerHTML = "";
@@ -738,13 +532,38 @@
     if (viewportEl) {
       viewportEl.scrollLeft = 0;
     }
-    closeVideoModal();
   }
 
   function setStatus(message, tone) {
     statusEl.hidden = false;
     statusEl.dataset.tone = tone || "";
     statusEl.innerHTML = message;
+  }
+
+  function scrollCarousel(direction) {
+    if (!viewportEl) return;
+    const card = gridEl ? gridEl.querySelector(".media-video-card") : null;
+    const cardWidth = card ? card.getBoundingClientRect().width : viewportEl.clientWidth;
+    const gap = getGridGap();
+    viewportEl.scrollBy({
+      left: direction * (cardWidth + gap),
+      behavior: "smooth"
+    });
+  }
+
+  function syncCarouselNav() {
+    if (!viewportEl) return;
+    const maxScrollLeft = Math.max(viewportEl.scrollWidth - viewportEl.clientWidth, 0);
+    const currentScrollLeft = viewportEl.scrollLeft;
+    if (prevButtonEl) prevButtonEl.disabled = currentScrollLeft <= 8;
+    if (nextButtonEl) nextButtonEl.disabled = currentScrollLeft >= maxScrollLeft - 8;
+  }
+
+  function getGridGap() {
+    if (!gridEl || !window.getComputedStyle) return 0;
+    const styles = window.getComputedStyle(gridEl);
+    const gap = parseFloat(styles.columnGap || styles.gap || "0");
+    return Number.isFinite(gap) ? gap : 0;
   }
 
   function escapeHtml(value) {
@@ -756,10 +575,4 @@
       .replace(/'/g, "&#39;");
   }
 
-  function cssEscape(value) {
-    if (window.CSS && typeof window.CSS.escape === "function") {
-      return window.CSS.escape(String(value));
-    }
-    return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
-  }
 })();

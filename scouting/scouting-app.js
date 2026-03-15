@@ -1755,7 +1755,7 @@ async function loadMatchTrackerSeasonEvents(season, { preferredEventKey = "", fa
     const nextEventKey = events.some((event) => event.key === preferredEventKey)
       ? preferredEventKey
       : fallbackToFirst
-        ? events[0].key
+        ? getDefaultMatchTrackerEventKey(events)
         : "";
 
     state.trackerSelectedEventKey = nextEventKey;
@@ -1973,6 +1973,11 @@ function getMatchTrackerEventByKey(season, eventKey) {
   return events.find((event) => event.key === eventKey) || null;
 }
 
+function getDefaultMatchTrackerEventKey(events) {
+  const rows = Array.isArray(events) ? events : [];
+  return rows.length ? rows[rows.length - 1].key : "";
+}
+
 function buildBlueAllianceEventKey(event) {
   if (!event) return "";
   const season = getEventSeason(event);
@@ -2080,8 +2085,8 @@ function buildMatchTrackerCards(matches, predictionMatches) {
   return (Array.isArray(matches) ? matches : [])
     .slice()
     .sort(compareBlueAllianceMatches)
-    .map((match) => decorateMatchTrackerMatch(match, predictionMap.get(match.key)))
-    .filter((match) => Array.isArray(match.videos) && match.videos.length);
+    .filter((match) => Array.isArray(match?.videos) && match.videos.length)
+    .map((match) => decorateMatchTrackerMatch(match, predictionMap.get(match.key)));
 }
 
 function decorateMatchTrackerMatch(match, predictionMatch) {
@@ -2227,10 +2232,6 @@ function updateMatchTrackerLinks(eventKey = state.trackerSelectedEventKey) {
       elements.overviewTrackerEventLink.href = `https://www.thebluealliance.com/team/${TRACKED_TEAM_NUMBER}`;
       elements.overviewTrackerEventLink.textContent = "Browse Team 10312 on The Blue Alliance";
     }
-  }
-
-  if (elements.overviewTrackerLinks) {
-    elements.overviewTrackerLinks.hidden = false;
   }
 }
 
@@ -2927,6 +2928,9 @@ function renderOverviewPredictions() {
   }
 
   renderMatchTrackerSeasonOptions();
+  if (elements.overviewTrackerLinks) {
+    elements.overviewTrackerLinks.hidden = true;
+  }
   updateMatchTrackerLinks();
   renderMatchTrackerEventMeta();
 
@@ -2962,12 +2966,15 @@ function renderOverviewPredictions() {
 
   const cards = buildMatchTrackerCards(state.trackerMatches, state.trackerPredictionMatches);
   if (!cards.length) {
-    setMatchTrackerStatus("No published match videos are available for this competition yet.");
+    setMatchTrackerStatus("No videos available for this event.");
     return;
   }
 
   elements.overviewPredictionBody.hidden = false;
   elements.overviewPredictionBody.innerHTML = cards.map((match) => renderMatchTrackerCard(match)).join("");
+  if (elements.overviewTrackerLinks) {
+    elements.overviewTrackerLinks.hidden = false;
+  }
   setMatchTrackerStatus(
     `${cards.length} team match video${cards.length === 1 ? "" : "s"} loaded from The Blue Alliance.${state.trackerPredictionError ? " Predicted scores unavailable." : ""}`
   );
