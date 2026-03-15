@@ -41,7 +41,34 @@ Deno.serve(async (request) => {
       return jsonResponse({ teamKey, eventKey, matches });
     }
 
-    return jsonResponse({ error: "Expected mode=events or mode=matches." }, 400);
+    if (mode === "alliances") {
+      const eventKey = parseEventKey(requestUrl.searchParams.get("eventKey"));
+      const alliances = await fetchBlueAllianceJson(`/event/${encodeURIComponent(eventKey)}/alliances`, tbaAuthKey);
+      return jsonResponse({ eventKey, alliances });
+    }
+
+    if (mode === "team_media") {
+      const eventKey = requestUrl.searchParams.get("eventKey");
+      const teamKeyParam = requestUrl.searchParams.get("teamKey");
+      const year = requestUrl.searchParams.get("year");
+
+      if (eventKey) {
+        const parsedEventKey = parseEventKey(eventKey);
+        const media = await fetchBlueAllianceJson(`/event/${encodeURIComponent(parsedEventKey)}/team_media`, tbaAuthKey);
+        return jsonResponse({ eventKey: parsedEventKey, media });
+      }
+
+      if (teamKeyParam && year) {
+        const parsedTeamKey = normalizeTeamKey(teamKeyParam);
+        const parsedYear = parseSeason(year);
+        const media = await fetchBlueAllianceJson(`/team/${encodeURIComponent(parsedTeamKey)}/media/${parsedYear}`, tbaAuthKey);
+        return jsonResponse({ teamKey: parsedTeamKey, year: parsedYear, media });
+      }
+
+      return jsonResponse({ error: "team_media mode requires either eventKey or both teamKey and year parameters." }, 400);
+    }
+
+    return jsonResponse({ error: "Expected mode=events, mode=matches, mode=alliances, or mode=team_media." }, 400);
   } catch (error) {
     const details = normalizeError(error);
     return jsonResponse({ error: details.error }, details.status || 500);

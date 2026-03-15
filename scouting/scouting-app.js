@@ -17,7 +17,6 @@ const STORAGE_KEYS = {
   activeEventId: "bf-scouting-active-event-v1",
   activeTab: "bf-scouting-active-tab-v1",
   overviewMode: "bf-scouting-overview-mode-v1",
-  analysisDebugOverride: "bf-scouting-analysis-debug-override-v1",
   outbox: "bf-scouting-outbox-v1",
   lastSyncAt: "bf-scouting-last-sync-v1",
   matchDraft: "bf-scouting-match-draft-v1",
@@ -151,6 +150,8 @@ const state = {
   overviewCompetitionRows: [],
   overviewTexasRows: [],
   overviewMatches: [],
+  overviewAllianceSelections: [],
+  overviewTeamMediaByTeam: new Map(),
   overviewEventData: null,
   trackerEventsBySeason: new Map(),
   trackerMatchesByEvent: new Map(),
@@ -165,7 +166,6 @@ const state = {
   trackerPredictionAccuracy: null,
   trackerPredictionError: "",
   analysisResult: null,
-  analysisDebugOverride: loadStoredValue(STORAGE_KEYS.analysisDebugOverride, "") === "true",
   analysisNeedsRefresh: true,
   analysisRunning: false,
   analysisRunAt: "",
@@ -208,6 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function init() {
   cacheDom();
+  removeStoredValue("bf-scouting-analysis-debug-override-v1");
   initCustomSelects();
   initAutoPathBoard();
   state.config = normalizeConfig(window.SCOUTING_CONFIG || {});
@@ -248,7 +249,25 @@ async function init() {
 
   state.client.auth.onAuthStateChange((event, session) => {
     if (event === "INITIAL_SESSION") return;
-    void syncSession(session);
+    if (event === "SIGNED_OUT") {
+      void syncSession(null);
+      return;
+    }
+
+    const currentUserId = String(state.session?.user?.id || "");
+    const nextUserId = String(session?.user?.id || "");
+    const shouldReloadSession =
+      !state.authReady ||
+      !currentUserId ||
+      !nextUserId ||
+      currentUserId !== nextUserId;
+
+    if (event === "SIGNED_IN" && shouldReloadSession) {
+      void syncSession(session);
+      return;
+    }
+
+    applyPassiveSessionUpdate(session);
   });
 
   await syncSession(data?.session || null);
@@ -299,7 +318,6 @@ function cacheDom() {
   elements.overviewTrackerLinks = document.getElementById("overviewTrackerLinks");
   elements.overviewTrackerEventLink = document.getElementById("overviewTrackerEventLink");
   elements.overviewTrackerTeamLink = document.getElementById("overviewTrackerTeamLink");
-  elements.toggleAnalysisDebugButton = document.getElementById("toggleAnalysisDebugButton");
   elements.runPickAnalysisButton = document.getElementById("runPickAnalysisButton");
   elements.pickAnalysisStatus = document.getElementById("pickAnalysisStatus");
   elements.pickAnalysisBest = document.getElementById("pickAnalysisBest");
@@ -1076,12 +1094,6 @@ function bindEvents() {
     });
   }
 
-  if (elements.toggleAnalysisDebugButton) {
-    elements.toggleAnalysisDebugButton.addEventListener("click", () => {
-      toggleAnalysisDebugOverride();
-    });
-  }
-
   if (elements.matchEntryLoadSelect) {
     elements.matchEntryLoadSelect.addEventListener("change", () => {
       handleScoutReload("match");
@@ -1420,6 +1432,15 @@ async function syncSession(session) {
   renderAll();
 }
 
+function applyPassiveSessionUpdate(session) {
+  state.session = session;
+  state.authRedirecting = false;
+  state.authReady = Boolean(session && isAllowedEmail(getSessionEmail(session)));
+  renderAuthState();
+  renderStatusPills();
+  renderFormAvailability();
+}
+
 async function refreshData({ message } = {}) {
   if (!state.client || !state.session) return;
 
@@ -1560,6 +1581,8 @@ function resetOverviewState() {
   state.overviewCompetitionRows = [];
   state.overviewTexasRows = [];
   state.overviewMatches = [];
+  state.overviewAllianceSelections = [];
+  state.overviewTeamMediaByTeam = new Map();
   state.overviewEventData = null;
   state.analysisResult = null;
   state.analysisNeedsRefresh = true;
@@ -1599,6 +1622,7 @@ async function loadOverviewData() {
 
   const eventKey = getStatboticsEventKey(event);
   const season = getEventSeason(event);
+  const tbaEventKey = buildBlueAllianceEventKey(event);
   const requestToken = ++overviewRequestToken;
 
   state.overviewLoading = true;
@@ -1606,11 +1630,13 @@ async function loadOverviewData() {
   renderOverview();
 
   try {
-    const [competitionRows, texasRows, matches, eventData] = await Promise.all([
+    const [competitionRows, texasRows, matches, eventData, allianceSelections, teamMediaMap] = await Promise.all([
       fetchStatbotics(`team_events?event=${encodeURIComponent(eventKey)}&limit=1000`),
       fetchStatbotics(`team_years?year=${season}&state=${encodeURIComponent(TEXAS_STATE_CODE)}&limit=500`),
       fetchStatbotics(`matches?event=${encodeURIComponent(eventKey)}&limit=${OVERVIEW_MATCH_LIMIT}`),
-      fetchStatbotics(`event/${encodeURIComponent(eventKey)}`)
+      fetchStatbotics(`event/${encodeURIComponent(eventKey)}`),
+      fetchOverviewAllianceSelections(tbaEventKey),
+      fetchOverviewTeamMedia(tbaEventKey)
     ]);
 
     if (requestToken !== overviewRequestToken) return;
@@ -1619,6 +1645,26 @@ async function loadOverviewData() {
     state.overviewTexasRows = sortTexasRows(texasRows);
     state.overviewMatches = Array.isArray(matches) ? matches.slice() : [];
     state.overviewEventData = eventData && !Array.isArray(eventData) ? eventData : null;
+    state.overviewAllianceSelections = Array.isArray(allianceSelections) ? allianceSelections.slice() : [];
+    state.overviewTeamMediaByTeam = teamMediaMap instanceof Map ? teamMediaMap : new Map();
+    
+    // Fetch media for teams in rankings that don't have media yet
+    const allTeamNumbers = [
+      ...(Array.isArray(competitionRows) ? competitionRows.map((row) => row?.team ?? row?.teamNumber) : []),
+      ...(Array.isArray(texasRows) ? texasRows.map((row) => row?.team ?? row?.teamNumber) : [])
+    ].filter((teamNum) => Number.isFinite(Number(teamNum)) && Number(teamNum) > 0);
+    
+    const missingMediaMap = await fetchMissingTeamMedia(allTeamNumbers, state.overviewTeamMediaByTeam, season);
+    if (missingMediaMap.size > 0) {
+      missingMediaMap.forEach((src, teamNum) => {
+        state.overviewTeamMediaByTeam.set(teamNum, src);
+      });
+      // Re-render to show newly loaded logos
+      if (requestToken === overviewRequestToken) {
+        renderOverview();
+      }
+    }
+    
     state.overviewFetchedAt = new Date().toISOString();
     state.analysisNeedsRefresh = true;
   } catch (error) {
@@ -1644,6 +1690,86 @@ async function fetchStatbotics(path) {
   }
 
   return response.json();
+}
+
+async function fetchOverviewAllianceSelections(eventKey) {
+  const normalizedKey = String(eventKey || "").trim().toLowerCase();
+  if (!normalizedKey) return [];
+
+  try {
+    const payload = await requestTbaMedia({ mode: "alliances", eventKey: normalizedKey });
+    return Array.isArray(payload?.alliances) ? payload.alliances : [];
+  } catch (error) {
+    console.warn("Unable to load Blue Alliance alliance selections", error);
+    return [];
+  }
+}
+
+async function fetchOverviewTeamMedia(eventKey) {
+  const normalizedKey = String(eventKey || "").trim().toLowerCase();
+  if (!normalizedKey) return new Map();
+
+  try {
+    const payload = await requestTbaMedia({ mode: "team_media", eventKey: normalizedKey });
+    return buildOverviewTeamMediaMap(payload?.media);
+  } catch (error) {
+    console.warn("Unable to load Blue Alliance team media", error);
+    return new Map();
+  }
+}
+
+async function fetchMissingTeamMedia(teamNumbers, existingMediaMap, season) {
+  const missingTeams = teamNumbers.filter((teamNum) => {
+    const num = Number(teamNum || 0);
+    return Number.isFinite(num) && num > 0 && !existingMediaMap.has(num);
+  });
+
+  if (missingTeams.length === 0) return new Map();
+
+  const mediaMap = new Map();
+  const batchSize = 10;
+  const normalizedSeason = Number(season || getCurrentSeason());
+  
+  for (let i = 0; i < missingTeams.length; i += batchSize) {
+    const batch = missingTeams.slice(i, i + batchSize);
+    const promises = batch.map(async (teamNum) => {
+      const teamKey = `frc${teamNum}`;
+      const num = Number(teamNum);
+      try {
+        const payload = await requestTbaMedia({ mode: "team_media", teamKey, year: normalizedSeason });
+        const mediaEntries = payload?.media;
+        
+        // When fetching by teamKey, media entries might not have team_keys set
+        // So we need to ensure each entry is associated with this team
+        const normalizedEntries = Array.isArray(mediaEntries) 
+          ? mediaEntries.map((entry) => {
+              // If entry doesn't have team_keys, add it
+              if (entry && typeof entry === "object") {
+                if (!Array.isArray(entry.team_keys) || entry.team_keys.length === 0) {
+                  return { ...entry, team_keys: [teamKey] };
+                }
+              }
+              return entry;
+            })
+          : [];
+        
+        const teamMediaMap = buildOverviewTeamMediaMap(normalizedEntries);
+        return { teamNum: num, mediaMap: teamMediaMap };
+      } catch (error) {
+        console.warn(`Unable to load media for team ${teamNum}`, error);
+        return { teamNum: num, mediaMap: new Map() };
+      }
+    });
+
+    const results = await Promise.all(promises);
+    results.forEach(({ teamNum, mediaMap: teamMedia }) => {
+      if (teamMedia.has(teamNum)) {
+        mediaMap.set(teamNum, teamMedia.get(teamNum));
+      }
+    });
+  }
+
+  return mediaMap;
 }
 
 async function handleMatchTrackerSeasonChange(season) {
@@ -2025,8 +2151,8 @@ function sortCompetitionRows(rows) {
 function sortTexasRows(rows) {
   return (Array.isArray(rows) ? rows.slice() : []).sort((left, right) => {
     return (
-      compareNullableNumbers(left?.district_rank, right?.district_rank) ||
       compareNullableNumbers(left?.epa?.ranks?.state?.rank, right?.epa?.ranks?.state?.rank) ||
+      compareNullableNumbers(left?.district_rank, right?.district_rank) ||
       compareNullableNumbers(left?.team, right?.team)
     );
   });
@@ -2365,16 +2491,6 @@ function isCurrentEventOver() {
   return status === "completed" || status === "complete" || status === "finished" || status === "over";
 }
 
-function isAnalysisDebugOverrideEnabled() {
-  return Boolean(state.analysisDebugOverride);
-}
-
-function toggleAnalysisDebugOverride() {
-  state.analysisDebugOverride = !state.analysisDebugOverride;
-  saveStoredValue(STORAGE_KEYS.analysisDebugOverride, state.analysisDebugOverride ? "true" : "");
-  renderOverview();
-}
-
 async function handleEventChange(eventId) {
   state.activeEventId = eventId;
   state.matchEntries = [];
@@ -2623,11 +2739,15 @@ function renderConfigState() {
   }
 }
 
+function isSessionRestorePending() {
+  return configReady() && !state.authReady;
+}
+
 function renderAuthState() {
   const configured = configReady();
   const signedIn = Boolean(state.session && isAllowedEmail(getSessionEmail(state.session)));
-  const restoringSession = configured && !state.authReady;
-  const showApp = signedIn && state.authReady;
+  const restoringSession = isSessionRestorePending();
+  const showApp = configured && (signedIn || restoringSession);
 
   elements.lockView.classList.toggle("hidden", showApp);
   elements.appView.classList.toggle("hidden", !showApp);
@@ -2637,7 +2757,7 @@ function renderAuthState() {
       elements.googleSignInButton.textContent = "Sign In With Google";
       elements.googleSignInButton.disabled = true;
     } else if (restoringSession) {
-      elements.googleSignInButton.textContent = state.authRedirecting ? "Completing Sign-In..." : "Restoring Session...";
+      elements.googleSignInButton.textContent = "Sign In With Google";
       elements.googleSignInButton.disabled = true;
     } else {
       elements.googleSignInButton.textContent = "Sign In With Google";
@@ -2645,18 +2765,18 @@ function renderAuthState() {
     }
   }
 
-  if (restoringSession && !state.authRedirecting && !signedIn) {
-    setAuthMessage("Checking for an existing scouting session...", "");
-  }
-
   if (showApp) {
     const email = getSessionEmail(state.session);
-    setStatusPill(elements.authPill, `Signed in: ${email}`, "success");
+    if (signedIn && email) {
+      setStatusPill(elements.authPill, `Signed in: ${email}`, "success");
+    } else {
+      setStatusPill(elements.authPill, "Loading workspace...", "warn");
+    }
     return;
   }
 
   if (restoringSession) {
-    setStatusPill(elements.authPill, state.authRedirecting ? "Signing in..." : "Restoring session...", "warn");
+    setStatusPill(elements.authPill, "Loading workspace...", "warn");
     return;
   }
 
@@ -2668,6 +2788,18 @@ function renderEventOptions() {
 
   const select = elements.eventSelect;
   select.innerHTML = "";
+  const restoringSession = isSessionRestorePending();
+
+  if (restoringSession) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Loading events...";
+    select.appendChild(option);
+    select.value = "";
+    select.disabled = true;
+    refreshCustomSelect(select);
+    return;
+  }
 
   if (!state.events.length) {
     const option = document.createElement("option");
@@ -2694,8 +2826,15 @@ function renderEventOptions() {
 
 function renderCurrentEvent() {
   const event = getActiveEvent();
+  const restoringSession = isSessionRestorePending();
 
   if (!event) {
+    if (restoringSession) {
+      elements.currentEventName.textContent = "Loading workspace...";
+      elements.currentEventMeta.textContent = "Restoring scouting session and event data.";
+      return;
+    }
+
     elements.currentEventName.textContent = "No active event selected";
     elements.currentEventMeta.textContent = state.session
       ? "Create or activate a scouting_events row in Supabase to enable submissions."
@@ -2720,7 +2859,9 @@ function renderStatusPills() {
     state.connectionOnline ? "success" : "danger"
   );
 
-  if (state.isRefreshing) {
+  if (isSessionRestorePending()) {
+    setStatusPill(elements.syncPill, "Loading workspace...", "warn");
+  } else if (state.isRefreshing) {
     setStatusPill(elements.syncPill, "Refreshing data...", "warn");
   } else if (state.lastSyncAt) {
     setStatusPill(elements.syncPill, `Last sync ${formatTime(state.lastSyncAt)}`, "success");
@@ -2744,9 +2885,7 @@ function renderOverview() {
 function renderOverviewEventState() {
   if (!elements.overviewEventClosedBanner) return;
   const eventOver = isCurrentEventOver();
-  elements.overviewEventClosedBanner.textContent = isAnalysisDebugOverrideEnabled()
-    ? "This event is over. Rankings stay visible, and debug override currently allows pick analysis."
-    : "This event is over. Rankings stay visible, but pick analysis is locked for completed events.";
+  elements.overviewEventClosedBanner.textContent = "This event is over.";
   elements.overviewEventClosedBanner.classList.toggle("hidden", !eventOver);
 }
 
@@ -2763,11 +2902,12 @@ function renderOverviewBanners() {
   const eventRow = getTrackedEventRow();
   const texasRow = getTrackedTexasRow();
   const eventStreamUrl = normalizeStatboticsVideoUrl(state.overviewEventData?.video);
+  const restoringSession = isSessionRestorePending();
 
   if (!elements.overviewCompetitionValue) return;
   renderOverviewCompetitionStream(eventStreamUrl);
 
-  if (state.overviewLoading && !eventRow && !texasRow) {
+  if ((restoringSession || state.overviewLoading) && !eventRow && !texasRow) {
     setOverviewBanner(elements.overviewCompetitionValue, elements.overviewCompetitionMeta, "Loading", "Pulling Statbotics event data.");
     setOverviewBanner(elements.overviewTexasValue, elements.overviewTexasMeta, "Loading", "Pulling Texas district data.");
     setOverviewBanner(elements.overviewWorldValue, elements.overviewWorldMeta, "Loading", "Pulling global EPA rank.");
@@ -2836,23 +2976,24 @@ function renderOverviewBanners() {
 function renderOverviewTable() {
   if (!elements.overviewRankingsHead || !elements.overviewRankingsBody || !elements.overviewSourceMeta) return;
 
-  const columns =
-    state.overviewMode === OVERVIEW_MODE_TEXAS
-      ? ["District", "State", "Team", "EPA", "District Pts", "World"]
-      : ["Rank", "Team", "Record", "EPA", "District Pts", "World"];
+  const columns = getOverviewRankingColumns();
   const rows =
     state.overviewMode === OVERVIEW_MODE_TEXAS ? state.overviewTexasRows : state.overviewCompetitionRows;
+  const hasRows = Array.isArray(rows) && rows.length > 0;
+  const restoringSession = isSessionRestorePending();
+  const isRefreshingExistingRows = state.overviewLoading && hasRows;
 
   elements.overviewRankingsHead.innerHTML = "";
   const headRow = document.createElement("tr");
   columns.forEach((column) => {
     const th = document.createElement("th");
-    th.textContent = column;
+    th.textContent = column.label;
+    th.className = column.headClassName || "";
     headRow.appendChild(th);
   });
   elements.overviewRankingsHead.appendChild(headRow);
 
-  if (state.overviewLoading) {
+  if ((restoringSession || state.overviewLoading) && !hasRows) {
     elements.overviewSourceMeta.textContent = "Loading Statbotics rankings and predictions...";
     renderOverviewMessageRow(elements.overviewRankingsBody, columns.length, "Loading live Statbotics rankings...");
     return;
@@ -2868,7 +3009,8 @@ function renderOverviewTable() {
     `${state.overviewCompetitionRows.length} event teams`,
     `${state.overviewTexasRows.length} Texas teams`,
     state.overviewFetchedAt ? `Updated ${formatTime(state.overviewFetchedAt)}` : "",
-    "Source: Statbotics"
+    isRefreshingExistingRows ? "Refreshing live Statbotics data..." : "",
+    "Source: Statbotics • team media: The Blue Alliance"
   ]
     .filter(Boolean)
     .join(" • ");
@@ -2886,28 +3028,14 @@ function renderOverviewTable() {
       tr.classList.add("is-tracked-row");
     }
 
-    const values =
-      state.overviewMode === OVERVIEW_MODE_TEXAS
-        ? [
-            row.district_rank || row.epa?.ranks?.district?.rank || "--",
-            row.epa?.ranks?.state?.rank || "--",
-            formatStatboticsTeam(row),
-            formatDecimal(row.epa?.total_points?.mean),
-            row.district_points ?? "--",
-            row.epa?.ranks?.total?.rank || "--"
-          ]
-        : [
-            row.record?.qual?.rank || "--",
-            formatStatboticsTeam(row),
-            formatRecord(row.record?.qual),
-            formatDecimal(row.epa?.total_points?.mean),
-            row.district_points ?? "--",
-            row.epa?.ranks?.total?.rank || "--"
-          ];
-
-    values.forEach((value) => {
+    columns.forEach((column) => {
       const td = document.createElement("td");
-      td.textContent = String(value);
+      td.className = column.cellClassName || "";
+      if (typeof column.render === "function") {
+        td.innerHTML = column.render(row);
+      } else {
+        td.textContent = String(column.getValue(row));
+      }
       tr.appendChild(td);
     });
 
@@ -2916,6 +3044,134 @@ function renderOverviewTable() {
 
   elements.overviewRankingsBody.innerHTML = "";
   elements.overviewRankingsBody.appendChild(fragment);
+}
+
+function getOverviewRankingColumns() {
+  if (state.overviewMode === OVERVIEW_MODE_TEXAS) {
+    return [
+      {
+        label: "Rank",
+        headClassName: "rankings-table__col--rank",
+        cellClassName: "rankings-table__cell--rank",
+        getValue: (row) => row.epa?.ranks?.state?.rank || row.district_rank || "--"
+      },
+      {
+        label: "Team",
+        headClassName: "rankings-table__col--team",
+        cellClassName: "rankings-table__cell--team",
+        render: renderOverviewTeamCell
+      },
+      {
+        label: "Ranking Score",
+        headClassName: "rankings-table__col--metric",
+        cellClassName: "rankings-table__cell--metric",
+        getValue: (row) => formatNullableFixedDecimal(row.record?.qual?.rps_per_match)
+      },
+      {
+        label: "Match",
+        headClassName: "rankings-table__col--metric",
+        cellClassName: "rankings-table__cell--metric",
+        getValue: (row) => formatNullableFixedDecimal(row.epa?.breakdown?.total_points)
+      },
+      {
+        label: "Auto Fuel",
+        headClassName: "rankings-table__col--metric",
+        cellClassName: "rankings-table__cell--metric",
+        getValue: (row) => formatNullableFixedDecimal(row.epa?.breakdown?.auto_fuel)
+      },
+      {
+        label: "Tower",
+        headClassName: "rankings-table__col--metric",
+        cellClassName: "rankings-table__cell--metric",
+        getValue: (row) => formatNullableFixedDecimal(row.epa?.breakdown?.total_tower)
+      },
+      {
+        label: "W-L-T",
+        headClassName: "rankings-table__col--metric",
+        cellClassName: "rankings-table__cell--metric",
+        getValue: (row) => formatRecordCompact(row.record?.qual)
+      },
+      {
+        label: "Matches Played",
+        headClassName: "rankings-table__col--metric",
+        cellClassName: "rankings-table__cell--metric",
+        getValue: (row) => getRecordMatchesPlayed(row.record?.qual)
+      }
+    ];
+  }
+
+  return [
+    {
+      label: "Rank",
+      headClassName: "rankings-table__col--rank",
+      cellClassName: "rankings-table__cell--rank",
+      getValue: (row) => row.record?.qual?.rank || "--"
+    },
+    {
+      label: "Team",
+      headClassName: "rankings-table__col--team",
+      cellClassName: "rankings-table__cell--team",
+      render: renderOverviewTeamCell
+    },
+    {
+      label: "Ranking Score",
+      headClassName: "rankings-table__col--metric",
+      cellClassName: "rankings-table__cell--metric",
+      getValue: (row) => formatNullableFixedDecimal(row.record?.qual?.rps_per_match)
+    },
+    {
+      label: "Match",
+      headClassName: "rankings-table__col--metric",
+      cellClassName: "rankings-table__cell--metric",
+      getValue: (row) => formatNullableFixedDecimal(row.epa?.breakdown?.total_points)
+    },
+    {
+      label: "Auto Fuel",
+      headClassName: "rankings-table__col--metric",
+      cellClassName: "rankings-table__cell--metric",
+      getValue: (row) => formatNullableFixedDecimal(row.epa?.breakdown?.auto_fuel)
+    },
+    {
+      label: "Tower",
+      headClassName: "rankings-table__col--metric",
+      cellClassName: "rankings-table__cell--metric",
+      getValue: (row) => formatNullableFixedDecimal(row.epa?.breakdown?.total_tower)
+    },
+    {
+      label: "W-L-T",
+      headClassName: "rankings-table__col--metric",
+      cellClassName: "rankings-table__cell--metric",
+      getValue: (row) => formatRecordCompact(row.record?.qual)
+    },
+    {
+      label: "Matches Played",
+      headClassName: "rankings-table__col--metric",
+      cellClassName: "rankings-table__cell--metric",
+      getValue: (row) => getRecordMatchesPlayed(row.record?.qual)
+    }
+  ];
+}
+
+function renderOverviewTeamCell(row) {
+  const teamNumber = row?.team ?? row?.teamNumber ?? "--";
+  const teamName = row?.team_name || row?.name || `Team ${teamNumber}`;
+  const href = `https://www.thebluealliance.com/team/${encodeURIComponent(String(teamNumber))}`;
+  const logoSrc = getOverviewTeamLogoSource(teamNumber);
+  const logoMarkup = logoSrc
+    ? `<span class="rankings-team-cell__logo"><img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(teamName)} logo" loading="lazy" /></span>`
+    : `<span class="rankings-team-cell__logo rankings-team-cell__logo--placeholder" aria-hidden="true">${escapeHtml(teamNumber)}</span>`;
+
+  return `
+    <div class="rankings-team-cell">
+      ${logoMarkup}
+      <div class="rankings-team-cell__copy">
+        <a class="rankings-team-cell__number" href="${href}" target="_blank" rel="noreferrer noopener">
+          ${escapeHtml(teamNumber)}
+        </a>
+        <span class="rankings-team-cell__name">${escapeHtml(teamName)}</span>
+      </div>
+    </div>
+  `;
 }
 
 function renderOverviewPredictions() {
@@ -2928,25 +3184,41 @@ function renderOverviewPredictions() {
   }
 
   renderMatchTrackerSeasonOptions();
-  if (elements.overviewTrackerLinks) {
-    elements.overviewTrackerLinks.hidden = true;
-  }
   updateMatchTrackerLinks();
   renderMatchTrackerEventMeta();
+  const restoringSession = isSessionRestorePending();
 
   elements.overviewPredictionLabel.textContent = state.trackerPredictionError
     ? "Match videos are loaded from The Blue Alliance. Predicted scores are temporarily unavailable for this competition."
     : "Browse Team 10312 match videos by season and competition. Predicted scores are powered by Statbotics.";
-
-  elements.overviewPredictionBody.innerHTML = "";
-  elements.overviewPredictionBody.hidden = true;
+  const cards = buildMatchTrackerCards(state.trackerMatches, state.trackerPredictionMatches);
+  const hasCards = cards.length > 0;
 
   if (!configReady()) {
+    clearMatchTrackerCards();
     setMatchTrackerStatus("Match tracker is unavailable until Supabase is configured.");
     return;
   }
 
-  if (state.trackerLoading) {
+  if (state.trackerError) {
+    clearMatchTrackerCards();
+    setMatchTrackerStatus(state.trackerError, "error");
+    return;
+  }
+
+  if (!state.trackerSelectedEventKey) {
+    if (restoringSession) {
+      clearMatchTrackerCards();
+      setMatchTrackerStatus("Loading match tracker...", "loading");
+      return;
+    }
+    clearMatchTrackerCards();
+    setMatchTrackerStatus("Choose a competition to load match videos.");
+    return;
+  }
+
+  if (state.trackerLoading && !hasCards) {
+    clearMatchTrackerCards();
     setMatchTrackerStatus(
       state.trackerSelectedEventKey ? "Loading match videos..." : "Loading competitions...",
       "loading"
@@ -2954,30 +3226,64 @@ function renderOverviewPredictions() {
     return;
   }
 
-  if (state.trackerError) {
-    setMatchTrackerStatus(state.trackerError, "error");
-    return;
-  }
-
-  if (!state.trackerSelectedEventKey) {
-    setMatchTrackerStatus("Choose a competition to load match videos.");
-    return;
-  }
-
-  const cards = buildMatchTrackerCards(state.trackerMatches, state.trackerPredictionMatches);
-  if (!cards.length) {
+  if (!hasCards) {
+    clearMatchTrackerCards();
     setMatchTrackerStatus("No videos available for this event.");
     return;
   }
 
-  elements.overviewPredictionBody.hidden = false;
-  elements.overviewPredictionBody.innerHTML = cards.map((match) => renderMatchTrackerCard(match)).join("");
+  renderMatchTrackerCards(cards);
   if (elements.overviewTrackerLinks) {
     elements.overviewTrackerLinks.hidden = false;
   }
   setMatchTrackerStatus(
-    `${cards.length} team match video${cards.length === 1 ? "" : "s"} loaded from The Blue Alliance.${state.trackerPredictionError ? " Predicted scores unavailable." : ""}`
+    state.trackerLoading
+      ? "Refreshing match videos..."
+      : `${cards.length} team match video${cards.length === 1 ? "" : "s"} loaded from The Blue Alliance.${state.trackerPredictionError ? " Predicted scores unavailable." : ""}`,
+    state.trackerLoading ? "loading" : ""
   );
+}
+
+function clearMatchTrackerCards() {
+  if (!elements.overviewPredictionBody) return;
+  elements.overviewPredictionBody.hidden = true;
+  elements.overviewPredictionBody.innerHTML = "";
+  delete elements.overviewPredictionBody.dataset.renderSignature;
+  if (elements.overviewTrackerLinks) {
+    elements.overviewTrackerLinks.hidden = true;
+  }
+}
+
+function renderMatchTrackerCards(cards) {
+  if (!elements.overviewPredictionBody) return;
+
+  const signature = getMatchTrackerRenderSignature(cards);
+  if (elements.overviewPredictionBody.dataset.renderSignature !== signature) {
+    elements.overviewPredictionBody.innerHTML = cards.map((match) => renderMatchTrackerCard(match)).join("");
+    elements.overviewPredictionBody.dataset.renderSignature = signature;
+  }
+
+  elements.overviewPredictionBody.hidden = false;
+}
+
+function getMatchTrackerRenderSignature(cards) {
+  return (Array.isArray(cards) ? cards : [])
+    .map((match) =>
+      [
+        match?.key || "",
+        match?.label || "",
+        match?.alliance || "",
+        match?.resultLine || "",
+        match?.scoreLine || "",
+        match?.winProbability || "",
+        match?.predictedScore || "",
+        match?.watchUrl || "",
+        match?.detailUrl || "",
+        match?.video?.type || "",
+        match?.video?.key || ""
+      ].join("::")
+    )
+    .join("|");
 }
 
 function renderOverviewMessageRow(target, colSpan, message) {
@@ -3007,7 +3313,7 @@ function runPickAnalysis() {
 
   const event = getActiveEvent();
   const ourRow = getTrackedEventRow();
-  if (isCurrentEventOver() && !isAnalysisDebugOverrideEnabled()) {
+  if (isCurrentEventOver()) {
     setAppMessage("Pick analysis is disabled because this event is already over.", "warn");
     return;
   }
@@ -3042,14 +3348,31 @@ function buildAlliancePickAnalysis() {
   const ourRow = getTrackedEventRow();
   const ourSummary = getSummaryRow(TRACKED_TEAM_NUMBER);
   const ourRank = Number(ourRow?.record?.qual?.rank || Number.POSITIVE_INFINITY);
-  const actualAvailability = buildCompletedEventAvailabilityContext(state.overviewMatches, state.overviewCompetitionRows);
+  const actualAvailability =
+    buildTbaAllianceSelectionAvailabilityContext(state.overviewAllianceSelections, state.overviewCompetitionRows) ||
+    buildCompletedEventAvailabilityContext(state.overviewMatches, state.overviewCompetitionRows);
+
+  if (actualAvailability && actualAvailability.canPick === false) {
+    return {
+      ourRank: Number.isFinite(ourRank) ? ourRank : 0,
+      actualAvailability,
+      recommendation: null,
+      shortlist: []
+    };
+  }
+
   const candidates = (actualAvailability?.availableRows?.length
     ? actualAvailability.availableRows
     : state.overviewCompetitionRows.filter((row) => Number(row?.team) !== TRACKED_TEAM_NUMBER)
   ).filter((row) => Number(row?.team) !== TRACKED_TEAM_NUMBER);
 
   if (!candidates.length) {
-    throw new Error("No other teams are available to analyze.");
+    return {
+      ourRank: Number.isFinite(ourRank) ? ourRank : 0,
+      actualAvailability,
+      recommendation: null,
+      shortlist: []
+    };
   }
 
   const metricContext = buildAnalysisMetricContext(candidates);
@@ -3066,6 +3389,49 @@ function buildAlliancePickAnalysis() {
     actualAvailability,
     recommendation: shortlist[0] || null,
     shortlist
+  };
+}
+
+function buildTbaAllianceSelectionAvailabilityContext(alliances, competitionRows) {
+  const normalizedAlliances = normalizeTbaAllianceSelections(alliances);
+  if (!normalizedAlliances.length) return null;
+
+  const selectedTeamNumbers = new Set();
+  const declinedTeamNumbers = new Set();
+  normalizedAlliances.forEach((alliance) => {
+    alliance.teamNumbers.forEach((teamNumber) => {
+      selectedTeamNumbers.add(teamNumber);
+    });
+    alliance.declinedTeamNumbers.forEach((teamNumber) => {
+      declinedTeamNumbers.add(teamNumber);
+    });
+  });
+
+  const unavailableTeamNumbers = new Set([TRACKED_TEAM_NUMBER]);
+  selectedTeamNumbers.forEach((teamNumber) => unavailableTeamNumbers.add(teamNumber));
+  declinedTeamNumbers.forEach((teamNumber) => unavailableTeamNumbers.add(teamNumber));
+
+  const ourAlliance = normalizedAlliances.find((alliance) => alliance.teamNumbers.includes(TRACKED_TEAM_NUMBER)) || null;
+  const ourRole = ourAlliance ? getTbaAllianceRole(ourAlliance, TRACKED_TEAM_NUMBER) : declinedTeamNumbers.has(TRACKED_TEAM_NUMBER) ? "declined" : "undrafted";
+  const canPick = Boolean(ourAlliance && ourRole === "captain" && ourAlliance.teamNumbers.length < 3);
+  const availableRows = canPick
+    ? (Array.isArray(competitionRows) ? competitionRows : []).filter((row) => {
+        const teamNumber = Number(row?.team || 0);
+        return Number.isFinite(teamNumber) && !unavailableTeamNumbers.has(teamNumber);
+      })
+    : [];
+
+  return {
+    source: "tba",
+    canPick,
+    ourAllianceSeed: ourAlliance?.seed || null,
+    ourRole,
+    pickStage: canPick ? getTbaAlliancePickStage(ourAlliance) : "",
+    ourAlliance,
+    availableRows,
+    selectedTeamNumbers: Array.from(selectedTeamNumbers).sort((left, right) => left - right),
+    declinedTeamNumbers: Array.from(declinedTeamNumbers).sort((left, right) => left - right),
+    unavailableTeamNumbers: Array.from(unavailableTeamNumbers).sort((left, right) => left - right)
   };
 }
 
@@ -3105,10 +3471,195 @@ function buildCompletedEventAvailabilityContext(matches, competitionRows) {
   });
 
   return {
+    source: "playoffs",
+    canPick: true,
+    ourRole: "captain",
     availableRows,
     ourAllianceSeed: ourAlliance.seed,
     unavailableTeamNumbers: Array.from(unavailableTeamNumbers).sort((left, right) => left - right)
   };
+}
+
+function normalizeTbaAllianceSelections(alliances) {
+  return (Array.isArray(alliances) ? alliances : [])
+    .map((alliance, index) => {
+      const seed = Number(alliance?.number || index + 1);
+      const picks = (Array.isArray(alliance?.picks) ? alliance.picks : [])
+        .map(parseTbaTeamNumber)
+        .filter((teamNumber) => Number.isFinite(teamNumber));
+      const declines = (Array.isArray(alliance?.declines) ? alliance.declines : [])
+        .map(parseTbaTeamNumber)
+        .filter((teamNumber) => Number.isFinite(teamNumber));
+
+      if (!Number.isFinite(seed) || !picks.length) return null;
+
+      return {
+        seed,
+        name: String(alliance?.name || `Alliance ${seed}`),
+        teamNumbers: picks,
+        captain: picks[0] || null,
+        firstPick: picks[1] || null,
+        secondPick: picks[2] || null,
+        declinedTeamNumbers: declines
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.seed - right.seed);
+}
+
+function buildOverviewTeamMediaMap(mediaEntries) {
+  const bestMediaByTeam = new Map();
+
+  normalizeOverviewTeamMediaEntries(mediaEntries).forEach((entry) => {
+    const imageSource = getPreferredTbaTeamMediaSource(entry);
+    if (!imageSource) return;
+
+    const teamNumbers = getTbaMediaTeamNumbers(entry);
+
+    teamNumbers.forEach((teamNumber) => {
+      const current = bestMediaByTeam.get(teamNumber);
+      if (!current || current.rank > imageSource.rank) {
+        bestMediaByTeam.set(teamNumber, imageSource);
+      }
+    });
+  });
+
+  const mediaMap = new Map();
+  bestMediaByTeam.forEach((value, teamNumber) => {
+    mediaMap.set(teamNumber, value.src);
+  });
+  return mediaMap;
+}
+
+function normalizeOverviewTeamMediaEntries(mediaEntries) {
+  if (Array.isArray(mediaEntries)) {
+    return mediaEntries;
+  }
+
+  if (!mediaEntries || typeof mediaEntries !== "object") {
+    return [];
+  }
+
+  const normalized = [];
+  Object.entries(mediaEntries).forEach(([teamKey, value]) => {
+    const entries = Array.isArray(value) ? value : [value];
+    entries.forEach((entry) => {
+      if (!entry || typeof entry !== "object") return;
+      if (Array.isArray(entry.team_keys) && entry.team_keys.length) {
+        normalized.push(entry);
+        return;
+      }
+
+      normalized.push({
+        ...entry,
+        team_keys: [teamKey]
+      });
+    });
+  });
+  return normalized;
+}
+
+function getTbaMediaTeamNumbers(entry) {
+  const teamKeys = [
+    ...(Array.isArray(entry?.team_keys) ? entry.team_keys : []),
+    entry?.team_key,
+    entry?.references?.team_key,
+    entry?.details?.team_key
+  ];
+
+  return Array.from(
+    new Set(
+      teamKeys
+        .map(parseTbaTeamNumber)
+        .filter((teamNumber) => Number.isFinite(teamNumber))
+    )
+  );
+}
+
+function getPreferredTbaTeamMediaSource(entry) {
+  const type = String(entry?.type || "").trim().toLowerCase();
+  const preferred = entry?.preferred === true;
+  const base64Image = String(entry?.details?.base64Image || entry?.details?.base64image || "").trim();
+  if (type === "avatar" && base64Image) {
+    return {
+      rank: 0,
+      src: `data:image/png;base64,${base64Image}`
+    };
+  }
+
+  const directUrl = normalizeTbaMediaUrl(entry?.direct_url);
+  if (!directUrl || isTbaPlaceholderMediaUrl(directUrl) || !isProbablyRenderableImageUrl(directUrl, type)) {
+    return null;
+  }
+
+  if (type === "avatar") {
+    return {
+      rank: 1,
+      src: directUrl
+    };
+  }
+
+  if (preferred) {
+    return {
+      rank: 2,
+      src: directUrl
+    };
+  }
+
+  return {
+    rank: 3,
+    src: directUrl
+  };
+}
+
+function normalizeTbaMediaUrl(value) {
+  const source = String(value || "").trim();
+  if (!source) return "";
+  if (source.startsWith("data:image/")) return source;
+
+  try {
+    const url = new URL(source, "https://www.thebluealliance.com");
+    if (!/^https?:$/i.test(url.protocol)) return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+function isProbablyRenderableImageUrl(url, type = "") {
+  const normalizedType = String(type || "").trim().toLowerCase();
+  if (!url) return false;
+  if (String(url).startsWith("data:image/")) return true;
+
+  try {
+    const parsed = new URL(url);
+    if (/\.(avif|gif|jpe?g|png|svg|webp)(?:$|\?)/i.test(parsed.pathname)) {
+      return true;
+    }
+
+    if (normalizedType === "avatar") {
+      return true;
+    }
+
+    return /(^|\.)i\.imgur\.com$/i.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isTbaPlaceholderMediaUrl(url) {
+  if (!url || String(url).startsWith("data:image/")) return false;
+
+  try {
+    const parsed = new URL(url);
+    if (!/(^|\.)thebluealliance\.com$/i.test(parsed.hostname)) {
+      return false;
+    }
+
+    return /(placeholder|default|missing|no[-_]?avatar|avatar[-_]?placeholder)/i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
 }
 
 function registerAllianceSeed(target, seed, teamKeys) {
@@ -3123,6 +3674,38 @@ function registerAllianceSeed(target, seed, teamKeys) {
     secondPick: roster[2] || null,
     teams: roster
   });
+}
+
+function getTbaAllianceRole(alliance, teamNumber) {
+  const target = Number(teamNumber || 0);
+  if (!alliance || !target) return "";
+  if (alliance.captain === target) return "captain";
+  if (alliance.firstPick === target) return "first_pick";
+  if (alliance.secondPick === target) return "second_pick";
+  return "member";
+}
+
+function getTbaAlliancePickStage(alliance) {
+  const pickCount = Array.isArray(alliance?.teamNumbers) ? alliance.teamNumbers.length : 0;
+  if (pickCount <= 1) return "first pick";
+  if (pickCount === 2) return "second pick";
+  return "picks complete";
+}
+
+function parseTbaTeamNumber(value) {
+  const normalized = String(value || "").trim().replace(/^frc/i, "");
+  if (!/^\d+$/.test(normalized)) {
+    return null;
+  }
+
+  const numeric = Number(normalized);
+  return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
+}
+
+function getOverviewTeamLogoSource(teamNumber) {
+  const target = Number(teamNumber || 0);
+  if (!Number.isFinite(target)) return "";
+  return state.overviewTeamMediaByTeam.get(target) || "";
 }
 
 function buildAnalysisMetricContext(candidates) {
@@ -3327,11 +3910,93 @@ function buildCandidateReasons(row, summary, contributions, actualAvailability =
     topReasons.push("limited local scouting, leaning on Statbotics");
   }
 
-  if (actualAvailability?.ourAllianceSeed) {
+  if (actualAvailability?.source === "tba" && actualAvailability.canPick) {
+    topReasons.push(`still available on the live TBA draft board for our ${actualAvailability.pickStage}`);
+  } else if (actualAvailability?.ourAllianceSeed) {
     topReasons.push(`available at captain seed #${actualAvailability.ourAllianceSeed}`);
   }
 
   return Array.from(new Set(topReasons)).slice(0, 3);
+}
+
+function describeAnalysisAvailability(actualAvailability) {
+  if (!actualAvailability) return "Projected current availability";
+
+  if (actualAvailability.source === "tba") {
+    if (actualAvailability.ourRole === "captain") {
+      if (actualAvailability.canPick) {
+        return `Live TBA alliance board • Captain seed #${actualAvailability.ourAllianceSeed} • choosing ${actualAvailability.pickStage}`;
+      }
+      return `Live TBA alliance board • Alliance #${actualAvailability.ourAllianceSeed} is already full`;
+    }
+
+    if (actualAvailability.ourRole === "first_pick") {
+      return `Live TBA alliance board • Team 10312 is already the first pick on Alliance #${actualAvailability.ourAllianceSeed}`;
+    }
+
+    if (actualAvailability.ourRole === "second_pick") {
+      return `Live TBA alliance board • Team 10312 is already the second pick on Alliance #${actualAvailability.ourAllianceSeed}`;
+    }
+
+    if (actualAvailability.ourRole === "declined") {
+      return "Live TBA alliance board • Team 10312 is marked as declined";
+    }
+
+    return "Live TBA alliance board • Team 10312 is not on a published alliance";
+  }
+
+  if (actualAvailability.ourAllianceSeed) {
+    return `Captain seed #${actualAvailability.ourAllianceSeed} actual availability`;
+  }
+
+  return "Projected current availability";
+}
+
+function describeAnalysisPickWindow(actualAvailability) {
+  if (!actualAvailability) return "Projected available";
+
+  if (actualAvailability.source === "tba") {
+    if (actualAvailability.canPick) {
+      const teamsOffBoard = Math.max(Number(actualAvailability.unavailableTeamNumbers?.length || 1) - 1, 0);
+      return `${capitalizeFirst(actualAvailability.pickStage)} • ${teamsOffBoard} teams already off the board`;
+    }
+
+    if (actualAvailability.ourRole === "captain") {
+      return `Alliance #${actualAvailability.ourAllianceSeed} already has three teams`;
+    }
+
+    return `Already drafted on Alliance #${actualAvailability.ourAllianceSeed || "--"}`;
+  }
+
+  if (actualAvailability.ourAllianceSeed) {
+    return `Available at seed #${actualAvailability.ourAllianceSeed}`;
+  }
+
+  return "Projected available";
+}
+
+function describeNoPickRecommendation(actualAvailability) {
+  if (!actualAvailability) {
+    return "No valid pick candidates were found for the current event.";
+  }
+
+  if (actualAvailability.source === "tba") {
+    if (actualAvailability.ourRole === "captain" && !actualAvailability.canPick) {
+      return `Alliance #${actualAvailability.ourAllianceSeed} already has all of its published picks on The Blue Alliance.`;
+    }
+
+    if (actualAvailability.ourRole === "first_pick" || actualAvailability.ourRole === "second_pick") {
+      return `Team 10312 is already drafted on Alliance #${actualAvailability.ourAllianceSeed}, so there are no captain picks left to recommend here.`;
+    }
+
+    if (actualAvailability.ourRole === "declined") {
+      return "Team 10312 is listed as declined on The Blue Alliance, so pick recommendations are unavailable.";
+    }
+
+    return "Team 10312 is not listed as a captain on The Blue Alliance, so there is no alliance draft slot to score.";
+  }
+
+  return "No valid pick candidates were found for the current event.";
 }
 
 function getPickAnalysisWeights(ourRank) {
@@ -3458,17 +4123,11 @@ function renderPickAnalysis() {
   if (!elements.pickAnalysisStatus || !elements.pickAnalysisBest || !elements.pickAnalysisBody) return;
 
   const eventOver = isCurrentEventOver();
-  const debugOverrideEnabled = isAnalysisDebugOverrideEnabled();
+  const restoringSession = isSessionRestorePending();
   const canAnalyze = Boolean(
-    state.session && getActiveEvent() && state.overviewCompetitionRows.length && !state.overviewLoading && (!eventOver || debugOverrideEnabled)
+    state.session && getActiveEvent() && state.overviewCompetitionRows.length && !state.overviewLoading && !eventOver && !restoringSession
   );
   elements.pickAnalysisBest.classList.remove("analysis-best");
-
-  if (elements.toggleAnalysisDebugButton) {
-    elements.toggleAnalysisDebugButton.textContent = debugOverrideEnabled ? "Debug Override On" : "Debug Override Off";
-    elements.toggleAnalysisDebugButton.setAttribute("aria-pressed", debugOverrideEnabled ? "true" : "false");
-    elements.toggleAnalysisDebugButton.classList.toggle("is-debug-active", debugOverrideEnabled);
-  }
 
   if (elements.runPickAnalysisButton) {
     elements.runPickAnalysisButton.disabled = !canAnalyze || state.analysisRunning;
@@ -3476,6 +4135,13 @@ function renderPickAnalysis() {
   }
 
   if (!getActiveEvent()) {
+    if (restoringSession) {
+      elements.pickAnalysisStatus.textContent = "Loading workspace data for pick analysis.";
+      elements.pickAnalysisBest.classList.add("empty-state");
+      elements.pickAnalysisBest.textContent = "Pick analysis will be available after the workspace loads.";
+      renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Loading current event data...");
+      return;
+    }
     elements.pickAnalysisStatus.textContent = "Select an event to enable pick analysis.";
     elements.pickAnalysisBest.classList.add("empty-state");
     elements.pickAnalysisBest.textContent = "No event selected.";
@@ -3499,25 +4165,16 @@ function renderPickAnalysis() {
     return;
   }
 
-  if (eventOver && !debugOverrideEnabled) {
+  if (eventOver) {
     elements.pickAnalysisStatus.textContent = "This event is over, so pick analysis is disabled.";
     elements.pickAnalysisBest.classList.add("empty-state");
     elements.pickAnalysisBest.textContent = "Completed events keep their rankings visible, but alliance-pick analysis is locked.";
-    if (state.analysisResult?.shortlist?.length) {
-      renderAnalysisShortlist();
-    } else {
-      renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Pick analysis is disabled because this event is completed.");
-    }
+    renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Pick analysis is disabled because this event is completed.");
     return;
   }
 
   if (!state.analysisResult) {
-    elements.pickAnalysisStatus.textContent = [
-      "Press Run Analysis to score alliance partners from the currently loaded Statbotics and scouting data.",
-      eventOver && debugOverrideEnabled ? "Debug override is active for this completed event." : ""
-    ]
-      .filter(Boolean)
-      .join(" • ");
+    elements.pickAnalysisStatus.textContent = "Press Run Analysis to score alliance partners from the currently loaded Statbotics and scouting data.";
     elements.pickAnalysisBest.classList.add("empty-state");
     elements.pickAnalysisBest.textContent = "No pick recommendation yet.";
     renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Run the analysis to build a ranked shortlist.");
@@ -3525,12 +4182,11 @@ function renderPickAnalysis() {
   }
 
   const recommendation = state.analysisResult.recommendation;
+  const availabilityLabel = describeAnalysisAvailability(state.analysisResult.actualAvailability);
+  const noRecommendationMessage = describeNoPickRecommendation(state.analysisResult.actualAvailability);
   elements.pickAnalysisStatus.textContent = [
     `Our rank: #${state.analysisResult.ourRank || "--"}`,
-    state.analysisResult.actualAvailability?.ourAllianceSeed
-      ? `Captain seed #${state.analysisResult.actualAvailability.ourAllianceSeed} actual availability`
-      : "Projected current availability",
-    eventOver && debugOverrideEnabled ? "Debug override active on completed-event data." : "",
+    availabilityLabel,
     state.analysisNeedsRefresh ? "Scouting changed since the last run. Press Run Analysis again." : "",
     state.analysisRunAt ? `Last run ${formatTime(state.analysisRunAt)}` : ""
   ]
@@ -3551,9 +4207,7 @@ function renderPickAnalysis() {
     meta.className = "muted";
     meta.textContent = [
       `Team ${recommendation.team}`,
-      state.analysisResult.actualAvailability?.ourAllianceSeed
-        ? `Available at seed #${state.analysisResult.actualAvailability.ourAllianceSeed}`
-        : "Projected available",
+      describeAnalysisPickWindow(state.analysisResult.actualAvailability),
       `Fit score ${formatDecimal(recommendation.score)}`,
       `Event rank #${recommendation.eventRank || "--"}`,
       `EPA ${formatDecimal(recommendation.epa)}`
@@ -3567,7 +4221,7 @@ function renderPickAnalysis() {
   } else {
     elements.pickAnalysisBest.classList.remove("analysis-best");
     elements.pickAnalysisBest.classList.add("empty-state");
-    elements.pickAnalysisBest.textContent = "No valid pick candidates were found for the current event.";
+    elements.pickAnalysisBest.textContent = noRecommendationMessage;
   }
 
   renderAnalysisShortlist();
@@ -3577,7 +4231,7 @@ function renderAnalysisShortlist() {
   const body = elements.pickAnalysisBody;
   body.innerHTML = "";
   if (!state.analysisResult?.shortlist?.length) {
-    renderOverviewMessageRow(body, 5, "No valid pick candidates were found for the current event.");
+    renderOverviewMessageRow(body, 5, describeNoPickRecommendation(state.analysisResult?.actualAvailability || null));
     return;
   }
 
@@ -5063,8 +5717,38 @@ function formatRecord(record) {
   return `${record.wins || 0}-${record.losses || 0}-${record.ties || 0}`;
 }
 
+function formatRecordCompact(record) {
+  if (!record) return "--";
+  return `${record.wins || 0}-${record.losses || 0}-${record.ties || 0}`;
+}
+
+function getRecordMatchesPlayed(record) {
+  if (!record) return "--";
+  if (Number.isFinite(Number(record.count))) {
+    return Number(record.count);
+  }
+  const wins = Number(record.wins || 0);
+  const losses = Number(record.losses || 0);
+  const ties = Number(record.ties || 0);
+  return wins + losses + ties;
+}
+
 function formatDecimal(value) {
   return Number(value || 0).toFixed(1).replace(/\.0$/, "");
+}
+
+function formatNullableDecimal(value) {
+  return Number.isFinite(Number(value)) ? formatDecimal(value) : "--";
+}
+
+function formatNullableFixedDecimal(value, digits = 2) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue.toFixed(digits) : "--";
+}
+
+function capitalizeFirst(value) {
+  const text = String(value || "");
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 }
 
 function formatTime(value) {
