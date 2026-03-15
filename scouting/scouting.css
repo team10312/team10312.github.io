@@ -937,6 +937,8 @@ code {
   display: grid;
   gap: 0.45rem;
   padding: 1rem 1.05rem;
+  justify-items: center;
+  text-align: center;
 }
 
 .analysis-best strong {

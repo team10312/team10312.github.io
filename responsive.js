@@ -13,11 +13,56 @@
   const mq = window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH}px)`);
   const ua = (navigator.userAgent || '').toLowerCase();
   const uaMobile = /android|iphone|ipod|ipad|iemobile|windows phone|blackberry|opera mini|mobile/.test(ua);
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   let containerNav, navLeft, navLinks, navCta;
   let original = null;
   let lastMobile = null;
   let mobileListenersOn = false;
+  let pageTransitionsBound = false;
+
+  document.documentElement.classList.add('has-page-transitions');
+
+  function initPageTransitions() {
+    if (pageTransitionsBound) return;
+    pageTransitionsBound = true;
+
+    const activatePage = () => {
+      requestAnimationFrame(() => {
+        document.body.classList.add('page-ready');
+        document.body.classList.remove('is-page-transitioning');
+      });
+    };
+
+    activatePage();
+    window.addEventListener('pageshow', activatePage);
+
+    if (prefersReducedMotion.matches) return;
+
+    document.addEventListener('click', (event) => {
+      const link = event.target.closest('a[href]');
+      if (!link) return;
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (link.target && link.target !== '_self') return;
+      if (link.hasAttribute('download')) return;
+
+      const href = link.getAttribute('href') || '';
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) {
+        return;
+      }
+
+      const nextUrl = new URL(link.href, window.location.href);
+      if (nextUrl.origin !== window.location.origin) return;
+      if (nextUrl.pathname === window.location.pathname && nextUrl.hash) return;
+
+      event.preventDefault();
+      document.body.classList.remove('page-ready');
+      document.body.classList.add('is-page-transitioning');
+      window.setTimeout(() => {
+        window.location.href = nextUrl.href;
+      }, 180);
+    });
+  }
 
   function cacheDom() {
     containerNav = document.querySelector('header .container.nav');
@@ -208,9 +253,13 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', apply);
+    document.addEventListener('DOMContentLoaded', () => {
+      apply();
+      initPageTransitions();
+    });
   } else {
     apply();
+    initPageTransitions();
   }
 
   // If the device rotates / resizes, re-check (won't affect desktop unless it becomes mobile)

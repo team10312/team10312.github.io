@@ -33,6 +33,12 @@ const TEXAS_STATE_CODE = "TX";
 const OVERVIEW_MODE_COMPETITION = "competition";
 const OVERVIEW_MODE_TEXAS = "texas";
 const OVERVIEW_MATCH_LIMIT = 100;
+const QF_ALLIANCE_SEED_MAP = Object.freeze({
+  1: { red: 1, blue: 8 },
+  2: { red: 4, blue: 5 },
+  3: { red: 2, blue: 7 },
+  4: { red: 3, blue: 6 }
+});
 
 const AUTO_PATH_DEFAULTS = Object.freeze({
   drawColor: "#ff7f00",
@@ -121,6 +127,8 @@ const state = {
   teamSummary: [],
   outbox: loadStoredJson(STORAGE_KEYS.outbox, []),
   activeTab: loadStoredValue(STORAGE_KEYS.activeTab, "overview"),
+  authReady: false,
+  authRedirecting: false,
   overviewMode: loadStoredValue(STORAGE_KEYS.overviewMode, OVERVIEW_MODE_COMPETITION),
   overviewLoading: false,
   overviewError: "",
@@ -1282,6 +1290,16 @@ async function handleGoogleSignIn() {
     return;
   }
 
+  if (state.session && isAllowedEmail(getSessionEmail(state.session))) {
+    state.authRedirecting = false;
+    state.authReady = true;
+    renderAll();
+    return;
+  }
+
+  state.authRedirecting = true;
+  state.authReady = false;
+  renderAll();
   setAuthMessage("Redirecting to Google sign-in...", "success");
 
   const redirectTo = `${window.location.origin}${window.location.pathname}`;
@@ -1297,12 +1315,17 @@ async function handleGoogleSignIn() {
   });
 
   if (error) {
+    state.authRedirecting = false;
+    state.authReady = true;
+    renderAll();
     setAuthMessage(normalizeError(error, "Unable to start Google sign-in."), "danger");
   }
 }
 
 async function handleSignOut() {
   if (!state.client) return;
+  state.authReady = false;
+  state.authRedirecting = false;
   state.pendingAuthMessage = "Signed out.";
   state.pendingAuthTone = "success";
   await state.client.auth.signOut();
@@ -1311,6 +1334,7 @@ async function handleSignOut() {
 
 async function syncSession(session) {
   state.session = session;
+  state.authReady = false;
 
   if (!session) {
     state.events = [];
@@ -1319,26 +1343,34 @@ async function syncSession(session) {
     state.teamSummary = [];
     resetOverviewState();
     state.isRefreshing = false;
+    state.authRedirecting = false;
+    state.authReady = true;
     renderAll();
 
     if (state.pendingAuthMessage) {
       setAuthMessage(state.pendingAuthMessage, state.pendingAuthTone || "warn");
       state.pendingAuthMessage = "";
       state.pendingAuthTone = "";
+    } else {
+      setAuthMessage("", "");
     }
     return;
   }
 
   const email = getSessionEmail(session);
   if (!isAllowedEmail(email)) {
+    state.authRedirecting = false;
     state.pendingAuthMessage = `Only ${state.config.allowedEmailDomain} Google accounts can access scouting.`;
     state.pendingAuthTone = "danger";
     await state.client.auth.signOut();
     return;
   }
 
+  state.authRedirecting = false;
   setAuthMessage(`Signed in as ${email}.`, "success");
   await refreshData({ message: "" });
+  state.authReady = true;
+  renderAll();
 }
 
 async function refreshData({ message } = {}) {
@@ -1515,9 +1547,7 @@ async function loadOverviewData() {
     const [competitionRows, texasRows, matches, eventData] = await Promise.all([
       fetchStatbotics(`team_events?event=${encodeURIComponent(eventKey)}&limit=1000`),
       fetchStatbotics(`team_years?year=${season}&state=${encodeURIComponent(TEXAS_STATE_CODE)}&limit=500`),
-      fetchStatbotics(
-        `matches?event=${encodeURIComponent(eventKey)}&team=${TRACKED_TEAM_NUMBER}&limit=${OVERVIEW_MATCH_LIMIT}`
-      ),
+      fetchStatbotics(`matches?event=${encodeURIComponent(eventKey)}&limit=${OVERVIEW_MATCH_LIMIT}`),
       fetchStatbotics(`event/${encodeURIComponent(eventKey)}`)
     ]);
 
@@ -1589,7 +1619,8 @@ function getStatboticsEventKey(event) {
 }
 
 function buildPredictionRows(matches, eventData) {
-  const sorted = (Array.isArray(matches) ? matches.slice() : []).sort((left, right) => {
+  const trackedMatches = (Array.isArray(matches) ? matches : []).filter((match) => matchIncludesTeam(match, TRACKED_TEAM_NUMBER));
+  const sorted = trackedMatches.slice().sort((left, right) => {
     return compareNullableNumbers(left?.time, right?.time) || compareNullableNumbers(left?.match_number, right?.match_number);
   });
   const upcoming = sorted.filter((match) => !isCompletedStatboticsMatch(match));
@@ -1678,6 +1709,13 @@ function getTrackedMatchTone(match, alliance) {
 
 function isCompletedStatboticsMatch(match) {
   return String(match?.status || "").toLowerCase() === "completed";
+}
+
+function matchIncludesTeam(match, teamNumber) {
+  const target = Number(teamNumber || 0);
+  const redTeams = match?.alliances?.red?.team_keys || [];
+  const blueTeams = match?.alliances?.blue?.team_keys || [];
+  return redTeams.includes(target) || blueTeams.includes(target);
 }
 
 function formatStatboticsTeam(row) {
@@ -1961,13 +1999,39 @@ function renderConfigState() {
 }
 
 function renderAuthState() {
+  const configured = configReady();
   const signedIn = Boolean(state.session && isAllowedEmail(getSessionEmail(state.session)));
-  elements.lockView.classList.toggle("hidden", signedIn);
-  elements.appView.classList.toggle("hidden", !signedIn);
+  const restoringSession = configured && !state.authReady;
+  const showApp = signedIn && state.authReady;
 
-  if (signedIn) {
+  elements.lockView.classList.toggle("hidden", showApp);
+  elements.appView.classList.toggle("hidden", !showApp);
+
+  if (elements.googleSignInButton) {
+    if (!configured) {
+      elements.googleSignInButton.textContent = "Sign In With Google";
+      elements.googleSignInButton.disabled = true;
+    } else if (restoringSession) {
+      elements.googleSignInButton.textContent = state.authRedirecting ? "Completing Sign-In..." : "Restoring Session...";
+      elements.googleSignInButton.disabled = true;
+    } else {
+      elements.googleSignInButton.textContent = "Sign In With Google";
+      elements.googleSignInButton.disabled = false;
+    }
+  }
+
+  if (restoringSession && !state.authRedirecting && !signedIn) {
+    setAuthMessage("Checking for an existing scouting session...", "");
+  }
+
+  if (showApp) {
     const email = getSessionEmail(state.session);
     setStatusPill(elements.authPill, `Signed in: ${email}`, "success");
+    return;
+  }
+
+  if (restoringSession) {
+    setStatusPill(elements.authPill, state.authRedirecting ? "Signing in..." : "Restoring session...", "warn");
     return;
   }
 
@@ -2342,7 +2406,11 @@ function buildAlliancePickAnalysis() {
   const ourRow = getTrackedEventRow();
   const ourSummary = getSummaryRow(TRACKED_TEAM_NUMBER);
   const ourRank = Number(ourRow?.record?.qual?.rank || Number.POSITIVE_INFINITY);
-  const candidates = state.overviewCompetitionRows.filter((row) => Number(row?.team) !== TRACKED_TEAM_NUMBER);
+  const actualAvailability = buildCompletedEventAvailabilityContext(state.overviewMatches, state.overviewCompetitionRows);
+  const candidates = (actualAvailability?.availableRows?.length
+    ? actualAvailability.availableRows
+    : state.overviewCompetitionRows.filter((row) => Number(row?.team) !== TRACKED_TEAM_NUMBER)
+  ).filter((row) => Number(row?.team) !== TRACKED_TEAM_NUMBER);
 
   if (!candidates.length) {
     throw new Error("No other teams are available to analyze.");
@@ -2353,15 +2421,72 @@ function buildAlliancePickAnalysis() {
   const ourProfile = buildOurAllianceProfile(ourRow, ourSummary, metricContext);
 
   const shortlist = candidates
-    .map((row) => scoreAllianceCandidate(row, ourProfile, metricContext, weights))
+    .map((row) => scoreAllianceCandidate(row, ourProfile, metricContext, weights, actualAvailability))
     .sort((left, right) => right.score - left.score)
     .slice(0, 5);
 
   return {
     ourRank: Number.isFinite(ourRank) ? ourRank : 0,
+    actualAvailability,
     recommendation: shortlist[0] || null,
     shortlist
   };
+}
+
+function buildCompletedEventAvailabilityContext(matches, competitionRows) {
+  const qfMatches = (Array.isArray(matches) ? matches : [])
+    .filter((match) => String(match?.comp_level || "").toLowerCase() === "qf")
+    .sort((left, right) => {
+      return compareNullableNumbers(left?.set_number, right?.set_number) || compareNullableNumbers(left?.match_number, right?.match_number);
+    });
+
+  if (!qfMatches.length) return null;
+
+  const alliancesBySeed = new Map();
+  qfMatches.forEach((match) => {
+    const seedMap = QF_ALLIANCE_SEED_MAP[Number(match?.set_number || 0)];
+    if (!seedMap) return;
+    registerAllianceSeed(alliancesBySeed, seedMap.red, match?.alliances?.red?.team_keys || []);
+    registerAllianceSeed(alliancesBySeed, seedMap.blue, match?.alliances?.blue?.team_keys || []);
+  });
+
+  if (!alliancesBySeed.size) return null;
+
+  const ourAlliance = Array.from(alliancesBySeed.values()).find((alliance) => alliance.captain === TRACKED_TEAM_NUMBER);
+  if (!ourAlliance) return null;
+
+  const unavailableTeamNumbers = new Set([TRACKED_TEAM_NUMBER]);
+  alliancesBySeed.forEach((alliance) => {
+    if (Number.isFinite(alliance.captain)) unavailableTeamNumbers.add(alliance.captain);
+    if (alliance.seed < ourAlliance.seed && Number.isFinite(alliance.firstPick)) {
+      unavailableTeamNumbers.add(alliance.firstPick);
+    }
+  });
+
+  const availableRows = (Array.isArray(competitionRows) ? competitionRows : []).filter((row) => {
+    const teamNumber = Number(row?.team || 0);
+    return Number.isFinite(teamNumber) && !unavailableTeamNumbers.has(teamNumber);
+  });
+
+  return {
+    availableRows,
+    ourAllianceSeed: ourAlliance.seed,
+    unavailableTeamNumbers: Array.from(unavailableTeamNumbers).sort((left, right) => left - right)
+  };
+}
+
+function registerAllianceSeed(target, seed, teamKeys) {
+  const numericSeed = Number(seed || 0);
+  if (!numericSeed || target.has(numericSeed)) return;
+  const roster = (Array.isArray(teamKeys) ? teamKeys : []).map((team) => Number(team)).filter((team) => Number.isFinite(team));
+  if (!roster.length) return;
+  target.set(numericSeed, {
+    seed: numericSeed,
+    captain: roster[0] || null,
+    firstPick: roster[1] || null,
+    secondPick: roster[2] || null,
+    teams: roster
+  });
 }
 
 function buildAnalysisMetricContext(candidates) {
@@ -2397,7 +2522,7 @@ function buildOurAllianceProfile(ourRow, ourSummary, context) {
   };
 }
 
-function scoreAllianceCandidate(row, ourProfile, context, weights) {
+function scoreAllianceCandidate(row, ourProfile, context, weights, actualAvailability = null) {
   const summary = getSummaryRow(row?.team);
   const hasPitData = Boolean(summary && buildPitSnapshot(summary) !== "No pit data");
   const epaScore = normalizeMetric(row?.epa?.total_points?.mean, context.epaBounds, 0.45);
@@ -2408,7 +2533,9 @@ function scoreAllianceCandidate(row, ourProfile, context, weights) {
   const reliabilityScore = buildCandidateReliabilityScore(summary);
   const towerScore = buildCandidateTowerScore(row, summary, context);
   const complementScore = buildComplementScore(offenseScore, defenseScore, towerScore, ourProfile);
-  const availabilityScore = buildAvailabilityScore(row?.record?.qual?.rank, Number(getTrackedEventRow()?.record?.qual?.rank || 999));
+  const availabilityScore = actualAvailability
+    ? 1
+    : buildAvailabilityScore(row?.record?.qual?.rank, Number(getTrackedEventRow()?.record?.qual?.rank || 999));
   const confidenceScore = buildConfidenceScore(summary, hasPitData);
   const pitReadiness = buildPitReadinessScore(summary);
 
@@ -2440,7 +2567,7 @@ function scoreAllianceCandidate(row, ourProfile, context, weights) {
     eventRank: Number(row?.record?.qual?.rank || 0),
     epa: Number(row?.epa?.total_points?.mean || 0),
     score: roundToTwo(Math.max(score, 0)),
-    reasons: buildCandidateReasons(row, summary, contributions)
+    reasons: buildCandidateReasons(row, summary, contributions, actualAvailability)
   };
 }
 
@@ -2540,7 +2667,7 @@ function buildPitReadinessScore(summary) {
   return roundToTwo((fuel * 0.3) + (defense * 0.2) + (speed * 0.25) + (climb * 0.15) + (strategy * 0.1));
 }
 
-function buildCandidateReasons(row, summary, contributions) {
+function buildCandidateReasons(row, summary, contributions, actualAvailability = null) {
   const reasonLabels = {
     epa: "elite Statbotics EPA",
     rank: "strong event seed",
@@ -2562,6 +2689,10 @@ function buildCandidateReasons(row, summary, contributions) {
 
   if (!summary?.matches_scouted) {
     topReasons.push("limited local scouting, leaning on Statbotics");
+  }
+
+  if (actualAvailability?.ourAllianceSeed) {
+    topReasons.push(`available at captain seed #${actualAvailability.ourAllianceSeed}`);
   }
 
   return Array.from(new Set(topReasons)).slice(0, 3);
@@ -2710,6 +2841,7 @@ function renderPickAnalysis() {
 
   if (!getActiveEvent()) {
     elements.pickAnalysisStatus.textContent = "Select an event to enable pick analysis.";
+    elements.pickAnalysisBest.classList.add("empty-state");
     elements.pickAnalysisBest.textContent = "No event selected.";
     renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Pick analysis is unavailable until an event is selected.");
     return;
@@ -2717,6 +2849,7 @@ function renderPickAnalysis() {
 
   if (state.overviewLoading) {
     elements.pickAnalysisStatus.textContent = "Waiting for Statbotics event rows to finish loading.";
+    elements.pickAnalysisBest.classList.add("empty-state");
     elements.pickAnalysisBest.textContent = "Analysis will be available after the current event data loads.";
     renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Loading current event data...");
     return;
@@ -2724,6 +2857,7 @@ function renderPickAnalysis() {
 
   if (state.overviewError) {
     elements.pickAnalysisStatus.textContent = "Statbotics event data is unavailable, so the analysis cannot run.";
+    elements.pickAnalysisBest.classList.add("empty-state");
     elements.pickAnalysisBest.textContent = state.overviewError;
     renderOverviewMessageRow(elements.pickAnalysisBody, 5, state.overviewError);
     return;
@@ -2731,6 +2865,7 @@ function renderPickAnalysis() {
 
   if (eventOver && !debugOverrideEnabled) {
     elements.pickAnalysisStatus.textContent = "This event is over, so pick analysis is disabled.";
+    elements.pickAnalysisBest.classList.add("empty-state");
     elements.pickAnalysisBest.textContent = "Completed events keep their rankings visible, but alliance-pick analysis is locked.";
     if (state.analysisResult?.shortlist?.length) {
       renderAnalysisShortlist();
@@ -2747,6 +2882,7 @@ function renderPickAnalysis() {
     ]
       .filter(Boolean)
       .join(" • ");
+    elements.pickAnalysisBest.classList.add("empty-state");
     elements.pickAnalysisBest.textContent = "No pick recommendation yet.";
     renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Run the analysis to build a ranked shortlist.");
     return;
@@ -2755,6 +2891,9 @@ function renderPickAnalysis() {
   const recommendation = state.analysisResult.recommendation;
   elements.pickAnalysisStatus.textContent = [
     `Our rank: #${state.analysisResult.ourRank || "--"}`,
+    state.analysisResult.actualAvailability?.ourAllianceSeed
+      ? `Captain seed #${state.analysisResult.actualAvailability.ourAllianceSeed} actual availability`
+      : "Projected current availability",
     eventOver && debugOverrideEnabled ? "Debug override active on completed-event data." : "",
     state.analysisNeedsRefresh ? "Scouting changed since the last run. Press Run Analysis again." : "",
     state.analysisRunAt ? `Last run ${formatTime(state.analysisRunAt)}` : ""
@@ -2763,19 +2902,35 @@ function renderPickAnalysis() {
     .join(" • ");
 
   elements.pickAnalysisBest.innerHTML = "";
+  elements.pickAnalysisBest.classList.remove("empty-state");
   elements.pickAnalysisBest.classList.add("analysis-best");
 
   if (recommendation) {
+    const eyebrow = document.createElement("span");
+    eyebrow.className = "section-label";
+    eyebrow.textContent = recommendation.teamName || `Team ${recommendation.team}`;
     const title = document.createElement("strong");
-    title.textContent = `Best current pick: Team ${recommendation.team}`;
+    title.textContent = "Best current pick";
     const meta = document.createElement("p");
     meta.className = "muted";
-    meta.textContent = `${recommendation.teamName || "Unknown team"} • Fit score ${formatDecimal(recommendation.score)} • Event rank #${recommendation.eventRank || "--"} • EPA ${formatDecimal(recommendation.epa)}`;
+    meta.textContent = [
+      `Team ${recommendation.team}`,
+      state.analysisResult.actualAvailability?.ourAllianceSeed
+        ? `Available at seed #${state.analysisResult.actualAvailability.ourAllianceSeed}`
+        : "Projected available",
+      `Fit score ${formatDecimal(recommendation.score)}`,
+      `Event rank #${recommendation.eventRank || "--"}`,
+      `EPA ${formatDecimal(recommendation.epa)}`
+    ]
+      .filter(Boolean)
+      .join(" • ");
     const reasons = document.createElement("p");
     reasons.className = "muted";
     reasons.textContent = recommendation.reasons.join(" • ");
-    elements.pickAnalysisBest.append(title, meta, reasons);
+    elements.pickAnalysisBest.append(eyebrow, title, meta, reasons);
   } else {
+    elements.pickAnalysisBest.classList.remove("analysis-best");
+    elements.pickAnalysisBest.classList.add("empty-state");
     elements.pickAnalysisBest.textContent = "No valid pick candidates were found for the current event.";
   }
 
