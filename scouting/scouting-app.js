@@ -1676,10 +1676,13 @@ function buildPredictionRow(match) {
   return {
     match: match?.match_name || match?.key || "Unknown match",
     alliance: alliance === "red" ? "Red" : alliance === "blue" ? "Blue" : "Unknown",
+    allianceTone: alliance || "unknown",
     winProb: formatPercentage(winProbability, 1),
     predicted: formatTrackedPredictedScore(match, alliance),
     actual,
-    tone
+    tone,
+    allianceTeams: formatTrackedTeams(match, alliance),
+    opponentTeams: formatTrackedTeams(match, alliance === "red" ? "blue" : alliance === "blue" ? "red" : "")
   };
 }
 
@@ -1696,6 +1699,16 @@ function getTrackedWinProbability(match, alliance) {
   if (alliance === "red") return redWinProbability;
   if (alliance === "blue") return 1 - redWinProbability;
   return redWinProbability;
+}
+
+function formatTrackedTeams(match, alliance) {
+  const teams = alliance === "red"
+    ? match?.alliances?.red?.team_keys || []
+    : alliance === "blue"
+      ? match?.alliances?.blue?.team_keys || []
+      : [];
+  if (!teams.length) return "Teams unavailable";
+  return teams.map((team) => `Team ${team}`).join(", ");
 }
 
 function formatTrackedPredictedScore(match, alliance) {
@@ -1763,6 +1776,15 @@ function normalizeStatboticsVideoUrl(value) {
 function normalizeTbaTeamKeyToNumber(value) {
   const numeric = Number(String(value || "").replace(/^frc/i, "").trim());
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function isCurrentEventOver() {
@@ -2329,13 +2351,13 @@ function renderOverviewPredictions() {
 
   if (state.overviewLoading) {
     elements.overviewPredictionLabel.textContent = "Loading Team 10312 Statbotics match predictions...";
-    renderOverviewMessageRow(elements.overviewPredictionBody, 5, "Loading match predictions...");
+    renderPredictionMessage("Loading match predictions...");
     return;
   }
 
   if (state.overviewError) {
     elements.overviewPredictionLabel.textContent = "Statbotics predictions are temporarily unavailable.";
-    renderOverviewMessageRow(elements.overviewPredictionBody, 5, state.overviewError);
+    renderPredictionMessage(state.overviewError);
     return;
   }
 
@@ -2343,25 +2365,24 @@ function renderOverviewPredictions() {
   elements.overviewPredictionLabel.textContent = label;
 
   if (!rows.length) {
-    renderOverviewMessageRow(
-      elements.overviewPredictionBody,
-      5,
-      "No team-specific Statbotics matches are available for the selected event yet."
-    );
+    renderPredictionMessage("No team-specific Statbotics matches are available for the selected event yet.");
     return;
   }
 
   const fragment = document.createDocumentFragment();
-
   rows.forEach((row) => {
     const tr = document.createElement("tr");
-    if (row.tone) {
-      tr.dataset.tone = row.tone;
-    }
+    const cells = [
+      row.match,
+      `${row.alliance} Alliance`,
+      row.winProb,
+      row.predicted,
+      row.actual
+    ];
 
-    [row.match, row.alliance, row.winProb, row.predicted, row.actual].forEach((value, index) => {
+    cells.forEach((value, index) => {
       const td = document.createElement("td");
-      td.textContent = value;
+      td.textContent = String(value);
       if (index === 4 && row.tone) {
         td.dataset.tone = row.tone;
       }
@@ -2373,6 +2394,10 @@ function renderOverviewPredictions() {
 
   elements.overviewPredictionBody.innerHTML = "";
   elements.overviewPredictionBody.appendChild(fragment);
+}
+
+function renderPredictionMessage(message) {
+  renderOverviewMessageRow(elements.overviewPredictionBody, 5, message);
 }
 
 function renderOverviewMessageRow(target, colSpan, message) {

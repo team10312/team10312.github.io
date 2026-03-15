@@ -1,6 +1,5 @@
 (function () {
   const MEDIA_PROXY_FUNCTION = "tba-media";
-  const STATBOTICS_API_BASE = "https://api.statbotics.io/v3";
   const MATCH_LEVEL_ORDER = { qm: 0, ef: 1, qf: 2, sf: 3, f: 4 };
   const MATCH_LEVEL_LABELS = {
     qm: "Qual",
@@ -13,19 +12,22 @@
   const state = {
     config: null,
     eventsBySeason: new Map(),
-    tbaMatchesByEvent: new Map(),
-    statboticsMatchesByEvent: new Map(),
-    statboticsEventDataByKey: new Map(),
+    matchesByEvent: new Map(),
     selectedSeason: null,
     selectedEventKey: "",
+    currentPage: 0,
+    totalPages: 0,
     requestToken: 0
   };
 
   let seasonSelect;
   let eventSelect;
   let statusEl;
-  let tableWrapEl;
-  let tableBodyEl;
+  let carouselEl;
+  let carouselTrackEl;
+  let carouselMetaEl;
+  let prevButtonEl;
+  let nextButtonEl;
   let metaEl;
   let eventNameEl;
   let eventSubtitleEl;
@@ -40,8 +42,11 @@
     seasonSelect = document.getElementById("videoSeasonSelect");
     eventSelect = document.getElementById("videoEventSelect");
     statusEl = document.getElementById("videoStatus");
-    tableWrapEl = document.getElementById("videoTableWrap");
-    tableBodyEl = document.getElementById("videoTableBody");
+    carouselEl = document.getElementById("videoCarousel");
+    carouselTrackEl = document.getElementById("videoCarouselTrack");
+    carouselMetaEl = document.getElementById("videoCarouselMeta");
+    prevButtonEl = document.getElementById("videoPrevButton");
+    nextButtonEl = document.getElementById("videoNextButton");
     metaEl = document.getElementById("videoEventMeta");
     eventNameEl = document.getElementById("videoEventName");
     eventSubtitleEl = document.getElementById("videoEventSubtitle");
@@ -50,7 +55,7 @@
     eventLinkEl = document.getElementById("videoEventLink");
     teamLinkEl = document.getElementById("videoTeamLink");
 
-    if (!seasonSelect || !eventSelect || !statusEl || !tableWrapEl || !tableBodyEl || !teamLinkEl) {
+    if (!seasonSelect || !eventSelect || !statusEl || !carouselEl || !carouselTrackEl || !teamLinkEl) {
       return;
     }
 
@@ -74,11 +79,23 @@
       const eventKey = eventSelect.value;
       state.selectedEventKey = eventKey;
       if (!eventKey) {
-        hideTable();
-        setStatus("Choose a competition to load videos and predictions.");
+        hideCarousel();
+        setStatus("Choose a competition to load videos.");
         return;
       }
-      loadEventMatches(eventKey);
+      loadEventVideos(eventKey);
+    });
+
+    prevButtonEl?.addEventListener("click", () => {
+      if (state.currentPage <= 0) return;
+      state.currentPage -= 1;
+      syncCarouselPosition();
+    });
+
+    nextButtonEl?.addEventListener("click", () => {
+      if (state.currentPage >= state.totalPages - 1) return;
+      state.currentPage += 1;
+      syncCarouselPosition();
     });
 
     if (!hasSupabaseConfig()) {
@@ -112,8 +129,7 @@
   function renderSeasonOptions() {
     const seasons = state.config.seasons.length ? state.config.seasons : [state.config.defaultSeason];
     seasonSelect.innerHTML = seasons.map((season) => `<option value="${season}">${season}</option>`).join("");
-    const preferredSeason = seasons.includes(state.config.defaultSeason) ? state.config.defaultSeason : seasons[0];
-    seasonSelect.value = String(preferredSeason);
+    seasonSelect.value = String(seasons.includes(state.config.defaultSeason) ? state.config.defaultSeason : seasons[0]);
   }
 
   function resetEventSelection(message) {
@@ -121,7 +137,7 @@
     eventSelect.innerHTML = '<option value="">Loading competitions...</option>';
     metaEl.hidden = true;
     linksEl.hidden = true;
-    hideTable();
+    hideCarousel();
     setStatus(message, "loading");
   }
 
@@ -139,7 +155,7 @@
         metaEl.hidden = true;
         linksEl.hidden = false;
         updateEventLinks("");
-        hideTable();
+        hideCarousel();
         setStatus(`No competitions were found for Team ${getTeamDisplayNumber()} in ${season}.`);
         return;
       }
@@ -149,7 +165,7 @@
       const nextEventKey = events.some((event) => event.key === state.selectedEventKey) ? state.selectedEventKey : events[0].key;
       state.selectedEventKey = nextEventKey;
       eventSelect.value = nextEventKey;
-      await loadEventMatches(nextEventKey, token);
+      await loadEventVideos(nextEventKey, token);
     } catch (error) {
       if (token !== state.requestToken) return;
       console.error("Unable to load competitions", error);
@@ -157,13 +173,13 @@
       eventSelect.innerHTML = '<option value="">Unable to load competitions</option>';
       metaEl.hidden = true;
       linksEl.hidden = false;
-      hideTable();
+      hideCarousel();
       updateEventLinks("");
       setStatus("Unable to load competitions right now.", "error");
     }
   }
 
-  async function loadEventMatches(eventKey, inheritedToken) {
+  async function loadEventVideos(eventKey, inheritedToken) {
     const token = inheritedToken || ++state.requestToken;
     const seasonEvents = state.eventsBySeason.get(state.selectedSeason) || [];
     const event = seasonEvents.find((entry) => entry.key === eventKey) || null;
@@ -174,53 +190,37 @@
       renderEventMeta(event, null);
     }
 
-    hideTable();
-    setStatus("Loading videos and predictions...", "loading");
+    hideCarousel();
+    setStatus("Loading videos...", "loading");
 
     try {
-      const [tbaMatches, statboticsMatches, statboticsEventData] = await Promise.all([
-        getTbaEventMatches(eventKey),
-        getStatboticsMatches(eventKey).catch((error) => {
-          console.warn("Unable to load Statbotics matches for media page", error);
-          return [];
-        }),
-        getStatboticsEventData(eventKey).catch((error) => {
-          console.warn("Unable to load Statbotics event metrics for media page", error);
-          return null;
-        })
-      ]);
-
+      const matches = await getEventMatches(eventKey);
       if (token !== state.requestToken) return;
 
-      const rows = buildMediaRows(tbaMatches, statboticsMatches, state.config.teamKey);
-      const summary = {
-        totalCount: rows.length,
-        videoCount: rows.filter((row) => Boolean(row.videoUrl)).length,
-        accuracy: Number(statboticsEventData?.metrics?.win_prob?.acc || 0)
-      };
+      const videoMatches = matches
+        .filter((match) => matchHasVideo(match))
+        .map((match) => buildVideoCardData(match));
 
-      renderEventMeta(event, summary);
+      renderEventMeta(event, {
+        totalCount: videoMatches.length
+      });
       linksEl.hidden = false;
 
-      if (!rows.length) {
-        hideTable();
-        setStatus("No team matches are available for this competition yet.");
+      if (!videoMatches.length) {
+        hideCarousel();
+        setStatus("No published match videos are available for this competition yet.");
         return;
       }
 
-      renderMatchTable(rows);
-      setStatus(
-        summary.videoCount
-          ? `${summary.videoCount} team match video${summary.videoCount === 1 ? "" : "s"} ready to watch.`
-          : "Predictions loaded. Match videos have not been posted yet."
-      );
+      renderVideoCarousel(videoMatches);
+      setStatus(`${videoMatches.length} video${videoMatches.length === 1 ? "" : "s"} loaded from The Blue Alliance.`);
     } catch (error) {
       if (token !== state.requestToken) return;
-      console.error("Unable to load match videos", error);
-      hideTable();
+      console.error("Unable to load videos", error);
+      hideCarousel();
       metaEl.hidden = !event;
       linksEl.hidden = false;
-      setStatus("Unable to load match videos right now.", "error");
+      setStatus("Unable to load videos right now.", "error");
     }
   }
 
@@ -236,38 +236,16 @@
     return sortedEvents;
   }
 
-  async function getTbaEventMatches(eventKey) {
-    if (state.tbaMatchesByEvent.has(eventKey)) {
-      return state.tbaMatchesByEvent.get(eventKey);
+  async function getEventMatches(eventKey) {
+    if (state.matchesByEvent.has(eventKey)) {
+      return state.matchesByEvent.get(eventKey);
     }
 
     const payload = await requestMediaProxy({ mode: "matches", eventKey });
     const matches = Array.isArray(payload?.matches) ? payload.matches : [];
     const sortedMatches = matches.slice().sort(compareMatches);
-    state.tbaMatchesByEvent.set(eventKey, sortedMatches);
+    state.matchesByEvent.set(eventKey, sortedMatches);
     return sortedMatches;
-  }
-
-  async function getStatboticsMatches(eventKey) {
-    if (state.statboticsMatchesByEvent.has(eventKey)) {
-      return state.statboticsMatchesByEvent.get(eventKey);
-    }
-
-    const matches = await fetchStatbotics(`matches?event=${encodeURIComponent(eventKey)}&limit=200`);
-    const sortedMatches = (Array.isArray(matches) ? matches.slice() : []).sort(compareMatches);
-    state.statboticsMatchesByEvent.set(eventKey, sortedMatches);
-    return sortedMatches;
-  }
-
-  async function getStatboticsEventData(eventKey) {
-    if (state.statboticsEventDataByKey.has(eventKey)) {
-      return state.statboticsEventDataByKey.get(eventKey);
-    }
-
-    const eventData = await fetchStatbotics(`event/${encodeURIComponent(eventKey)}`);
-    const normalized = eventData && !Array.isArray(eventData) ? eventData : null;
-    state.statboticsEventDataByKey.set(eventKey, normalized);
-    return normalized;
   }
 
   async function requestMediaProxy(params) {
@@ -283,28 +261,7 @@
     });
 
     if (!response.ok) {
-      let errorMessage = `Media request failed with ${response.status}.`;
-      try {
-        const errorPayload = await response.json();
-        if (errorPayload && typeof errorPayload.error === "string" && errorPayload.error.trim()) {
-          errorMessage = errorPayload.error.trim();
-        }
-      } catch (error) {
-        // Ignore JSON parse failures and fall back to the HTTP status code.
-      }
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
-  }
-
-  async function fetchStatbotics(path) {
-    const response = await fetch(`${STATBOTICS_API_BASE}/${path}`, {
-      headers: { Accept: "application/json" }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Statbotics request failed (${response.status}).`);
+      throw new Error(`Media request failed with ${response.status}.`);
     }
 
     return response.json();
@@ -319,215 +276,86 @@
     metaEl.hidden = false;
     eventNameEl.textContent = event.name || "Selected competition";
     eventSubtitleEl.textContent = buildEventSubtitle(event);
-
-    if (!summary) {
-      eventSummaryEl.textContent = "Loading matches...";
-      return;
-    }
-
-    eventSummaryEl.textContent = [
-      `${summary.videoCount} video${summary.videoCount === 1 ? "" : "s"} from ${summary.totalCount} team match${summary.totalCount === 1 ? "" : "es"}`,
-      summary.accuracy ? `model accuracy ${formatPercentage(summary.accuracy, 1)}` : ""
-    ]
-      .filter(Boolean)
-      .join(" • ");
+    eventSummaryEl.textContent = summary ? `${summary.totalCount} published video${summary.totalCount === 1 ? "" : "s"}` : "Loading videos...";
   }
 
-  function renderMatchTable(rows) {
-    tableWrapEl.hidden = false;
-    tableBodyEl.innerHTML = rows
-      .map((row) => {
-        const actions = row.videoUrl
-          ? `
-            <div class="media-video-actions">
-              <a class="btn secondary" href="${row.videoUrl}" target="_blank" rel="noreferrer">Watch</a>
-              <a class="btn secondary" href="${row.detailsUrl}" target="_blank" rel="noreferrer">Details</a>
-            </div>
-          `
-          : `
-            <div class="media-video-actions">
-              <span class="media-video-pending">Awaiting upload</span>
-              <a class="btn secondary" href="${row.detailsUrl}" target="_blank" rel="noreferrer">Details</a>
-            </div>
-          `;
-
+  function renderVideoCarousel(videos) {
+    const pages = chunkArray(videos, 4);
+    state.totalPages = pages.length;
+    state.currentPage = 0;
+    carouselTrackEl.innerHTML = pages
+      .map((page) => {
         return `
-          <tr>
-            <td>
-              <div class="media-video-match">
-                <strong>${escapeHtml(row.match)}</strong>
-                <span class="media-video-cell-subtitle">${escapeHtml(row.matchup)}</span>
-              </div>
-            </td>
-            <td>
-              <span class="media-video-chip" data-alliance="${escapeHtml(row.allianceTone)}">${escapeHtml(row.alliance)}</span>
-            </td>
-            <td>${escapeHtml(row.winProb)}</td>
-            <td>${escapeHtml(row.predicted)}</td>
-            <td class="media-video-actual" data-tone="${escapeHtml(row.actualTone)}">${escapeHtml(row.actual)}</td>
-            <td>${actions}</td>
-          </tr>
+          <div class="media-video-slide">
+            ${page.map((video) => renderVideoCard(video)).join("")}
+          </div>
         `;
       })
       .join("");
+    carouselEl.hidden = false;
+    syncCarouselPosition();
   }
 
-  function buildMediaRows(tbaMatches, statboticsMatches, teamKey) {
-    const statboticsByKey = new Map(
-      (Array.isArray(statboticsMatches) ? statboticsMatches : []).map((match) => [normalizeMatchKey(match?.key), match])
-    );
-
-    return (Array.isArray(tbaMatches) ? tbaMatches : []).map((tbaMatch) => {
-      const statboticsMatch = statboticsByKey.get(normalizeMatchKey(tbaMatch?.key)) || null;
-      return buildMediaRow(tbaMatch, statboticsMatch, teamKey);
-    });
+  function renderVideoCard(video) {
+    return `
+      <article class="media-video-card">
+        <div class="media-video-card__player">
+          <iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(video.youtubeKey)}" title="${escapeHtml(video.title)} video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+        </div>
+        <h3 class="media-video-card__title">${escapeHtml(video.title)}</h3>
+        <p class="media-video-card__meta">${escapeHtml(video.meta)}</p>
+        <div class="media-video-card__actions">
+          <a class="media-video-link" href="${video.watchUrl}" target="_blank" rel="noreferrer">Watch</a>
+          <a class="media-video-link" href="${video.detailsUrl}" target="_blank" rel="noreferrer">Match Details</a>
+        </div>
+      </article>
+    `;
   }
 
-  function buildMediaRow(tbaMatch, statboticsMatch, teamKey) {
-    const teamNumber = getTeamDisplayNumber();
-    const alliance = getMatchAlliance(tbaMatch, statboticsMatch, teamKey, teamNumber);
-    const opponentAlliance = alliance === "red" ? "blue" : alliance === "blue" ? "red" : "";
-    const ourTeams = getMatchTeams(tbaMatch, statboticsMatch, alliance);
-    const opponentTeams = getMatchTeams(tbaMatch, statboticsMatch, opponentAlliance);
-    const actual = getActualLine(tbaMatch, statboticsMatch, alliance);
-    const video = getPrimaryVideo(tbaMatch);
+  function syncCarouselPosition() {
+    carouselTrackEl.style.transform = `translateX(-${state.currentPage * 100}%)`;
+    if (carouselMetaEl) {
+      carouselMetaEl.textContent = state.totalPages > 1
+        ? `Showing ${state.currentPage + 1} of ${state.totalPages}`
+        : `${state.totalPages ? "Showing all videos" : ""}`;
+    }
+    if (prevButtonEl) {
+      prevButtonEl.disabled = state.currentPage <= 0;
+    }
+    if (nextButtonEl) {
+      nextButtonEl.disabled = state.currentPage >= state.totalPages - 1;
+    }
+  }
 
+  function buildVideoCardData(match) {
+    const video = getPrimaryVideo(match);
     return {
-      match: statboticsMatch?.match_name || formatMatchLabel(tbaMatch),
-      matchup: `${ourTeams.join(", ") || "Teams unavailable"} vs ${opponentTeams.join(", ") || "Teams unavailable"}`,
-      alliance: alliance === "red" ? "Red" : alliance === "blue" ? "Blue" : "Unknown",
-      allianceTone: alliance || "unknown",
-      winProb: formatTrackedWinProbability(statboticsMatch, alliance),
-      predicted: formatTrackedPredictedScore(statboticsMatch, alliance),
-      actual: actual.label,
-      actualTone: actual.tone,
-      videoUrl: getVideoWatchUrl(tbaMatch, video),
-      detailsUrl: `https://www.thebluealliance.com/match/${encodeURIComponent(tbaMatch?.key || "")}`
+      title: formatMatchLabel(match),
+      meta: buildVideoMeta(match),
+      youtubeKey: video.key,
+      watchUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(video.key)}`,
+      detailsUrl: `https://www.thebluealliance.com/match/${encodeURIComponent(match.key)}`
     };
   }
 
-  function getMatchAlliance(tbaMatch, statboticsMatch, teamKey, teamNumber) {
-    const statboticsAlliance = getStatboticsAlliance(statboticsMatch, teamNumber);
-    if (statboticsAlliance) {
-      return statboticsAlliance;
-    }
-
-    const redTeams = getTbaAllianceTeams(tbaMatch, "red", true);
-    if (redTeams.includes(teamKey)) return "red";
-    const blueTeams = getTbaAllianceTeams(tbaMatch, "blue", true);
-    if (blueTeams.includes(teamKey)) return "blue";
-    return "";
+  function buildVideoMeta(match) {
+    const redTeams = formatTeamList(match?.alliances?.red?.team_keys || []);
+    const blueTeams = formatTeamList(match?.alliances?.blue?.team_keys || []);
+    return `${redTeams} vs ${blueTeams}`;
   }
 
-  function getStatboticsAlliance(match, teamNumber) {
-    const numericTeam = Number(teamNumber || 0);
-    const redTeams = getStatboticsAllianceTeams(match, "red", true);
-    if (redTeams.includes(numericTeam)) return "red";
-    const blueTeams = getStatboticsAllianceTeams(match, "blue", true);
-    if (blueTeams.includes(numericTeam)) return "blue";
-    return "";
+  function formatTeamList(teamKeys) {
+    const teams = Array.isArray(teamKeys) ? teamKeys : [];
+    return teams.map((teamKey) => String(teamKey).replace(/^frc/i, "")).join(", ");
   }
 
-  function getMatchTeams(tbaMatch, statboticsMatch, alliance) {
-    const statboticsTeams = getStatboticsAllianceTeams(statboticsMatch, alliance);
-    if (statboticsTeams.length) {
-      return statboticsTeams;
-    }
-    return getTbaAllianceTeams(tbaMatch, alliance);
-  }
-
-  function getStatboticsAllianceTeams(match, alliance, rawNumbers) {
-    const teams = match?.alliances?.[alliance]?.team_keys;
-    const normalized = Array.isArray(teams) ? teams.map((team) => Number(team)).filter((team) => Number.isFinite(team)) : [];
-    return rawNumbers ? normalized : normalized.map((team) => `Team ${team}`);
-  }
-
-  function getTbaAllianceTeams(match, alliance, rawKeys) {
-    const teams = match?.alliances?.[alliance]?.team_keys;
-    const normalized = Array.isArray(teams) ? teams.slice() : [];
-    return rawKeys ? normalized : normalized.map((teamKey) => formatTeamKey(teamKey));
-  }
-
-  function getActualLine(tbaMatch, statboticsMatch, alliance) {
-    if (statboticsMatch) {
-      const statboticsActual = formatTrackedActual(statboticsMatch, alliance);
-      if (statboticsActual.label !== "Scheduled") {
-        return statboticsActual;
-      }
-    }
-
-    const ownScore = getTbaAllianceScore(tbaMatch, alliance);
-    const opponentScore = getTbaAllianceScore(tbaMatch, alliance === "blue" ? "red" : "blue");
-    if (!Number.isFinite(ownScore) || !Number.isFinite(opponentScore) || ownScore < 0 || opponentScore < 0) {
-      return { label: "Scheduled", tone: "" };
-    }
-
-    if (ownScore === opponentScore) {
-      return { label: `Tied ${ownScore}-${opponentScore}`, tone: "" };
-    }
-
-    return {
-      label: `${ownScore > opponentScore ? "Won" : "Lost"} ${ownScore}-${opponentScore}`,
-      tone: ownScore > opponentScore ? "positive" : "negative"
-    };
-  }
-
-  function formatTrackedWinProbability(match, alliance) {
-    const redWinProbability = Number(match?.pred?.red_win_prob);
-    if (!Number.isFinite(redWinProbability)) {
-      return "Prediction unavailable";
-    }
-    const probability = alliance === "blue" ? 1 - redWinProbability : redWinProbability;
-    return formatPercentage(probability, 1);
-  }
-
-  function formatTrackedPredictedScore(match, alliance) {
-    const ownScore = alliance === "blue" ? Number(match?.pred?.blue_score) : Number(match?.pred?.red_score);
-    const opponentScore = alliance === "blue" ? Number(match?.pred?.red_score) : Number(match?.pred?.blue_score);
-    if (!Number.isFinite(ownScore) || !Number.isFinite(opponentScore)) {
-      return "Prediction unavailable";
-    }
-    return `${Math.round(ownScore)} - ${Math.round(opponentScore)}`;
-  }
-
-  function formatTrackedActual(match, alliance) {
-    if (String(match?.status || "").toLowerCase() !== "completed" || !match?.result) {
-      return { label: "Scheduled", tone: "" };
-    }
-
-    const ownScore = alliance === "blue" ? Number(match?.result?.blue_score) : Number(match?.result?.red_score);
-    const opponentScore = alliance === "blue" ? Number(match?.result?.red_score) : Number(match?.result?.blue_score);
-    if (!Number.isFinite(ownScore) || !Number.isFinite(opponentScore)) {
-      return { label: "Completed", tone: "" };
-    }
-    if (ownScore === opponentScore) {
-      return { label: `Tied ${ownScore}-${opponentScore}`, tone: "" };
-    }
-
-    return {
-      label: `${ownScore > opponentScore ? "Won" : "Lost"} ${ownScore}-${opponentScore}`,
-      tone: ownScore > opponentScore ? "positive" : "negative"
-    };
+  function matchHasVideo(match) {
+    return Boolean(getPrimaryVideo(match));
   }
 
   function getPrimaryVideo(match) {
     const videos = Array.isArray(match?.videos) ? match.videos : [];
-    return videos.find((video) => video && video.type === "youtube" && video.key) || videos.find((video) => video && video.key) || null;
-  }
-
-  function getVideoWatchUrl(match, video) {
-    if (!video) {
-      return "";
-    }
-    if (video.type === "youtube") {
-      return `https://www.youtube.com/watch?v=${encodeURIComponent(video.key)}`;
-    }
-    return `https://www.thebluealliance.com/match/${encodeURIComponent(match?.key || "")}`;
-  }
-
-  function getTbaAllianceScore(match, alliance) {
-    const score = match?.alliances?.[alliance]?.score;
-    return typeof score === "number" ? score : null;
+    return videos.find((video) => video && video.type === "youtube" && video.key) || null;
   }
 
   function compareMatches(a, b) {
@@ -591,20 +419,12 @@
     return `${start.toLocaleDateString(undefined, opts)} - ${end.toLocaleDateString(undefined, opts)}, ${end.getFullYear()}`;
   }
 
-  function formatPercentage(value, digits) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-      return "Prediction unavailable";
+  function chunkArray(items, size) {
+    const chunks = [];
+    for (let index = 0; index < items.length; index += size) {
+      chunks.push(items.slice(index, index + size));
     }
-    return `${(numeric * 100).toFixed(typeof digits === "number" ? digits : 0)}%`;
-  }
-
-  function normalizeMatchKey(value) {
-    return String(value || "").trim().toLowerCase();
-  }
-
-  function formatTeamKey(teamKey) {
-    return String(teamKey || "").replace(/^frc/i, "Team ");
+    return chunks;
   }
 
   function getTeamDisplayNumber() {
@@ -632,9 +452,12 @@
     }
   }
 
-  function hideTable() {
-    tableWrapEl.hidden = true;
-    tableBodyEl.innerHTML = "";
+  function hideCarousel() {
+    carouselEl.hidden = true;
+    carouselTrackEl.innerHTML = "";
+    state.currentPage = 0;
+    state.totalPages = 0;
+    syncCarouselPosition();
   }
 
   function setStatus(message, tone) {
