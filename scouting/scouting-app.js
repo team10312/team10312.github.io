@@ -16,6 +16,8 @@ const PAGE = "scouting";
 const STORAGE_KEYS = {
   activeEventId: "bf-scouting-active-event-v1",
   activeTab: "bf-scouting-active-tab-v1",
+  overviewMode: "bf-scouting-overview-mode-v1",
+  analysisDebugOverride: "bf-scouting-analysis-debug-override-v1",
   outbox: "bf-scouting-outbox-v1",
   lastSyncAt: "bf-scouting-last-sync-v1",
   matchDraft: "bf-scouting-match-draft-v1",
@@ -25,6 +27,12 @@ const STORAGE_KEYS = {
 };
 
 const SCOUT_RELOAD_NEW_VALUE = "__new__";
+const STATBOTICS_API_BASE = "https://api.statbotics.io/v3";
+const TRACKED_TEAM_NUMBER = 10312;
+const TEXAS_STATE_CODE = "TX";
+const OVERVIEW_MODE_COMPETITION = "competition";
+const OVERVIEW_MODE_TEXAS = "texas";
+const OVERVIEW_MATCH_LIMIT = 100;
 
 const AUTO_PATH_DEFAULTS = Object.freeze({
   drawColor: "#ff7f00",
@@ -113,6 +121,19 @@ const state = {
   teamSummary: [],
   outbox: loadStoredJson(STORAGE_KEYS.outbox, []),
   activeTab: loadStoredValue(STORAGE_KEYS.activeTab, "overview"),
+  overviewMode: loadStoredValue(STORAGE_KEYS.overviewMode, OVERVIEW_MODE_COMPETITION),
+  overviewLoading: false,
+  overviewError: "",
+  overviewFetchedAt: "",
+  overviewCompetitionRows: [],
+  overviewTexasRows: [],
+  overviewMatches: [],
+  overviewEventData: null,
+  analysisResult: null,
+  analysisDebugOverride: loadStoredValue(STORAGE_KEYS.analysisDebugOverride, "") === "true",
+  analysisNeedsRefresh: true,
+  analysisRunning: false,
+  analysisRunAt: "",
   lastSyncAt: loadStoredValue(STORAGE_KEYS.lastSyncAt, ""),
   scoutReloadSelections: {
     match: SCOUT_RELOAD_NEW_VALUE,
@@ -132,6 +153,7 @@ const elements = {};
 const customSelectRegistry = new WeakMap();
 let activeCustomSelect = null;
 let customSelectEventsBound = false;
+let overviewRequestToken = 0;
 const autoPathState = {
   mode: "draw",
   drawColor: AUTO_PATH_DEFAULTS.drawColor,
@@ -216,15 +238,27 @@ function cacheDom() {
   elements.appMessage = document.getElementById("appMessage");
   elements.tabButtons = Array.from(document.querySelectorAll(".tab-button"));
   elements.tabPanels = Array.from(document.querySelectorAll(".tab-panel"));
-  elements.statTeams = document.getElementById("statTeams");
-  elements.statMatches = document.getElementById("statMatches");
-  elements.statPits = document.getElementById("statPits");
-  elements.statQueued = document.getElementById("statQueued");
+  elements.overviewCompetitionValue = document.getElementById("overviewCompetitionValue");
+  elements.overviewCompetitionMeta = document.getElementById("overviewCompetitionMeta");
+  elements.overviewCompetitionStream = document.getElementById("overviewCompetitionStream");
+  elements.overviewTexasValue = document.getElementById("overviewTexasValue");
+  elements.overviewTexasMeta = document.getElementById("overviewTexasMeta");
+  elements.overviewWorldValue = document.getElementById("overviewWorldValue");
+  elements.overviewWorldMeta = document.getElementById("overviewWorldMeta");
+  elements.overviewEventClosedBanner = document.getElementById("overviewEventClosedBanner");
+  elements.overviewModeButtons = Array.from(document.querySelectorAll("[data-overview-mode]"));
+  elements.overviewSourceMeta = document.getElementById("overviewSourceMeta");
+  elements.overviewRankingsHead = document.getElementById("overviewRankingsHead");
+  elements.overviewRankingsBody = document.getElementById("overviewRankingsBody");
+  elements.overviewPredictionLabel = document.getElementById("overviewPredictionLabel");
+  elements.overviewPredictionBody = document.getElementById("overviewPredictionBody");
+  elements.toggleAnalysisDebugButton = document.getElementById("toggleAnalysisDebugButton");
+  elements.runPickAnalysisButton = document.getElementById("runPickAnalysisButton");
+  elements.pickAnalysisStatus = document.getElementById("pickAnalysisStatus");
+  elements.pickAnalysisBest = document.getElementById("pickAnalysisBest");
+  elements.pickAnalysisBody = document.getElementById("pickAnalysisBody");
   elements.outboxEmpty = document.getElementById("outboxEmpty");
   elements.outboxList = document.getElementById("outboxList");
-  elements.teamSearch = document.getElementById("teamSearch");
-  elements.summaryCount = document.getElementById("summaryCount");
-  elements.summaryTableBody = document.getElementById("summaryTableBody");
   elements.matchForm = document.getElementById("matchForm");
   elements.matchEntryLoadSelect = document.getElementById("matchEntryLoadSelect");
   elements.matchSaveDraftButton = document.getElementById("matchSaveDraftButton");
@@ -976,8 +1010,22 @@ function bindEvents() {
     });
   }
 
-  if (elements.teamSearch) {
-    elements.teamSearch.addEventListener("input", renderSummaryTable);
+  elements.overviewModeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setOverviewMode(button.dataset.overviewMode || OVERVIEW_MODE_COMPETITION);
+    });
+  });
+
+  if (elements.runPickAnalysisButton) {
+    elements.runPickAnalysisButton.addEventListener("click", () => {
+      runPickAnalysis();
+    });
+  }
+
+  if (elements.toggleAnalysisDebugButton) {
+    elements.toggleAnalysisDebugButton.addEventListener("click", () => {
+      toggleAnalysisDebugOverride();
+    });
   }
 
   if (elements.matchEntryLoadSelect) {
@@ -1269,6 +1317,7 @@ async function syncSession(session) {
     state.matchEntries = [];
     state.pitEntries = [];
     state.teamSummary = [];
+    resetOverviewState();
     state.isRefreshing = false;
     renderAll();
 
@@ -1302,6 +1351,7 @@ async function refreshData({ message } = {}) {
   try {
     await loadEvents();
     await loadEntriesForActiveEvent();
+    await loadOverviewData();
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
     if (typeof message === "string") {
@@ -1420,6 +1470,247 @@ async function loadEntriesForActiveEvent() {
   state.matchEntries = dedupeScoutingEntries(Array.isArray(matchResponse.data) ? matchResponse.data : [], "match");
   state.pitEntries = dedupeScoutingEntries(Array.isArray(pitResponse.data) ? pitResponse.data : [], "pit");
   state.teamSummary = buildTeamSummary(state.matchEntries, state.pitEntries);
+  state.analysisNeedsRefresh = true;
+}
+
+function resetOverviewState() {
+  state.overviewLoading = false;
+  state.overviewError = "";
+  state.overviewFetchedAt = "";
+  state.overviewCompetitionRows = [];
+  state.overviewTexasRows = [];
+  state.overviewMatches = [];
+  state.overviewEventData = null;
+  state.analysisResult = null;
+  state.analysisNeedsRefresh = true;
+  state.analysisRunning = false;
+  state.analysisRunAt = "";
+}
+
+function setOverviewMode(mode) {
+  const nextMode = mode === OVERVIEW_MODE_TEXAS ? OVERVIEW_MODE_TEXAS : OVERVIEW_MODE_COMPETITION;
+  if (state.overviewMode === nextMode) return;
+  state.overviewMode = nextMode;
+  saveStoredValue(STORAGE_KEYS.overviewMode, state.overviewMode);
+  renderOverview();
+}
+
+async function loadOverviewData() {
+  const event = getActiveEvent();
+  if (!event) {
+    resetOverviewState();
+    renderOverview();
+    return;
+  }
+
+  const eventKey = getStatboticsEventKey(event);
+  const season = getEventSeason(event);
+  const requestToken = ++overviewRequestToken;
+
+  state.overviewLoading = true;
+  state.overviewError = "";
+  renderOverview();
+
+  try {
+    const [competitionRows, texasRows, matches, eventData] = await Promise.all([
+      fetchStatbotics(`team_events?event=${encodeURIComponent(eventKey)}&limit=1000`),
+      fetchStatbotics(`team_years?year=${season}&state=${encodeURIComponent(TEXAS_STATE_CODE)}&limit=500`),
+      fetchStatbotics(
+        `matches?event=${encodeURIComponent(eventKey)}&team=${TRACKED_TEAM_NUMBER}&limit=${OVERVIEW_MATCH_LIMIT}`
+      ),
+      fetchStatbotics(`event/${encodeURIComponent(eventKey)}`)
+    ]);
+
+    if (requestToken !== overviewRequestToken) return;
+
+    state.overviewCompetitionRows = sortCompetitionRows(competitionRows);
+    state.overviewTexasRows = sortTexasRows(texasRows);
+    state.overviewMatches = Array.isArray(matches) ? matches.slice() : [];
+    state.overviewEventData = eventData && !Array.isArray(eventData) ? eventData : null;
+    state.overviewFetchedAt = new Date().toISOString();
+    state.analysisNeedsRefresh = true;
+  } catch (error) {
+    if (requestToken !== overviewRequestToken) return;
+    resetOverviewState();
+    state.overviewError = normalizeError(error, "Unable to load Statbotics overview data.");
+  } finally {
+    if (requestToken !== overviewRequestToken) return;
+    state.overviewLoading = false;
+    renderOverview();
+  }
+}
+
+async function fetchStatbotics(path) {
+  const response = await fetch(`${STATBOTICS_API_BASE}/${path}`, {
+    headers: {
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Statbotics request failed (${response.status}).`);
+  }
+
+  return response.json();
+}
+
+function sortCompetitionRows(rows) {
+  return (Array.isArray(rows) ? rows.slice() : []).sort((left, right) => {
+    return compareNullableNumbers(left?.record?.qual?.rank, right?.record?.qual?.rank) || compareNullableNumbers(left?.team, right?.team);
+  });
+}
+
+function sortTexasRows(rows) {
+  return (Array.isArray(rows) ? rows.slice() : []).sort((left, right) => {
+    return (
+      compareNullableNumbers(left?.district_rank, right?.district_rank) ||
+      compareNullableNumbers(left?.epa?.ranks?.state?.rank, right?.epa?.ranks?.state?.rank) ||
+      compareNullableNumbers(left?.team, right?.team)
+    );
+  });
+}
+
+function getTrackedEventRow() {
+  return state.overviewCompetitionRows.find((row) => Number(row?.team) === TRACKED_TEAM_NUMBER) || null;
+}
+
+function getTrackedTexasRow() {
+  return state.overviewTexasRows.find((row) => Number(row?.team) === TRACKED_TEAM_NUMBER) || null;
+}
+
+function getEventSeason(event) {
+  const startYear = Number(String(event?.start_date || "").slice(0, 4));
+  return Number.isFinite(startYear) && startYear > 2000 ? startYear : new Date().getFullYear();
+}
+
+function getStatboticsEventKey(event) {
+  if (!event) return "";
+  return `${getEventSeason(event)}${String(event.event_code || "").trim().toLowerCase()}`;
+}
+
+function buildPredictionRows(matches, eventData) {
+  const sorted = (Array.isArray(matches) ? matches.slice() : []).sort((left, right) => {
+    return compareNullableNumbers(left?.time, right?.time) || compareNullableNumbers(left?.match_number, right?.match_number);
+  });
+  const upcoming = sorted.filter((match) => !isCompletedStatboticsMatch(match));
+  const completed = sorted.filter((match) => isCompletedStatboticsMatch(match)).reverse();
+  const rows = [...upcoming, ...completed].map((match) => buildPredictionRow(match));
+  const accuracy = eventData?.metrics?.win_prob?.acc;
+  const modeLabel = upcoming.length ? "All Team 10312 matches" : "All completed Team 10312 matches";
+
+  return {
+    label: [modeLabel, eventData?.name || getTrackedEventRow()?.event_name || "", accuracy ? `model accuracy ${formatPercentage(accuracy, 1)}` : ""]
+      .filter(Boolean)
+      .join(" • "),
+    rows
+  };
+}
+
+function buildPredictionRow(match) {
+  const alliance = getTrackedAlliance(match);
+  const winProbability = getTrackedWinProbability(match, alliance);
+  const actual = formatTrackedMatchActual(match, alliance);
+  const tone = isCompletedStatboticsMatch(match)
+    ? getTrackedMatchTone(match, alliance)
+    : winProbability >= 0.5
+      ? "positive"
+      : "negative";
+
+  return {
+    match: match?.match_name || match?.key || "Unknown match",
+    alliance: alliance === "red" ? "Red" : alliance === "blue" ? "Blue" : "Unknown",
+    winProb: formatPercentage(winProbability, 1),
+    predicted: formatTrackedPredictedScore(match, alliance),
+    actual,
+    tone
+  };
+}
+
+function getTrackedAlliance(match) {
+  const redTeams = match?.alliances?.red?.team_keys || [];
+  const blueTeams = match?.alliances?.blue?.team_keys || [];
+  if (redTeams.includes(TRACKED_TEAM_NUMBER)) return "red";
+  if (blueTeams.includes(TRACKED_TEAM_NUMBER)) return "blue";
+  return "";
+}
+
+function getTrackedWinProbability(match, alliance) {
+  const redWinProbability = Number(match?.pred?.red_win_prob || 0);
+  if (alliance === "red") return redWinProbability;
+  if (alliance === "blue") return 1 - redWinProbability;
+  return redWinProbability;
+}
+
+function formatTrackedPredictedScore(match, alliance) {
+  const predicted = match?.pred || {};
+  const ownScore = alliance === "blue" ? predicted.blue_score : predicted.red_score;
+  const opponentScore = alliance === "blue" ? predicted.red_score : predicted.blue_score;
+  if (!Number.isFinite(ownScore) || !Number.isFinite(opponentScore)) {
+    return "Prediction unavailable";
+  }
+  return `${Math.round(ownScore)} - ${Math.round(opponentScore)}`;
+}
+
+function formatTrackedMatchActual(match, alliance) {
+  if (!isCompletedStatboticsMatch(match) || !match?.result) {
+    return String(match?.status || "Scheduled");
+  }
+
+  const ownScore = alliance === "blue" ? match.result.blue_score : match.result.red_score;
+  const opponentScore = alliance === "blue" ? match.result.red_score : match.result.blue_score;
+  if (!Number.isFinite(ownScore) || !Number.isFinite(opponentScore)) {
+    return "Completed";
+  }
+
+  if (ownScore === opponentScore) {
+    return `Tied ${ownScore}-${opponentScore}`;
+  }
+
+  return `${ownScore > opponentScore ? "Won" : "Lost"} ${ownScore}-${opponentScore}`;
+}
+
+function getTrackedMatchTone(match, alliance) {
+  if (!match?.result) return "";
+  if (match.result.winner === alliance) return "positive";
+  if (match.result.winner && match.result.winner !== alliance) return "negative";
+  return "";
+}
+
+function isCompletedStatboticsMatch(match) {
+  return String(match?.status || "").toLowerCase() === "completed";
+}
+
+function formatStatboticsTeam(row) {
+  const teamNumber = row?.team ?? row?.teamNumber ?? "--";
+  const teamName = row?.team_name || row?.name || "";
+  return teamName ? `${teamNumber} • ${teamName}` : String(teamNumber);
+}
+
+function normalizeStatboticsVideoUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^[a-zA-Z0-9_-]{6,}$/.test(raw)) {
+    return `https://www.youtube.com/watch?v=${encodeURIComponent(raw)}`;
+  }
+  return "";
+}
+
+function isCurrentEventOver() {
+  const status = String(state.overviewEventData?.status || state.overviewEventData?.status_str || "")
+    .trim()
+    .toLowerCase();
+  return status === "completed" || status === "complete" || status === "finished" || status === "over";
+}
+
+function isAnalysisDebugOverrideEnabled() {
+  return Boolean(state.analysisDebugOverride);
+}
+
+function toggleAnalysisDebugOverride() {
+  state.analysisDebugOverride = !state.analysisDebugOverride;
+  saveStoredValue(STORAGE_KEYS.analysisDebugOverride, state.analysisDebugOverride ? "true" : "");
+  renderOverview();
 }
 
 async function handleEventChange(eventId) {
@@ -1427,6 +1718,7 @@ async function handleEventChange(eventId) {
   state.matchEntries = [];
   state.pitEntries = [];
   state.teamSummary = [];
+  resetOverviewState();
   clearEditingEntryId("match");
   clearEditingEntryId("pit");
   setScoutReloadSelection("match", SCOUT_RELOAD_NEW_VALUE);
@@ -1442,6 +1734,7 @@ async function handleEventChange(eventId) {
     state.isRefreshing = true;
     renderAll();
     await loadEntriesForActiveEvent();
+    await loadOverviewData();
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
     setAppMessage("Event data loaded.", "success");
@@ -1651,9 +1944,8 @@ function renderAll() {
   renderEventOptions();
   renderCurrentEvent();
   renderStatusPills();
-  renderStats();
+  renderOverview();
   renderOutbox();
-  renderSummaryTable();
   renderScoutReloadOptions();
   renderDraftStamp("match");
   renderDraftStamp("pit");
@@ -1751,11 +2043,776 @@ function renderStatusPills() {
   setStatusPill(elements.queuePill, `Outbox: ${state.outbox.length}`, queueTone);
 }
 
-function renderStats() {
-  elements.statTeams.textContent = String(state.teamSummary.length);
-  elements.statMatches.textContent = String(state.matchEntries.length);
-  elements.statPits.textContent = String(state.pitEntries.length);
-  elements.statQueued.textContent = String(state.outbox.length);
+function renderOverview() {
+  renderOverviewEventState();
+  renderOverviewModeButtons();
+  renderOverviewBanners();
+  renderOverviewTable();
+  renderOverviewPredictions();
+  renderPickAnalysis();
+}
+
+function renderOverviewEventState() {
+  if (!elements.overviewEventClosedBanner) return;
+  const eventOver = isCurrentEventOver();
+  elements.overviewEventClosedBanner.textContent = isAnalysisDebugOverrideEnabled()
+    ? "This event is over. Rankings stay visible, and debug override currently allows pick analysis."
+    : "This event is over. Rankings stay visible, but pick analysis is locked for completed events.";
+  elements.overviewEventClosedBanner.classList.toggle("hidden", !eventOver);
+}
+
+function renderOverviewModeButtons() {
+  elements.overviewModeButtons.forEach((button) => {
+    const mode = button.dataset.overviewMode || OVERVIEW_MODE_COMPETITION;
+    const active = mode === state.overviewMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
+function renderOverviewBanners() {
+  const eventRow = getTrackedEventRow();
+  const texasRow = getTrackedTexasRow();
+  const eventStreamUrl = normalizeStatboticsVideoUrl(state.overviewEventData?.video);
+
+  if (!elements.overviewCompetitionValue) return;
+  renderOverviewCompetitionStream(eventStreamUrl);
+
+  if (state.overviewLoading && !eventRow && !texasRow) {
+    setOverviewBanner(elements.overviewCompetitionValue, elements.overviewCompetitionMeta, "Loading", "Pulling Statbotics event data.");
+    setOverviewBanner(elements.overviewTexasValue, elements.overviewTexasMeta, "Loading", "Pulling Texas district data.");
+    setOverviewBanner(elements.overviewWorldValue, elements.overviewWorldMeta, "Loading", "Pulling global EPA rank.");
+    return;
+  }
+
+  if (state.overviewError && !eventRow && !texasRow) {
+    setOverviewBanner(elements.overviewCompetitionValue, elements.overviewCompetitionMeta, "Unavailable", state.overviewError);
+    setOverviewBanner(elements.overviewTexasValue, elements.overviewTexasMeta, "Unavailable", "Texas and world rankings are temporarily unavailable.");
+    setOverviewBanner(elements.overviewWorldValue, elements.overviewWorldMeta, "Unavailable", "Statbotics could not return a team-year row.");
+    return;
+  }
+
+  if (eventRow) {
+    const qualRecord = eventRow.record?.qual || {};
+    setOverviewBanner(
+      elements.overviewCompetitionValue,
+      elements.overviewCompetitionMeta,
+      `#${eventRow.record?.qual?.rank || "--"}`,
+      `${eventRow.event_name || "Selected event"} • ${formatRecord(qualRecord)} • EPA ${formatDecimal(eventRow.epa?.total_points?.mean)}`
+    );
+  } else {
+    setOverviewBanner(
+      elements.overviewCompetitionValue,
+      elements.overviewCompetitionMeta,
+      "No rank",
+      "Team 10312 does not have a Statbotics event row for the selected event yet."
+    );
+  }
+
+  if (texasRow) {
+    const stateRank = texasRow.epa?.ranks?.state?.rank;
+    const stateCount = texasRow.epa?.ranks?.state?.team_count;
+    setOverviewBanner(
+      elements.overviewTexasValue,
+      elements.overviewTexasMeta,
+      `#${texasRow.district_rank || texasRow.epa?.ranks?.district?.rank || "--"}`,
+      `FIT district • Texas EPA #${stateRank || "--"} of ${stateCount || "--"} • ${texasRow.district_points ?? "--"} pts`
+    );
+    setOverviewBanner(
+      elements.overviewWorldValue,
+      elements.overviewWorldMeta,
+      `#${texasRow.epa?.ranks?.total?.rank || "--"}`,
+      `${texasRow.epa?.ranks?.total?.team_count || "--"} teams • percentile ${formatPercentage(
+        texasRow.epa?.ranks?.total?.percentile,
+        1
+      )} • EPA ${formatDecimal(texasRow.epa?.total_points?.mean)}`
+    );
+    return;
+  }
+
+  setOverviewBanner(
+    elements.overviewTexasValue,
+    elements.overviewTexasMeta,
+    "No rank",
+    "Texas district data is not available from Statbotics for this season yet."
+  );
+  setOverviewBanner(
+    elements.overviewWorldValue,
+    elements.overviewWorldMeta,
+    "No rank",
+    "Global EPA rank is unavailable until Team 10312 has a Statbotics team-year row."
+  );
+}
+
+function renderOverviewTable() {
+  if (!elements.overviewRankingsHead || !elements.overviewRankingsBody || !elements.overviewSourceMeta) return;
+
+  const columns =
+    state.overviewMode === OVERVIEW_MODE_TEXAS
+      ? ["District", "State", "Team", "EPA", "District Pts", "World"]
+      : ["Rank", "Team", "Record", "EPA", "District Pts", "World"];
+  const rows =
+    state.overviewMode === OVERVIEW_MODE_TEXAS ? state.overviewTexasRows : state.overviewCompetitionRows;
+
+  elements.overviewRankingsHead.innerHTML = "";
+  const headRow = document.createElement("tr");
+  columns.forEach((column) => {
+    const th = document.createElement("th");
+    th.textContent = column;
+    headRow.appendChild(th);
+  });
+  elements.overviewRankingsHead.appendChild(headRow);
+
+  if (state.overviewLoading) {
+    elements.overviewSourceMeta.textContent = "Loading Statbotics rankings and predictions...";
+    renderOverviewMessageRow(elements.overviewRankingsBody, columns.length, "Loading live Statbotics rankings...");
+    return;
+  }
+
+  if (state.overviewError) {
+    elements.overviewSourceMeta.textContent = state.overviewError;
+    renderOverviewMessageRow(elements.overviewRankingsBody, columns.length, state.overviewError);
+    return;
+  }
+
+  elements.overviewSourceMeta.textContent = [
+    `${state.overviewCompetitionRows.length} event teams`,
+    `${state.overviewTexasRows.length} Texas teams`,
+    state.overviewFetchedAt ? `Updated ${formatTime(state.overviewFetchedAt)}` : "",
+    "Source: Statbotics"
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  if (!rows.length) {
+    renderOverviewMessageRow(elements.overviewRankingsBody, columns.length, "No Statbotics ranking rows are available yet.");
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    if (Number(row.team) === TRACKED_TEAM_NUMBER) {
+      tr.classList.add("is-tracked-row");
+    }
+
+    const values =
+      state.overviewMode === OVERVIEW_MODE_TEXAS
+        ? [
+            row.district_rank || row.epa?.ranks?.district?.rank || "--",
+            row.epa?.ranks?.state?.rank || "--",
+            formatStatboticsTeam(row),
+            formatDecimal(row.epa?.total_points?.mean),
+            row.district_points ?? "--",
+            row.epa?.ranks?.total?.rank || "--"
+          ]
+        : [
+            row.record?.qual?.rank || "--",
+            formatStatboticsTeam(row),
+            formatRecord(row.record?.qual),
+            formatDecimal(row.epa?.total_points?.mean),
+            row.district_points ?? "--",
+            row.epa?.ranks?.total?.rank || "--"
+          ];
+
+    values.forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = String(value);
+      tr.appendChild(td);
+    });
+
+    fragment.appendChild(tr);
+  });
+
+  elements.overviewRankingsBody.innerHTML = "";
+  elements.overviewRankingsBody.appendChild(fragment);
+}
+
+function renderOverviewPredictions() {
+  if (!elements.overviewPredictionBody || !elements.overviewPredictionLabel) return;
+
+  if (state.overviewLoading) {
+    elements.overviewPredictionLabel.textContent = "Loading Team 10312 Statbotics match predictions...";
+    renderOverviewMessageRow(elements.overviewPredictionBody, 5, "Loading match predictions...");
+    return;
+  }
+
+  if (state.overviewError) {
+    elements.overviewPredictionLabel.textContent = "Statbotics predictions are temporarily unavailable.";
+    renderOverviewMessageRow(elements.overviewPredictionBody, 5, state.overviewError);
+    return;
+  }
+
+  const { rows, label } = buildPredictionRows(state.overviewMatches, state.overviewEventData);
+  elements.overviewPredictionLabel.textContent = label;
+
+  if (!rows.length) {
+    renderOverviewMessageRow(
+      elements.overviewPredictionBody,
+      5,
+      "No team-specific Statbotics matches are available for the selected event yet."
+    );
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    if (row.tone) {
+      tr.dataset.tone = row.tone;
+    }
+
+    [row.match, row.alliance, row.winProb, row.predicted, row.actual].forEach((value, index) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      if (index === 4 && row.tone) {
+        td.dataset.tone = row.tone;
+      }
+      tr.appendChild(td);
+    });
+
+    fragment.appendChild(tr);
+  });
+
+  elements.overviewPredictionBody.innerHTML = "";
+  elements.overviewPredictionBody.appendChild(fragment);
+}
+
+function renderOverviewMessageRow(target, colSpan, message) {
+  target.innerHTML = "";
+  const tr = document.createElement("tr");
+  const td = document.createElement("td");
+  td.colSpan = colSpan;
+  td.textContent = message;
+  tr.appendChild(td);
+  target.appendChild(tr);
+}
+
+function setOverviewBanner(valueTarget, metaTarget, value, meta) {
+  if (valueTarget) valueTarget.textContent = value;
+  if (metaTarget) metaTarget.textContent = meta;
+}
+
+function renderOverviewCompetitionStream(url) {
+  if (!elements.overviewCompetitionStream) return;
+  const hasUrl = Boolean(url);
+  elements.overviewCompetitionStream.classList.toggle("hidden", !hasUrl);
+  elements.overviewCompetitionStream.href = hasUrl ? url : "#";
+}
+
+function runPickAnalysis() {
+  if (state.analysisRunning) return;
+
+  const event = getActiveEvent();
+  const ourRow = getTrackedEventRow();
+  if (isCurrentEventOver() && !isAnalysisDebugOverrideEnabled()) {
+    setAppMessage("Pick analysis is disabled because this event is already over.", "warn");
+    return;
+  }
+
+  if (!event || !state.overviewCompetitionRows.length) {
+    setAppMessage("Load an event before running pick analysis.", "warn");
+    return;
+  }
+
+  if (!ourRow) {
+    setAppMessage("Team 10312 does not have a Statbotics event row yet for this event.", "warn");
+    return;
+  }
+
+  state.analysisRunning = true;
+  renderPickAnalysis();
+
+  try {
+    state.analysisResult = buildAlliancePickAnalysis();
+    state.analysisNeedsRefresh = false;
+    state.analysisRunAt = new Date().toISOString();
+  } catch (error) {
+    state.analysisResult = null;
+    setAppMessage(normalizeError(error, "Unable to run pick analysis."), "danger");
+  } finally {
+    state.analysisRunning = false;
+    renderPickAnalysis();
+  }
+}
+
+function buildAlliancePickAnalysis() {
+  const ourRow = getTrackedEventRow();
+  const ourSummary = getSummaryRow(TRACKED_TEAM_NUMBER);
+  const ourRank = Number(ourRow?.record?.qual?.rank || Number.POSITIVE_INFINITY);
+  const candidates = state.overviewCompetitionRows.filter((row) => Number(row?.team) !== TRACKED_TEAM_NUMBER);
+
+  if (!candidates.length) {
+    throw new Error("No other teams are available to analyze.");
+  }
+
+  const metricContext = buildAnalysisMetricContext(candidates);
+  const weights = getPickAnalysisWeights(ourRank);
+  const ourProfile = buildOurAllianceProfile(ourRow, ourSummary, metricContext);
+
+  const shortlist = candidates
+    .map((row) => scoreAllianceCandidate(row, ourProfile, metricContext, weights))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 5);
+
+  return {
+    ourRank: Number.isFinite(ourRank) ? ourRank : 0,
+    recommendation: shortlist[0] || null,
+    shortlist
+  };
+}
+
+function buildAnalysisMetricContext(candidates) {
+  return {
+    epaBounds: getMetricBounds(candidates.map((row) => row?.epa?.total_points?.mean)),
+    statboticsFuelBounds: getMetricBounds(candidates.map((row) => row?.epa?.breakdown?.total_fuel)),
+    statboticsTowerBounds: getMetricBounds(candidates.map((row) => row?.epa?.breakdown?.total_tower)),
+    qualRankBounds: getMetricBounds(candidates.map((row) => row?.record?.qual?.rank)),
+    districtPointBounds: getMetricBounds(candidates.map((row) => row?.district_points)),
+    worldRankBounds: getMetricBounds(candidates.map((row) => row?.epa?.ranks?.total?.rank)),
+    localOffenseBounds: getMetricBounds(state.teamSummary.map((row) => row?.avg_total_fuel)),
+    localAutoBounds: getMetricBounds(state.teamSummary.map((row) => row?.avg_auto_fuel)),
+    localDefenseBounds: getMetricBounds(state.teamSummary.map((row) => row?.avg_defense_rating)),
+    localTowerBounds: getMetricBounds(state.teamSummary.map((row) => row?.tower_success_rate))
+  };
+}
+
+function buildOurAllianceProfile(ourRow, ourSummary, context) {
+  const offenseSource = ourSummary?.matches_scouted
+    ? normalizeMetric(ourSummary.avg_total_fuel, context.localOffenseBounds, 0.45)
+    : normalizeMetric(ourRow?.epa?.total_points?.mean, context.epaBounds, 0.45);
+  const defenseSource = ourSummary?.matches_scouted
+    ? normalizeMetric(ourSummary.avg_defense_rating, context.localDefenseBounds, 0.4)
+    : normalizeDefenseCapability(ourSummary?.defense_capability || "Unknown");
+  const towerSource = ourSummary?.matches_scouted
+    ? clamp(Number(ourSummary.tower_success_rate || 0) / 100, 0, 1)
+    : 0.4;
+
+  return {
+    offenseNeed: clamp(1.15 - offenseSource, 0.35, 1),
+    defenseNeed: clamp(1.05 - defenseSource, 0.35, 1),
+    towerNeed: clamp(1.05 - towerSource, 0.25, 1)
+  };
+}
+
+function scoreAllianceCandidate(row, ourProfile, context, weights) {
+  const summary = getSummaryRow(row?.team);
+  const hasPitData = Boolean(summary && buildPitSnapshot(summary) !== "No pit data");
+  const epaScore = normalizeMetric(row?.epa?.total_points?.mean, context.epaBounds, 0.45);
+  const rankScore = invertMetric(row?.record?.qual?.rank, context.qualRankBounds, 0.4);
+  const districtScore = buildDistrictStrengthScore(row, context);
+  const offenseScore = buildCandidateOffenseScore(row, summary, context);
+  const defenseScore = buildCandidateDefenseScore(summary, context);
+  const reliabilityScore = buildCandidateReliabilityScore(summary);
+  const towerScore = buildCandidateTowerScore(row, summary, context);
+  const complementScore = buildComplementScore(offenseScore, defenseScore, towerScore, ourProfile);
+  const availabilityScore = buildAvailabilityScore(row?.record?.qual?.rank, Number(getTrackedEventRow()?.record?.qual?.rank || 999));
+  const confidenceScore = buildConfidenceScore(summary, hasPitData);
+  const pitReadiness = buildPitReadinessScore(summary);
+
+  const contributions = {
+    epa: weights.epa * epaScore,
+    rank: weights.rank * rankScore,
+    district: weights.district * districtScore,
+    offense: weights.offense * offenseScore,
+    defense: weights.defense * defenseScore,
+    reliability: weights.reliability * reliabilityScore,
+    tower: weights.tower * towerScore,
+    complement: weights.complement * complementScore,
+    availability: weights.availability * availabilityScore,
+    confidence: weights.confidence * confidenceScore,
+    pit: weights.pit * pitReadiness
+  };
+
+  let score = 100 * Object.values(contributions).reduce((sum, value) => sum + value, 0);
+  if (Number(row?.record?.qual?.rank || 999) <= 8 && Number(getTrackedEventRow()?.record?.qual?.rank || 999) <= 8) {
+    score -= 8;
+  }
+  if (summary?.breakdown_count >= 2) {
+    score -= 4;
+  }
+
+  return {
+    team: Number(row?.team || 0),
+    teamName: row?.team_name || row?.name || "",
+    eventRank: Number(row?.record?.qual?.rank || 0),
+    epa: Number(row?.epa?.total_points?.mean || 0),
+    score: roundToTwo(Math.max(score, 0)),
+    reasons: buildCandidateReasons(row, summary, contributions)
+  };
+}
+
+function buildDistrictStrengthScore(row, context) {
+  const districtPointsScore = normalizeMetric(row?.district_points, context.districtPointBounds, 0.4);
+  const worldRankScore = invertMetric(row?.epa?.ranks?.total?.rank, context.worldRankBounds, 0.4);
+  return roundToTwo((districtPointsScore * 0.55) + (worldRankScore * 0.45));
+}
+
+function buildCandidateOffenseScore(row, summary, context) {
+  const statboticsOffense = normalizeMetric(row?.epa?.breakdown?.total_fuel, context.statboticsFuelBounds, 0.45);
+  if (!summary?.matches_scouted) return statboticsOffense;
+
+  const liveFuel = normalizeMetric(summary.avg_total_fuel, context.localOffenseBounds, statboticsOffense);
+  const liveAuto = normalizeMetric(summary.avg_auto_fuel, context.localAutoBounds, statboticsOffense);
+  const pitFuel = normalizeFuelCapability(summary.fuel_scoring_capability);
+  return roundToTwo((liveFuel * 0.55) + (liveAuto * 0.2) + (pitFuel * 0.1) + (statboticsOffense * 0.15));
+}
+
+function buildCandidateDefenseScore(summary, context) {
+  if (!summary) return 0.4;
+  const liveDefense = normalizeMetric(summary.avg_defense_rating, context.localDefenseBounds, 0.45);
+  const pitDefense = normalizeDefenseCapability(summary.defense_capability);
+  return roundToTwo((liveDefense * 0.7) + (pitDefense * 0.3));
+}
+
+function buildCandidateReliabilityScore(summary) {
+  if (!summary?.matches_scouted) return 0.72;
+  let score = clamp(1 - Number(summary.breakdown_count || 0) / Math.max(Number(summary.matches_scouted || 1), 1), 0.2, 1);
+  const reliabilityNotes = String(summary.reliability_notes || "").toLowerCase();
+  if (/(break|repair|issue|dead|battery|chain|electrical|brownout)/.test(reliabilityNotes)) {
+    score -= 0.08;
+  }
+  return clamp(score, 0.15, 1);
+}
+
+function buildCandidateTowerScore(row, summary, context) {
+  if (summary?.matches_scouted) {
+    return clamp(Number(summary.tower_success_rate || 0) / 100, 0, 1);
+  }
+  return normalizeMetric(row?.epa?.breakdown?.total_tower, context.statboticsTowerBounds, 0.35);
+}
+
+function buildComplementScore(offenseScore, defenseScore, towerScore, ourProfile) {
+  const totalNeed = ourProfile.offenseNeed + ourProfile.defenseNeed + ourProfile.towerNeed;
+  return roundToTwo(
+    ((offenseScore * ourProfile.offenseNeed) +
+      (defenseScore * ourProfile.defenseNeed) +
+      (towerScore * ourProfile.towerNeed)) /
+      Math.max(totalNeed, 0.01)
+  );
+}
+
+function buildAvailabilityScore(candidateRank, ourRank) {
+  const rank = Number(candidateRank || 999);
+  const ourSeed = Number(ourRank || 999);
+
+  if (ourSeed <= 4) {
+    if (rank <= 8) return 0.12;
+    if (rank <= 16) return 1;
+    if (rank <= 24) return 0.82;
+    return 0.55;
+  }
+
+  if (ourSeed <= 8) {
+    if (rank <= 8) return 0.1;
+    if (rank <= 20) return 1;
+    if (rank <= 30) return 0.76;
+    return 0.5;
+  }
+
+  if (ourSeed <= 16) {
+    if (rank <= 8) return 0.42;
+    if (rank <= 24) return 0.95;
+    return 0.7;
+  }
+
+  if (rank <= 24) return 0.92;
+  return 0.78;
+}
+
+function buildConfidenceScore(summary, hasPitData) {
+  if (!summary) return 0.22;
+  const matchCoverage = clamp(Number(summary.matches_scouted || 0) / 6, 0, 1);
+  return clamp((matchCoverage * 0.75) + (hasPitData ? 0.25 : 0.08), 0.2, 1);
+}
+
+function buildPitReadinessScore(summary) {
+  if (!summary) return 0.35;
+  const fuel = normalizeFuelCapability(summary.fuel_scoring_capability);
+  const defense = normalizeDefenseCapability(summary.defense_capability);
+  const speed = normalizeScoringSpeed(summary.scoring_speed);
+  const climb = normalizeClimbLevel(summary.climb_level);
+  const strategy = /defense|cycle|endgame|pair|feeder|trap|amp|speaker|tower/i.test(String(summary.preferred_strategy || ""))
+    ? 0.8
+    : 0.5;
+  return roundToTwo((fuel * 0.3) + (defense * 0.2) + (speed * 0.25) + (climb * 0.15) + (strategy * 0.1));
+}
+
+function buildCandidateReasons(row, summary, contributions) {
+  const reasonLabels = {
+    epa: "elite Statbotics EPA",
+    rank: "strong event seed",
+    district: "strong season profile",
+    offense: "productive live scoring",
+    defense: "helpful defense profile",
+    reliability: "reliable so far",
+    tower: "good tower conversion",
+    complement: "fits our current needs",
+    availability: "good availability from our seed",
+    confidence: "well-scouted profile",
+    pit: "strong pit-readiness notes"
+  };
+
+  const topReasons = Object.entries(contributions)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 3)
+    .map(([key]) => reasonLabels[key]);
+
+  if (!summary?.matches_scouted) {
+    topReasons.push("limited local scouting, leaning on Statbotics");
+  }
+
+  return Array.from(new Set(topReasons)).slice(0, 3);
+}
+
+function getPickAnalysisWeights(ourRank) {
+  if (Number(ourRank || 999) <= 8) {
+    return {
+      epa: 0.19,
+      rank: 0.07,
+      district: 0.05,
+      offense: 0.13,
+      defense: 0.09,
+      reliability: 0.1,
+      tower: 0.06,
+      complement: 0.14,
+      availability: 0.11,
+      confidence: 0.03,
+      pit: 0.03
+    };
+  }
+
+  return {
+    epa: 0.23,
+    rank: 0.09,
+    district: 0.06,
+    offense: 0.13,
+    defense: 0.08,
+    reliability: 0.1,
+    tower: 0.05,
+    complement: 0.1,
+    availability: 0.07,
+    confidence: 0.05,
+    pit: 0.04
+  };
+}
+
+function getSummaryRow(teamNumber) {
+  const target = Number(teamNumber || 0);
+  return state.teamSummary.find((row) => Number(row?.team_number) === target) || null;
+}
+
+function getMetricBounds(values) {
+  const numbers = (Array.isArray(values) ? values : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+  if (!numbers.length) {
+    return { min: 0, max: 1 };
+  }
+  return {
+    min: Math.min(...numbers),
+    max: Math.max(...numbers)
+  };
+}
+
+function normalizeMetric(value, bounds, fallback = 0.5) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return fallback;
+  const min = Number(bounds?.min);
+  const max = Number(bounds?.max);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 0.5;
+  return clamp((numericValue - min) / (max - min), 0, 1);
+}
+
+function invertMetric(value, bounds, fallback = 0.5) {
+  const normalized = normalizeMetric(value, bounds, fallback);
+  return clamp(1 - normalized, 0, 1);
+}
+
+function normalizeFuelCapability(value) {
+  switch (String(value || "").trim().toLowerCase()) {
+    case "high volume":
+      return 1;
+    case "steady":
+      return 0.8;
+    case "situational":
+      return 0.55;
+    case "minimal":
+      return 0.25;
+    default:
+      return 0.45;
+  }
+}
+
+function normalizeDefenseCapability(value) {
+  switch (String(value || "").trim().toLowerCase()) {
+    case "strong":
+      return 1;
+    case "balanced":
+      return 0.7;
+    case "light":
+      return 0.35;
+    default:
+      return 0.45;
+  }
+}
+
+function normalizeScoringSpeed(value) {
+  switch (String(value || "").trim().toLowerCase()) {
+    case "very fast":
+      return 1;
+    case "fast":
+      return 0.82;
+    case "average":
+      return 0.6;
+    case "slow":
+      return 0.3;
+    default:
+      return 0.45;
+  }
+}
+
+function normalizeClimbLevel(value) {
+  switch (String(value || "").trim().toLowerCase()) {
+    case "level 3":
+      return 1;
+    case "level 2":
+      return 0.7;
+    case "level 1":
+      return 0.4;
+    default:
+      return 0.2;
+  }
+}
+
+function renderPickAnalysis() {
+  if (!elements.pickAnalysisStatus || !elements.pickAnalysisBest || !elements.pickAnalysisBody) return;
+
+  const eventOver = isCurrentEventOver();
+  const debugOverrideEnabled = isAnalysisDebugOverrideEnabled();
+  const canAnalyze = Boolean(
+    state.session && getActiveEvent() && state.overviewCompetitionRows.length && !state.overviewLoading && (!eventOver || debugOverrideEnabled)
+  );
+  elements.pickAnalysisBest.classList.remove("analysis-best");
+
+  if (elements.toggleAnalysisDebugButton) {
+    elements.toggleAnalysisDebugButton.textContent = debugOverrideEnabled ? "Debug Override On" : "Debug Override Off";
+    elements.toggleAnalysisDebugButton.setAttribute("aria-pressed", debugOverrideEnabled ? "true" : "false");
+    elements.toggleAnalysisDebugButton.classList.toggle("is-debug-active", debugOverrideEnabled);
+  }
+
+  if (elements.runPickAnalysisButton) {
+    elements.runPickAnalysisButton.disabled = !canAnalyze || state.analysisRunning;
+    elements.runPickAnalysisButton.textContent = state.analysisRunning ? "Analyzing..." : "Run Analysis";
+  }
+
+  if (!getActiveEvent()) {
+    elements.pickAnalysisStatus.textContent = "Select an event to enable pick analysis.";
+    elements.pickAnalysisBest.textContent = "No event selected.";
+    renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Pick analysis is unavailable until an event is selected.");
+    return;
+  }
+
+  if (state.overviewLoading) {
+    elements.pickAnalysisStatus.textContent = "Waiting for Statbotics event rows to finish loading.";
+    elements.pickAnalysisBest.textContent = "Analysis will be available after the current event data loads.";
+    renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Loading current event data...");
+    return;
+  }
+
+  if (state.overviewError) {
+    elements.pickAnalysisStatus.textContent = "Statbotics event data is unavailable, so the analysis cannot run.";
+    elements.pickAnalysisBest.textContent = state.overviewError;
+    renderOverviewMessageRow(elements.pickAnalysisBody, 5, state.overviewError);
+    return;
+  }
+
+  if (eventOver && !debugOverrideEnabled) {
+    elements.pickAnalysisStatus.textContent = "This event is over, so pick analysis is disabled.";
+    elements.pickAnalysisBest.textContent = "Completed events keep their rankings visible, but alliance-pick analysis is locked.";
+    if (state.analysisResult?.shortlist?.length) {
+      renderAnalysisShortlist();
+    } else {
+      renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Pick analysis is disabled because this event is completed.");
+    }
+    return;
+  }
+
+  if (!state.analysisResult) {
+    elements.pickAnalysisStatus.textContent = [
+      "Press Run Analysis to score alliance partners from the currently loaded Statbotics and scouting data.",
+      eventOver && debugOverrideEnabled ? "Debug override is active for this completed event." : ""
+    ]
+      .filter(Boolean)
+      .join(" • ");
+    elements.pickAnalysisBest.textContent = "No pick recommendation yet.";
+    renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Run the analysis to build a ranked shortlist.");
+    return;
+  }
+
+  const recommendation = state.analysisResult.recommendation;
+  elements.pickAnalysisStatus.textContent = [
+    `Our rank: #${state.analysisResult.ourRank || "--"}`,
+    eventOver && debugOverrideEnabled ? "Debug override active on completed-event data." : "",
+    state.analysisNeedsRefresh ? "Scouting changed since the last run. Press Run Analysis again." : "",
+    state.analysisRunAt ? `Last run ${formatTime(state.analysisRunAt)}` : ""
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  elements.pickAnalysisBest.innerHTML = "";
+  elements.pickAnalysisBest.classList.add("analysis-best");
+
+  if (recommendation) {
+    const title = document.createElement("strong");
+    title.textContent = `Best current pick: Team ${recommendation.team}`;
+    const meta = document.createElement("p");
+    meta.className = "muted";
+    meta.textContent = `${recommendation.teamName || "Unknown team"} • Fit score ${formatDecimal(recommendation.score)} • Event rank #${recommendation.eventRank || "--"} • EPA ${formatDecimal(recommendation.epa)}`;
+    const reasons = document.createElement("p");
+    reasons.className = "muted";
+    reasons.textContent = recommendation.reasons.join(" • ");
+    elements.pickAnalysisBest.append(title, meta, reasons);
+  } else {
+    elements.pickAnalysisBest.textContent = "No valid pick candidates were found for the current event.";
+  }
+
+  renderAnalysisShortlist();
+}
+
+function renderAnalysisShortlist() {
+  const body = elements.pickAnalysisBody;
+  body.innerHTML = "";
+  if (!state.analysisResult?.shortlist?.length) {
+    renderOverviewMessageRow(body, 5, "No valid pick candidates were found for the current event.");
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  state.analysisResult.shortlist.forEach((candidate, index) => {
+    const tr = document.createElement("tr");
+    if (index === 0) {
+      tr.classList.add("is-tracked-row");
+    }
+
+    [
+      `${candidate.team}${candidate.teamName ? ` • ${candidate.teamName}` : ""}`,
+      formatDecimal(candidate.score),
+      candidate.eventRank || "--",
+      formatDecimal(candidate.epa),
+      candidate.reasons.join(" • ")
+    ].forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = String(value);
+      tr.appendChild(td);
+    });
+
+    fragment.appendChild(tr);
+  });
+
+  body.appendChild(fragment);
 }
 
 function renderOutbox() {
@@ -3194,6 +4251,26 @@ function createId() {
 
 function roundToTwo(value) {
   return Math.round(value * 100) / 100;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function compareNullableNumbers(left, right) {
+  const leftValue = Number.isFinite(Number(left)) ? Number(left) : Number.POSITIVE_INFINITY;
+  const rightValue = Number.isFinite(Number(right)) ? Number(right) : Number.POSITIVE_INFINITY;
+  return leftValue - rightValue;
+}
+
+function formatPercentage(value, precision = 0) {
+  if (!Number.isFinite(Number(value))) return "--";
+  return `${(Number(value) * 100).toFixed(precision).replace(/\.0$/, "")}%`;
+}
+
+function formatRecord(record) {
+  if (!record) return "No record";
+  return `${record.wins || 0}-${record.losses || 0}-${record.ties || 0}`;
 }
 
 function formatDecimal(value) {
