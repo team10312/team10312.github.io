@@ -92,7 +92,7 @@ code {
 }
 
 .container {
-  width: min(1180px, 92vw);
+  width: min(1150px, 92vw);
   margin: 0 auto;
 }
 
@@ -245,7 +245,7 @@ code {
 }
 
 .hero {
-  padding: 4.8rem 0 1.8rem;
+  padding: 4.8rem 0 1.6rem;
 }
 
 .hero-grid {
@@ -269,9 +269,9 @@ code {
 }
 
 .headline {
-  font-size: clamp(2.35rem, 5.3vw, 4.2rem);
-  line-height: 1.02;
-  margin: 0.5rem 0 0.8rem;
+  font-size: clamp(2rem, 4.8vw, 3.4rem);
+  line-height: 1.05;
+  margin: 0 0 0.6rem;
   color: var(--brand);
 }
 
@@ -323,7 +323,7 @@ code {
 }
 
 .section {
-  padding: 1.5rem 0 3.4rem;
+  padding: 2.8rem 0;
 }
 
 .card {
