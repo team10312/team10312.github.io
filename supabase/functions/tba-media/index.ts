@@ -41,13 +41,7 @@ Deno.serve(async (request) => {
       return jsonResponse({ teamKey, eventKey, matches });
     }
 
-    if (mode === "alliances") {
-      const eventKey = parseEventKey(requestUrl.searchParams.get("eventKey"));
-      const alliances = await fetchBlueAllianceJson(`/event/${encodeURIComponent(eventKey)}/alliances`, tbaAuthKey);
-      return jsonResponse({ eventKey, alliances });
-    }
-
-    return jsonResponse({ error: "Expected mode=events, mode=matches, or mode=alliances." }, 400);
+    return jsonResponse({ error: "Expected mode=events or mode=matches." }, 400);
   } catch (error) {
     const details = normalizeError(error);
     return jsonResponse({ error: details.error }, details.status || 500);

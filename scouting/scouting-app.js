@@ -28,7 +28,6 @@ const STORAGE_KEYS = {
 
 const SCOUT_RELOAD_NEW_VALUE = "__new__";
 const STATBOTICS_API_BASE = "https://api.statbotics.io/v3";
-const TBA_MEDIA_FUNCTION = "tba-media";
 const TRACKED_TEAM_NUMBER = 10312;
 const TEXAS_STATE_CODE = "TX";
 const OVERVIEW_MODE_COMPETITION = "competition";
@@ -137,7 +136,6 @@ const state = {
   overviewCompetitionRows: [],
   overviewTexasRows: [],
   overviewMatches: [],
-  overviewEventAlliances: [],
   overviewEventData: null,
   analysisResult: null,
   analysisDebugOverride: loadStoredValue(STORAGE_KEYS.analysisDebugOverride, "") === "true",
@@ -1514,7 +1512,6 @@ function resetOverviewState() {
   state.overviewCompetitionRows = [];
   state.overviewTexasRows = [];
   state.overviewMatches = [];
-  state.overviewEventAlliances = [];
   state.overviewEventData = null;
   state.analysisResult = null;
   state.analysisNeedsRefresh = true;
@@ -1547,12 +1544,11 @@ async function loadOverviewData() {
   renderOverview();
 
   try {
-    const [competitionRows, texasRows, matches, eventData, allianceData] = await Promise.all([
+    const [competitionRows, texasRows, matches, eventData] = await Promise.all([
       fetchStatbotics(`team_events?event=${encodeURIComponent(eventKey)}&limit=1000`),
       fetchStatbotics(`team_years?year=${season}&state=${encodeURIComponent(TEXAS_STATE_CODE)}&limit=500`),
       fetchStatbotics(`matches?event=${encodeURIComponent(eventKey)}&limit=${OVERVIEW_MATCH_LIMIT}`),
-      fetchStatbotics(`event/${encodeURIComponent(eventKey)}`),
-      fetchTbaMediaProxy({ mode: "alliances", eventKey }).catch(() => ({ alliances: [] }))
+      fetchStatbotics(`event/${encodeURIComponent(eventKey)}`)
     ]);
 
     if (requestToken !== overviewRequestToken) return;
@@ -1560,7 +1556,6 @@ async function loadOverviewData() {
     state.overviewCompetitionRows = sortCompetitionRows(competitionRows);
     state.overviewTexasRows = sortTexasRows(texasRows);
     state.overviewMatches = Array.isArray(matches) ? matches.slice() : [];
-    state.overviewEventAlliances = Array.isArray(allianceData?.alliances) ? allianceData.alliances.slice() : [];
     state.overviewEventData = eventData && !Array.isArray(eventData) ? eventData : null;
     state.overviewFetchedAt = new Date().toISOString();
     state.analysisNeedsRefresh = true;
@@ -1584,27 +1579,6 @@ async function fetchStatbotics(path) {
 
   if (!response.ok) {
     throw new Error(`Statbotics request failed (${response.status}).`);
-  }
-
-  return response.json();
-}
-
-async function fetchTbaMediaProxy(params) {
-  const query = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value != null && value !== "") {
-      query.set(key, String(value));
-    }
-  });
-
-  const response = await fetch(`${state.config.supabaseUrl}/functions/v1/${TBA_MEDIA_FUNCTION}?${query.toString()}`, {
-    headers: {
-      Accept: "application/json"
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`TBA media request failed (${response.status}).`);
   }
 
   return response.json();
@@ -1676,13 +1650,10 @@ function buildPredictionRow(match) {
   return {
     match: match?.match_name || match?.key || "Unknown match",
     alliance: alliance === "red" ? "Red" : alliance === "blue" ? "Blue" : "Unknown",
-    allianceTone: alliance || "unknown",
     winProb: formatPercentage(winProbability, 1),
     predicted: formatTrackedPredictedScore(match, alliance),
     actual,
-    tone,
-    allianceTeams: formatTrackedTeams(match, alliance),
-    opponentTeams: formatTrackedTeams(match, alliance === "red" ? "blue" : alliance === "blue" ? "red" : "")
+    tone
   };
 }
 
@@ -1699,16 +1670,6 @@ function getTrackedWinProbability(match, alliance) {
   if (alliance === "red") return redWinProbability;
   if (alliance === "blue") return 1 - redWinProbability;
   return redWinProbability;
-}
-
-function formatTrackedTeams(match, alliance) {
-  const teams = alliance === "red"
-    ? match?.alliances?.red?.team_keys || []
-    : alliance === "blue"
-      ? match?.alliances?.blue?.team_keys || []
-      : [];
-  if (!teams.length) return "Teams unavailable";
-  return teams.map((team) => `Team ${team}`).join(", ");
 }
 
 function formatTrackedPredictedScore(match, alliance) {
@@ -1771,20 +1732,6 @@ function normalizeStatboticsVideoUrl(value) {
     return `https://www.youtube.com/watch?v=${encodeURIComponent(raw)}`;
   }
   return "";
-}
-
-function normalizeTbaTeamKeyToNumber(value) {
-  const numeric = Number(String(value || "").replace(/^frc/i, "").trim());
-  return Number.isFinite(numeric) ? numeric : null;
-}
-
-function escapeHtml(value) {
-  return String(value == null ? "" : value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 function isCurrentEventOver() {
@@ -2351,13 +2298,13 @@ function renderOverviewPredictions() {
 
   if (state.overviewLoading) {
     elements.overviewPredictionLabel.textContent = "Loading Team 10312 Statbotics match predictions...";
-    renderPredictionMessage("Loading match predictions...");
+    renderOverviewMessageRow(elements.overviewPredictionBody, 5, "Loading match predictions...");
     return;
   }
 
   if (state.overviewError) {
     elements.overviewPredictionLabel.textContent = "Statbotics predictions are temporarily unavailable.";
-    renderPredictionMessage(state.overviewError);
+    renderOverviewMessageRow(elements.overviewPredictionBody, 5, state.overviewError);
     return;
   }
 
@@ -2365,24 +2312,25 @@ function renderOverviewPredictions() {
   elements.overviewPredictionLabel.textContent = label;
 
   if (!rows.length) {
-    renderPredictionMessage("No team-specific Statbotics matches are available for the selected event yet.");
+    renderOverviewMessageRow(
+      elements.overviewPredictionBody,
+      5,
+      "No team-specific Statbotics matches are available for the selected event yet."
+    );
     return;
   }
 
   const fragment = document.createDocumentFragment();
+
   rows.forEach((row) => {
     const tr = document.createElement("tr");
-    const cells = [
-      row.match,
-      `${row.alliance} Alliance`,
-      row.winProb,
-      row.predicted,
-      row.actual
-    ];
+    if (row.tone) {
+      tr.dataset.tone = row.tone;
+    }
 
-    cells.forEach((value, index) => {
+    [row.match, row.alliance, row.winProb, row.predicted, row.actual].forEach((value, index) => {
       const td = document.createElement("td");
-      td.textContent = String(value);
+      td.textContent = value;
       if (index === 4 && row.tone) {
         td.dataset.tone = row.tone;
       }
@@ -2394,10 +2342,6 @@ function renderOverviewPredictions() {
 
   elements.overviewPredictionBody.innerHTML = "";
   elements.overviewPredictionBody.appendChild(fragment);
-}
-
-function renderPredictionMessage(message) {
-  renderOverviewMessageRow(elements.overviewPredictionBody, 5, message);
 }
 
 function renderOverviewMessageRow(target, colSpan, message) {
@@ -2462,9 +2406,7 @@ function buildAlliancePickAnalysis() {
   const ourRow = getTrackedEventRow();
   const ourSummary = getSummaryRow(TRACKED_TEAM_NUMBER);
   const ourRank = Number(ourRow?.record?.qual?.rank || Number.POSITIVE_INFINITY);
-  const actualAvailability =
-    buildOfficialAllianceAvailabilityContext(state.overviewEventAlliances, state.overviewCompetitionRows) ||
-    buildCompletedEventAvailabilityContext(state.overviewMatches, state.overviewCompetitionRows);
+  const actualAvailability = buildCompletedEventAvailabilityContext(state.overviewMatches, state.overviewCompetitionRows);
   const candidates = (actualAvailability?.availableRows?.length
     ? actualAvailability.availableRows
     : state.overviewCompetitionRows.filter((row) => Number(row?.team) !== TRACKED_TEAM_NUMBER)
@@ -2488,41 +2430,6 @@ function buildAlliancePickAnalysis() {
     actualAvailability,
     recommendation: shortlist[0] || null,
     shortlist
-  };
-}
-
-function buildOfficialAllianceAvailabilityContext(alliances, competitionRows) {
-  const normalizedAlliances = (Array.isArray(alliances) ? alliances : [])
-    .map((alliance, index) => normalizeOfficialAlliance(alliance, index))
-    .filter(Boolean);
-
-  if (!normalizedAlliances.length) return null;
-
-  const ourAlliance = normalizedAlliances.find((alliance) => alliance.captain === TRACKED_TEAM_NUMBER);
-  if (!ourAlliance) return null;
-
-  const unavailableTeamNumbers = new Set([TRACKED_TEAM_NUMBER]);
-  normalizedAlliances.forEach((alliance) => {
-    if (Number.isFinite(alliance.captain)) unavailableTeamNumbers.add(alliance.captain);
-    alliance.declines.forEach((teamNumber) => unavailableTeamNumbers.add(teamNumber));
-  });
-
-  normalizedAlliances.forEach((alliance) => {
-    if (alliance.seed < ourAlliance.seed && Number.isFinite(alliance.firstPick)) {
-      unavailableTeamNumbers.add(alliance.firstPick);
-    }
-  });
-
-  const availableRows = (Array.isArray(competitionRows) ? competitionRows : []).filter((row) => {
-    const teamNumber = Number(row?.team || 0);
-    return Number.isFinite(teamNumber) && !unavailableTeamNumbers.has(teamNumber);
-  });
-
-  return {
-    availableRows,
-    ourAllianceSeed: ourAlliance.seed,
-    unavailableTeamNumbers: Array.from(unavailableTeamNumbers).sort((left, right) => left - right),
-    source: "tba"
   };
 }
 
@@ -2564,45 +2471,8 @@ function buildCompletedEventAvailabilityContext(matches, competitionRows) {
   return {
     availableRows,
     ourAllianceSeed: ourAlliance.seed,
-    unavailableTeamNumbers: Array.from(unavailableTeamNumbers).sort((left, right) => left - right),
-    source: "inferred"
+    unavailableTeamNumbers: Array.from(unavailableTeamNumbers).sort((left, right) => left - right)
   };
-}
-
-function normalizeOfficialAlliance(alliance, index) {
-  const picks = (Array.isArray(alliance?.picks) ? alliance.picks : [])
-    .map((teamKey) => normalizeTbaTeamKeyToNumber(teamKey))
-    .filter((teamNumber) => Number.isFinite(teamNumber));
-  if (!picks.length) return null;
-
-  const declines = (Array.isArray(alliance?.declines) ? alliance.declines : [])
-    .map((teamKey) => normalizeTbaTeamKeyToNumber(teamKey))
-    .filter((teamNumber) => Number.isFinite(teamNumber));
-  const backupIn = normalizeTbaTeamKeyToNumber(alliance?.backup?.in);
-  if (Number.isFinite(backupIn) && !picks.includes(backupIn)) {
-    picks.push(backupIn);
-  }
-
-  return {
-    seed: getOfficialAllianceSeed(alliance, index),
-    captain: picks[0] || null,
-    firstPick: picks[1] || null,
-    secondPick: picks[2] || null,
-    teams: picks,
-    declines
-  };
-}
-
-function getOfficialAllianceSeed(alliance, index) {
-  const name = String(alliance?.name || "");
-  const match = name.match(/(\d+)/);
-  if (match) {
-    const parsed = Number(match[1]);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-  return Number(index + 1);
 }
 
 function registerAllianceSeed(target, seed, teamKeys) {
@@ -3022,7 +2892,7 @@ function renderPickAnalysis() {
   elements.pickAnalysisStatus.textContent = [
     `Our rank: #${state.analysisResult.ourRank || "--"}`,
     state.analysisResult.actualAvailability?.ourAllianceSeed
-      ? `${state.analysisResult.actualAvailability.source === "tba" ? "Official TBA" : "Inferred"} captain seed #${state.analysisResult.actualAvailability.ourAllianceSeed} availability`
+      ? `Captain seed #${state.analysisResult.actualAvailability.ourAllianceSeed} actual availability`
       : "Projected current availability",
     eventOver && debugOverrideEnabled ? "Debug override active on completed-event data." : "",
     state.analysisNeedsRefresh ? "Scouting changed since the last run. Press Run Analysis again." : "",
