@@ -28,11 +28,26 @@ const STORAGE_KEYS = {
 
 const SCOUT_RELOAD_NEW_VALUE = "__new__";
 const STATBOTICS_API_BASE = "https://api.statbotics.io/v3";
+const TBA_MEDIA_PROXY_FUNCTION = "tba-media";
 const TRACKED_TEAM_NUMBER = 10312;
 const TEXAS_STATE_CODE = "TX";
 const OVERVIEW_MODE_COMPETITION = "competition";
 const OVERVIEW_MODE_TEXAS = "texas";
 const OVERVIEW_MATCH_LIMIT = 100;
+const MATCH_LEVEL_ORDER = Object.freeze({
+  qm: 0,
+  ef: 1,
+  qf: 2,
+  sf: 3,
+  f: 4
+});
+const MATCH_LEVEL_LABELS = Object.freeze({
+  qm: "Qual",
+  ef: "Eighthfinal",
+  qf: "Quarterfinal",
+  sf: "Semifinal",
+  f: "Final"
+});
 const QF_ALLIANCE_SEED_MAP = Object.freeze({
   1: { red: 1, blue: 8 },
   2: { red: 4, blue: 5 },
@@ -137,6 +152,18 @@ const state = {
   overviewTexasRows: [],
   overviewMatches: [],
   overviewEventData: null,
+  trackerEventsBySeason: new Map(),
+  trackerMatchesByEvent: new Map(),
+  trackerPredictionDataByEvent: new Map(),
+  trackerSelectedSeason: "",
+  trackerSelectedEventKey: "",
+  trackerLoading: false,
+  trackerError: "",
+  trackerMatches: [],
+  trackerEvent: null,
+  trackerPredictionMatches: [],
+  trackerPredictionAccuracy: null,
+  trackerPredictionError: "",
   analysisResult: null,
   analysisDebugOverride: loadStoredValue(STORAGE_KEYS.analysisDebugOverride, "") === "true",
   analysisNeedsRefresh: true,
@@ -162,6 +189,7 @@ const customSelectRegistry = new WeakMap();
 let activeCustomSelect = null;
 let customSelectEventsBound = false;
 let overviewRequestToken = 0;
+let trackerRequestToken = 0;
 const autoPathState = {
   mode: "draw",
   drawColor: AUTO_PATH_DEFAULTS.drawColor,
@@ -183,6 +211,8 @@ async function init() {
   initCustomSelects();
   initAutoPathBoard();
   state.config = normalizeConfig(window.SCOUTING_CONFIG || {});
+  renderMatchTrackerSeasonOptions();
+  updateMatchTrackerLinks();
 
   applyYear();
   wireLinks();
@@ -234,7 +264,6 @@ function cacheDom() {
   elements.authMessage = document.getElementById("authMessage");
   elements.eventSelect = document.getElementById("eventSelect");
   elements.refreshButton = document.getElementById("refreshButton");
-  elements.retryOutboxButton = document.getElementById("retryOutboxButton");
   elements.retryOutboxInline = document.getElementById("retryOutboxInline");
   elements.signOutButton = document.getElementById("signOutButton");
   elements.authPill = document.getElementById("authPill");
@@ -259,7 +288,17 @@ function cacheDom() {
   elements.overviewRankingsHead = document.getElementById("overviewRankingsHead");
   elements.overviewRankingsBody = document.getElementById("overviewRankingsBody");
   elements.overviewPredictionLabel = document.getElementById("overviewPredictionLabel");
+  elements.overviewTrackerSeasonSelect = document.getElementById("overviewTrackerSeasonSelect");
+  elements.overviewTrackerEventSelect = document.getElementById("overviewTrackerEventSelect");
+  elements.overviewTrackerEventMeta = document.getElementById("overviewTrackerEventMeta");
+  elements.overviewTrackerEventName = document.getElementById("overviewTrackerEventName");
+  elements.overviewTrackerEventSubtitle = document.getElementById("overviewTrackerEventSubtitle");
+  elements.overviewTrackerEventSummary = document.getElementById("overviewTrackerEventSummary");
+  elements.overviewTrackerStatus = document.getElementById("overviewTrackerStatus");
   elements.overviewPredictionBody = document.getElementById("overviewPredictionBody");
+  elements.overviewTrackerLinks = document.getElementById("overviewTrackerLinks");
+  elements.overviewTrackerEventLink = document.getElementById("overviewTrackerEventLink");
+  elements.overviewTrackerTeamLink = document.getElementById("overviewTrackerTeamLink");
   elements.toggleAnalysisDebugButton = document.getElementById("toggleAnalysisDebugButton");
   elements.runPickAnalysisButton = document.getElementById("runPickAnalysisButton");
   elements.pickAnalysisStatus = document.getElementById("pickAnalysisStatus");
@@ -994,12 +1033,6 @@ function bindEvents() {
     });
   }
 
-  if (elements.retryOutboxButton) {
-    elements.retryOutboxButton.addEventListener("click", () => {
-      void flushOutbox();
-    });
-  }
-
   if (elements.retryOutboxInline) {
     elements.retryOutboxInline.addEventListener("click", () => {
       void flushOutbox();
@@ -1015,6 +1048,19 @@ function bindEvents() {
   if (elements.eventSelect) {
     elements.eventSelect.addEventListener("change", () => {
       void handleEventChange(elements.eventSelect.value);
+    });
+  }
+
+  if (elements.overviewTrackerSeasonSelect) {
+    elements.overviewTrackerSeasonSelect.addEventListener("change", () => {
+      const season = Number(elements.overviewTrackerSeasonSelect.value);
+      void handleMatchTrackerSeasonChange(season);
+    });
+  }
+
+  if (elements.overviewTrackerEventSelect) {
+    elements.overviewTrackerEventSelect.addEventListener("change", () => {
+      void handleMatchTrackerEventChange(elements.overviewTrackerEventSelect.value);
     });
   }
 
@@ -1342,6 +1388,7 @@ async function syncSession(session) {
     state.pitEntries = [];
     state.teamSummary = [];
     resetOverviewState();
+    resetMatchTrackerState();
     state.isRefreshing = false;
     state.authRedirecting = false;
     state.authReady = true;
@@ -1384,6 +1431,7 @@ async function refreshData({ message } = {}) {
     await loadEvents();
     await loadEntriesForActiveEvent();
     await loadOverviewData();
+    await syncMatchTrackerSelection();
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
     if (typeof message === "string") {
@@ -1519,6 +1567,20 @@ function resetOverviewState() {
   state.analysisRunAt = "";
 }
 
+function resetMatchTrackerState({ preserveSelection = false } = {}) {
+  state.trackerLoading = false;
+  state.trackerError = "";
+  state.trackerMatches = [];
+  state.trackerEvent = null;
+  state.trackerPredictionMatches = [];
+  state.trackerPredictionAccuracy = null;
+  state.trackerPredictionError = "";
+  if (!preserveSelection) {
+    state.trackerSelectedSeason = "";
+    state.trackerSelectedEventKey = "";
+  }
+}
+
 function setOverviewMode(mode) {
   const nextMode = mode === OVERVIEW_MODE_TEXAS ? OVERVIEW_MODE_TEXAS : OVERVIEW_MODE_COMPETITION;
   if (state.overviewMode === nextMode) return;
@@ -1584,6 +1646,371 @@ async function fetchStatbotics(path) {
   return response.json();
 }
 
+async function handleMatchTrackerSeasonChange(season) {
+  if (!Number.isInteger(season) || season < 1992) return;
+  state.trackerSelectedSeason = season;
+  state.trackerSelectedEventKey = "";
+  await loadMatchTrackerSeasonEvents(season, { fallbackToFirst: true });
+}
+
+async function handleMatchTrackerEventChange(eventKey) {
+  const nextEventKey = String(eventKey || "").trim().toLowerCase();
+  state.trackerSelectedEventKey = nextEventKey;
+  if (!nextEventKey) {
+    resetMatchTrackerState({ preserveSelection: true });
+    renderOverviewPredictions();
+    return;
+  }
+  await loadMatchTrackerEventData(nextEventKey);
+}
+
+async function syncMatchTrackerSelection({ forceActiveEvent = false } = {}) {
+  renderMatchTrackerSeasonOptions();
+
+  if (!configReady() || !elements.overviewTrackerSeasonSelect || !elements.overviewTrackerEventSelect) {
+    renderOverviewPredictions();
+    return;
+  }
+
+  const activeEvent = getActiveEvent();
+  const activeSeason = activeEvent ? getEventSeason(activeEvent) : getCurrentSeason();
+  const activeEventKey = buildBlueAllianceEventKey(activeEvent);
+  const currentSeason = Number(state.trackerSelectedSeason);
+  const desiredSeason =
+    forceActiveEvent || !Number.isInteger(currentSeason) ? activeSeason : currentSeason;
+  const desiredEventKey = forceActiveEvent ? activeEventKey : state.trackerSelectedEventKey || activeEventKey;
+
+  state.trackerSelectedSeason = desiredSeason;
+  renderMatchTrackerSeasonOptions();
+  await loadMatchTrackerSeasonEvents(desiredSeason, {
+    preferredEventKey: desiredEventKey,
+    fallbackToFirst: true
+  });
+}
+
+function renderMatchTrackerSeasonOptions() {
+  if (!elements.overviewTrackerSeasonSelect) return;
+
+  const select = elements.overviewTrackerSeasonSelect;
+  const seasons = getMatchTrackerSeasonOptions();
+  select.innerHTML = seasons.map((season) => `<option value="${season}">${season}</option>`).join("");
+
+  if (!seasons.length) {
+    select.innerHTML = '<option value="">No seasons available</option>';
+    select.disabled = true;
+    refreshCustomSelect(select);
+    return;
+  }
+
+  const selectedSeason = Number(state.trackerSelectedSeason);
+  const nextSeason = seasons.includes(selectedSeason) ? selectedSeason : seasons[0];
+  state.trackerSelectedSeason = nextSeason;
+  select.disabled = !configReady();
+  select.value = String(nextSeason);
+  refreshCustomSelect(select);
+}
+
+function renderMatchTrackerEventOptions(events, { selectedValue = "", disabled = false, placeholder = "Choose a competition" } = {}) {
+  if (!elements.overviewTrackerEventSelect) return;
+
+  const select = elements.overviewTrackerEventSelect;
+  const rows = Array.isArray(events) ? events : [];
+
+  if (!rows.length) {
+    select.innerHTML = `<option value="">${placeholder}</option>`;
+    select.value = "";
+    select.disabled = true;
+    refreshCustomSelect(select);
+    return;
+  }
+
+  select.innerHTML = rows
+    .map((event) => `<option value="${escapeHtml(event.key)}">${escapeHtml(event.name || event.key)}</option>`)
+    .join("");
+  select.disabled = disabled;
+  select.value = rows.some((event) => event.key === selectedValue) ? selectedValue : rows[0].key;
+  refreshCustomSelect(select);
+}
+
+async function loadMatchTrackerSeasonEvents(season, { preferredEventKey = "", fallbackToFirst = true } = {}) {
+  const token = ++trackerRequestToken;
+  const normalizedSeason = Number(season);
+  state.trackerSelectedSeason = normalizedSeason;
+  state.trackerSelectedEventKey = "";
+  resetMatchTrackerState({ preserveSelection: true });
+  renderMatchTrackerEventOptions([], { placeholder: "Loading competitions..." });
+  renderOverviewPredictions();
+
+  try {
+    const events = await getMatchTrackerSeasonEvents(normalizedSeason);
+    if (token !== trackerRequestToken) return;
+
+    if (!events.length) {
+      state.trackerError = `No competitions were found for Team ${TRACKED_TEAM_NUMBER} in ${normalizedSeason}.`;
+      renderMatchTrackerEventOptions([], { placeholder: "No competitions found" });
+      renderOverviewPredictions();
+      return;
+    }
+
+    const nextEventKey = events.some((event) => event.key === preferredEventKey)
+      ? preferredEventKey
+      : fallbackToFirst
+        ? events[0].key
+        : "";
+
+    state.trackerSelectedEventKey = nextEventKey;
+    renderMatchTrackerEventOptions(events, { selectedValue: nextEventKey });
+
+    if (!nextEventKey) {
+      renderOverviewPredictions();
+      return;
+    }
+
+    await loadMatchTrackerEventData(nextEventKey, token);
+  } catch (error) {
+    if (token !== trackerRequestToken) return;
+    state.trackerError = normalizeError(error, "Unable to load competitions right now.");
+    renderMatchTrackerEventOptions([], { placeholder: "Unable to load competitions" });
+    renderOverviewPredictions();
+  }
+}
+
+async function loadMatchTrackerEventData(eventKey, inheritedToken) {
+  const token = inheritedToken || ++trackerRequestToken;
+  const selectedEventKey = String(eventKey || "").trim().toLowerCase();
+
+  if (!selectedEventKey) {
+    resetMatchTrackerState({ preserveSelection: true });
+    renderOverviewPredictions();
+    return;
+  }
+
+  state.trackerSelectedEventKey = selectedEventKey;
+  state.trackerLoading = true;
+  state.trackerError = "";
+  state.trackerMatches = [];
+  state.trackerEvent = getMatchTrackerEventByKey(Number(state.trackerSelectedSeason), selectedEventKey);
+  state.trackerPredictionMatches = [];
+  state.trackerPredictionAccuracy = null;
+  state.trackerPredictionError = "";
+  renderOverviewPredictions();
+
+  try {
+    const [matchesResult, predictionResult] = await Promise.allSettled([
+      getMatchTrackerMatches(selectedEventKey),
+      getMatchTrackerPredictionData(selectedEventKey)
+    ]);
+
+    if (token !== trackerRequestToken) return;
+
+    if (matchesResult.status !== "fulfilled") {
+      throw matchesResult.reason;
+    }
+
+    state.trackerMatches = Array.isArray(matchesResult.value) ? matchesResult.value.slice() : [];
+    state.trackerEvent = getMatchTrackerEventByKey(Number(state.trackerSelectedSeason), selectedEventKey);
+
+    const predictionData =
+      predictionResult.status === "fulfilled"
+        ? predictionResult.value
+        : {
+            matches: [],
+            eventData: null,
+            error: normalizeError(predictionResult.reason, "Statbotics predictions are unavailable right now.")
+          };
+
+    state.trackerPredictionMatches = Array.isArray(predictionData?.matches) ? predictionData.matches.slice() : [];
+    state.trackerPredictionAccuracy = Number.isFinite(Number(predictionData?.eventData?.metrics?.win_prob?.acc))
+      ? Number(predictionData.eventData.metrics.win_prob.acc)
+      : null;
+    state.trackerPredictionError = String(predictionData?.error || "").trim();
+  } catch (error) {
+    if (token !== trackerRequestToken) return;
+    state.trackerError = normalizeError(error, "Unable to load match videos right now.");
+    state.trackerMatches = [];
+    state.trackerPredictionMatches = [];
+    state.trackerPredictionAccuracy = null;
+    state.trackerPredictionError = "";
+  } finally {
+    if (token !== trackerRequestToken) return;
+    state.trackerLoading = false;
+    renderOverviewPredictions();
+  }
+}
+
+async function getMatchTrackerSeasonEvents(season) {
+  const normalizedSeason = Number(season);
+  if (state.trackerEventsBySeason.has(normalizedSeason)) {
+    return state.trackerEventsBySeason.get(normalizedSeason);
+  }
+
+  const payload = await requestTbaMedia({ mode: "events", season: normalizedSeason });
+  const events = Array.isArray(payload?.events) ? payload.events : [];
+  const sortedEvents = events.slice().sort(sortBlueAllianceEventsByDate);
+  state.trackerEventsBySeason.set(normalizedSeason, sortedEvents);
+  return sortedEvents;
+}
+
+async function getMatchTrackerMatches(eventKey) {
+  const normalizedKey = String(eventKey || "").trim().toLowerCase();
+  if (state.trackerMatchesByEvent.has(normalizedKey)) {
+    return state.trackerMatchesByEvent.get(normalizedKey);
+  }
+
+  const payload = await requestTbaMedia({ mode: "matches", eventKey: normalizedKey });
+  const matches = Array.isArray(payload?.matches) ? payload.matches : [];
+  const sortedMatches = matches.slice().sort(compareBlueAllianceMatches);
+  state.trackerMatchesByEvent.set(normalizedKey, sortedMatches);
+  return sortedMatches;
+}
+
+async function getMatchTrackerPredictionData(eventKey) {
+  const normalizedKey = String(eventKey || "").trim().toLowerCase();
+  const liveOverviewData = getLiveOverviewPredictionData(normalizedKey);
+  if (liveOverviewData) {
+    return liveOverviewData;
+  }
+
+  if (state.trackerPredictionDataByEvent.has(normalizedKey)) {
+    return state.trackerPredictionDataByEvent.get(normalizedKey);
+  }
+
+  try {
+    const [matches, eventData] = await Promise.all([
+      fetchStatbotics(`matches?event=${encodeURIComponent(normalizedKey)}&limit=${OVERVIEW_MATCH_LIMIT}`),
+      fetchStatbotics(`event/${encodeURIComponent(normalizedKey)}`)
+    ]);
+
+    const data = {
+      matches: Array.isArray(matches) ? matches : [],
+      eventData: eventData && !Array.isArray(eventData) ? eventData : null,
+      error: ""
+    };
+    state.trackerPredictionDataByEvent.set(normalizedKey, data);
+    return data;
+  } catch (error) {
+    const data = {
+      matches: [],
+      eventData: null,
+      error: normalizeError(error, "Statbotics predictions are unavailable right now.")
+    };
+    state.trackerPredictionDataByEvent.set(normalizedKey, data);
+    return data;
+  }
+}
+
+function getLiveOverviewPredictionData(eventKey) {
+  const activeEventKey = getStatboticsEventKey(getActiveEvent());
+  if (!eventKey || !activeEventKey || activeEventKey !== eventKey) {
+    return null;
+  }
+
+  if (state.overviewError || (!state.overviewMatches.length && !state.overviewEventData)) {
+    return null;
+  }
+
+  return {
+    matches: Array.isArray(state.overviewMatches) ? state.overviewMatches.slice() : [],
+    eventData: state.overviewEventData || null,
+    error: ""
+  };
+}
+
+async function requestTbaMedia(params) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value != null && value !== "") {
+      query.set(key, String(value));
+    }
+  });
+
+  const response = await fetch(`${state.config.supabaseUrl}/functions/v1/${TBA_MEDIA_PROXY_FUNCTION}?${query.toString()}`, {
+    headers: {
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Match tracker request failed with ${response.status}.`;
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload.error === "string" && payload.error.trim()) {
+        errorMessage = payload.error.trim();
+      }
+    } catch (error) {
+      // Ignore JSON parse issues and fall back to the HTTP status.
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+function getMatchTrackerSeasonOptions() {
+  const currentSeason = getCurrentSeason();
+  const seasons = new Set([
+    currentSeason,
+    currentSeason - 1,
+    currentSeason - 2,
+    currentSeason - 3
+  ]);
+
+  state.events.forEach((event) => {
+    seasons.add(getEventSeason(event));
+  });
+
+  state.trackerEventsBySeason.forEach((_, season) => {
+    seasons.add(Number(season));
+  });
+
+  return Array.from(seasons)
+    .filter((season) => Number.isInteger(season) && season >= 1992)
+    .sort((left, right) => right - left);
+}
+
+function getMatchTrackerEventByKey(season, eventKey) {
+  const events = state.trackerEventsBySeason.get(Number(season)) || [];
+  return events.find((event) => event.key === eventKey) || null;
+}
+
+function buildBlueAllianceEventKey(event) {
+  if (!event) return "";
+  const season = getEventSeason(event);
+  const eventCode = String(event.event_code || "")
+    .trim()
+    .toLowerCase();
+  return eventCode ? `${season}${eventCode}` : "";
+}
+
+function getCurrentSeason() {
+  return new Date().getFullYear();
+}
+
+function sortBlueAllianceEventsByDate(left, right) {
+  const leftDate = Date.parse(left?.end_date || left?.start_date || `${left?.year || 0}-01-01`);
+  const rightDate = Date.parse(right?.end_date || right?.start_date || `${right?.year || 0}-01-01`);
+
+  if (leftDate !== rightDate) {
+    return rightDate - leftDate;
+  }
+
+  return String(left?.name || "").localeCompare(String(right?.name || ""));
+}
+
+function compareBlueAllianceMatches(left, right) {
+  const levelDiff = (MATCH_LEVEL_ORDER[left?.comp_level] ?? 99) - (MATCH_LEVEL_ORDER[right?.comp_level] ?? 99);
+  if (levelDiff !== 0) {
+    return levelDiff;
+  }
+
+  const setDiff = Number(left?.set_number || 0) - Number(right?.set_number || 0);
+  if (setDiff !== 0) {
+    return setDiff;
+  }
+
+  return Number(left?.match_number || 0) - Number(right?.match_number || 0);
+}
+
 function sortCompetitionRows(rows) {
   return (Array.isArray(rows) ? rows.slice() : []).sort((left, right) => {
     return compareNullableNumbers(left?.record?.qual?.rank, right?.record?.qual?.rank) || compareNullableNumbers(left?.team, right?.team);
@@ -1618,45 +2045,6 @@ function getStatboticsEventKey(event) {
   return `${getEventSeason(event)}${String(event.event_code || "").trim().toLowerCase()}`;
 }
 
-function buildPredictionRows(matches, eventData) {
-  const trackedMatches = (Array.isArray(matches) ? matches : []).filter((match) => matchIncludesTeam(match, TRACKED_TEAM_NUMBER));
-  const sorted = trackedMatches.slice().sort((left, right) => {
-    return compareNullableNumbers(left?.time, right?.time) || compareNullableNumbers(left?.match_number, right?.match_number);
-  });
-  const upcoming = sorted.filter((match) => !isCompletedStatboticsMatch(match));
-  const completed = sorted.filter((match) => isCompletedStatboticsMatch(match)).reverse();
-  const rows = [...upcoming, ...completed].map((match) => buildPredictionRow(match));
-  const accuracy = eventData?.metrics?.win_prob?.acc;
-  const modeLabel = upcoming.length ? "All Team 10312 matches" : "All completed Team 10312 matches";
-
-  return {
-    label: [modeLabel, eventData?.name || getTrackedEventRow()?.event_name || "", accuracy ? `model accuracy ${formatPercentage(accuracy, 1)}` : ""]
-      .filter(Boolean)
-      .join(" • "),
-    rows
-  };
-}
-
-function buildPredictionRow(match) {
-  const alliance = getTrackedAlliance(match);
-  const winProbability = getTrackedWinProbability(match, alliance);
-  const actual = formatTrackedMatchActual(match, alliance);
-  const tone = isCompletedStatboticsMatch(match)
-    ? getTrackedMatchTone(match, alliance)
-    : winProbability >= 0.5
-      ? "positive"
-      : "negative";
-
-  return {
-    match: match?.match_name || match?.key || "Unknown match",
-    alliance: alliance === "red" ? "Red" : alliance === "blue" ? "Blue" : "Unknown",
-    winProb: formatPercentage(winProbability, 1),
-    predicted: formatTrackedPredictedScore(match, alliance),
-    actual,
-    tone
-  };
-}
-
 function getTrackedAlliance(match) {
   const redTeams = match?.alliances?.red?.team_keys || [];
   const blueTeams = match?.alliances?.blue?.team_keys || [];
@@ -1682,29 +2070,264 @@ function formatTrackedPredictedScore(match, alliance) {
   return `${Math.round(ownScore)} - ${Math.round(opponentScore)}`;
 }
 
-function formatTrackedMatchActual(match, alliance) {
-  if (!isCompletedStatboticsMatch(match) || !match?.result) {
-    return String(match?.status || "Scheduled");
-  }
+function buildMatchTrackerCards(matches, predictionMatches) {
+  const predictionMap = new Map(
+    (Array.isArray(predictionMatches) ? predictionMatches : [])
+      .filter((match) => match && typeof match.key === "string")
+      .map((match) => [match.key, match])
+  );
 
-  const ownScore = alliance === "blue" ? match.result.blue_score : match.result.red_score;
-  const opponentScore = alliance === "blue" ? match.result.red_score : match.result.blue_score;
-  if (!Number.isFinite(ownScore) || !Number.isFinite(opponentScore)) {
-    return "Completed";
-  }
-
-  if (ownScore === opponentScore) {
-    return `Tied ${ownScore}-${opponentScore}`;
-  }
-
-  return `${ownScore > opponentScore ? "Won" : "Lost"} ${ownScore}-${opponentScore}`;
+  return (Array.isArray(matches) ? matches : [])
+    .slice()
+    .sort(compareBlueAllianceMatches)
+    .map((match) => decorateMatchTrackerMatch(match, predictionMap.get(match.key)))
+    .filter((match) => Array.isArray(match.videos) && match.videos.length);
 }
 
-function getTrackedMatchTone(match, alliance) {
-  if (!match?.result) return "";
-  if (match.result.winner === alliance) return "positive";
-  if (match.result.winner && match.result.winner !== alliance) return "negative";
-  return "";
+function decorateMatchTrackerMatch(match, predictionMatch) {
+  const alliance = getBlueAllianceAllianceForTeam(match, `frc${TRACKED_TEAM_NUMBER}`);
+  const opponentAlliance = alliance === "red" ? "blue" : "red";
+  const ourTeams = getBlueAllianceAllianceTeams(match, alliance);
+  const opponentTeams = getBlueAllianceAllianceTeams(match, opponentAlliance);
+  const ourScore = getBlueAllianceAllianceScore(match, alliance);
+  const opponentScore = getBlueAllianceAllianceScore(match, opponentAlliance);
+  const played =
+    Number.isFinite(ourScore) &&
+    ourScore >= 0 &&
+    Number.isFinite(opponentScore) &&
+    opponentScore >= 0;
+
+  let resultLine = `${formatBlueAllianceMatchLabel(match)} scheduled`;
+  let scoreLine = "Score not posted yet";
+  let tone = "";
+
+  if (played) {
+    const didWin = ourScore > opponentScore;
+    const didTie = ourScore === opponentScore;
+    resultLine = didTie ? "Match ended in a tie" : didWin ? "Match win" : "Match loss";
+    scoreLine = `${didTie ? "Tied" : didWin ? "Won" : "Lost"} ${ourScore}-${opponentScore}`;
+    tone = didTie ? "" : didWin ? "positive" : "negative";
+  } else {
+    const scheduledAt = match?.actual_time || match?.predicted_time || match?.time;
+    scoreLine = scheduledAt ? `Scheduled ${formatUnixDateTime(scheduledAt)}` : "Scheduled";
+  }
+
+  const winProbability = predictionMatch ? formatPercentage(getTrackedWinProbability(predictionMatch, alliance), 1) : "--";
+  const predictedScore = predictionMatch ? formatTrackedPredictedScore(predictionMatch, alliance) : "Prediction unavailable";
+
+  return {
+    key: match?.key || "",
+    label: formatBlueAllianceMatchLabel(match),
+    alliance,
+    allianceLabel: alliance === "red" ? "Red Alliance" : alliance === "blue" ? "Blue Alliance" : "Alliance TBD",
+    resultLine,
+    scoreLine,
+    winProbability,
+    predictedScore,
+    teamLine: ourTeams.join(", ") || "Team list unavailable",
+    opponentLine: opponentTeams.join(", ") || "Team list unavailable",
+    watchUrl: buildWatchSourceUrl(match),
+    detailUrl: match?.key ? `https://www.thebluealliance.com/match/${encodeURIComponent(match.key)}` : "#",
+    video: getBlueAlliancePrimaryVideo(match),
+    tone
+  };
+}
+
+function renderMatchTrackerCard(match) {
+  const embed = match.video && match.video.type === "youtube"
+    ? `<iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(match.video.key)}" title="${escapeHtml(match.label)} video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`
+    : `<div class="tracker-card-fallback"><div><strong>${escapeHtml(match.label)}</strong><p>Video source is available on The Blue Alliance.</p></div></div>`;
+
+  return `
+    <article class="tracker-card" ${match.tone ? `data-tone="${escapeHtml(match.tone)}"` : ""}>
+      <div class="tracker-card-media">${embed}</div>
+      <div class="tracker-card-copy">
+        <div class="tracker-card-topline">
+          <span class="tracker-chip tracker-chip--label">${escapeHtml(match.label)}</span>
+          <span class="tracker-chip tracker-chip--alliance" data-alliance="${escapeHtml(match.alliance)}">${escapeHtml(match.allianceLabel)}</span>
+        </div>
+        <h4 class="tracker-card-title">${escapeHtml(match.resultLine)}</h4>
+        <p class="tracker-card-summary">${escapeHtml(match.scoreLine)}</p>
+        <div class="tracker-card-metrics">
+          <div class="tracker-metric">
+            <span>Win odds</span>
+            <strong>${escapeHtml(match.winProbability)}</strong>
+          </div>
+          <div class="tracker-metric">
+            <span>Predicted score</span>
+            <strong>${escapeHtml(match.predictedScore)}</strong>
+          </div>
+        </div>
+        <p class="tracker-card-teams"><strong>Alliance:</strong> ${escapeHtml(match.teamLine)}</p>
+        <p class="tracker-card-teams"><strong>Opposition:</strong> ${escapeHtml(match.opponentLine)}</p>
+        <div class="tracker-card-actions">
+          <a class="btn secondary" href="${match.watchUrl}" target="_blank" rel="noreferrer noopener">Watch Source</a>
+          <a class="btn secondary" href="${match.detailUrl}" target="_blank" rel="noreferrer noopener">Match Details</a>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderMatchTrackerEventMeta() {
+  if (
+    !elements.overviewTrackerEventMeta ||
+    !elements.overviewTrackerEventName ||
+    !elements.overviewTrackerEventSubtitle ||
+    !elements.overviewTrackerEventSummary
+  ) {
+    return;
+  }
+
+  if (!state.trackerEvent) {
+    elements.overviewTrackerEventMeta.hidden = true;
+    return;
+  }
+
+  elements.overviewTrackerEventMeta.hidden = false;
+  elements.overviewTrackerEventName.textContent = state.trackerEvent.name || "Selected competition";
+  elements.overviewTrackerEventSubtitle.textContent = buildBlueAllianceEventSubtitle(state.trackerEvent);
+
+  if (state.trackerLoading && !state.trackerMatches.length) {
+    elements.overviewTrackerEventSummary.textContent = "Loading matches...";
+    return;
+  }
+
+  const totalMatches = state.trackerMatches.length;
+  const videoCount = state.trackerMatches.filter((match) => Array.isArray(match?.videos) && match.videos.length).length;
+  const summaryParts = [];
+
+  if (totalMatches) {
+    summaryParts.push(`${videoCount} videos from ${totalMatches} team match${totalMatches === 1 ? "" : "es"}`);
+  } else {
+    summaryParts.push("No team matches loaded yet");
+  }
+
+  if (Number.isFinite(state.trackerPredictionAccuracy)) {
+    summaryParts.push(`model accuracy ${formatPercentage(state.trackerPredictionAccuracy, 1)}`);
+  }
+
+  if (state.trackerPredictionError) {
+    summaryParts.push("predicted scores unavailable");
+  }
+
+  elements.overviewTrackerEventSummary.textContent = summaryParts.join(" • ");
+}
+
+function updateMatchTrackerLinks(eventKey = state.trackerSelectedEventKey) {
+  if (elements.overviewTrackerTeamLink) {
+    elements.overviewTrackerTeamLink.href = `https://www.thebluealliance.com/team/${TRACKED_TEAM_NUMBER}`;
+  }
+
+  if (elements.overviewTrackerEventLink) {
+    if (eventKey) {
+      elements.overviewTrackerEventLink.href = `https://www.thebluealliance.com/event/${encodeURIComponent(eventKey)}`;
+      elements.overviewTrackerEventLink.textContent = "Open Competition on The Blue Alliance";
+    } else {
+      elements.overviewTrackerEventLink.href = `https://www.thebluealliance.com/team/${TRACKED_TEAM_NUMBER}`;
+      elements.overviewTrackerEventLink.textContent = "Browse Team 10312 on The Blue Alliance";
+    }
+  }
+
+  if (elements.overviewTrackerLinks) {
+    elements.overviewTrackerLinks.hidden = false;
+  }
+}
+
+function setMatchTrackerStatus(message, tone = "") {
+  if (!elements.overviewTrackerStatus) return;
+  elements.overviewTrackerStatus.textContent = message;
+  elements.overviewTrackerStatus.dataset.tone = tone || "";
+}
+
+function formatBlueAllianceMatchLabel(match) {
+  const base = MATCH_LEVEL_LABELS[match?.comp_level] || "Match";
+  if (match?.comp_level === "qm") {
+    return `${base} ${match?.match_number || "?"}`;
+  }
+
+  if (match?.set_number && match?.match_number) {
+    return `${base} ${match.set_number}-${match.match_number}`;
+  }
+
+  return `${base} ${match?.match_number || "?"}`;
+}
+
+function buildBlueAllianceEventSubtitle(event) {
+  const location = [event?.city, event?.state_prov, event?.country].filter(Boolean).join(", ");
+  const dateText = formatArchiveDateRange(event?.start_date, event?.end_date);
+
+  if (location && dateText) {
+    return `${location} • ${dateText}`;
+  }
+
+  return location || dateText || "Blue Alliance competition archive";
+}
+
+function formatUnixDateTime(unixSeconds) {
+  const timestamp = Number(unixSeconds);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return "";
+  return formatDateTime(timestamp * 1000);
+}
+
+function formatArchiveDateRange(startDate, endDate) {
+  if (!startDate) return "";
+
+  const start = new Date(`${startDate}T12:00:00`);
+  const end = endDate ? new Date(`${endDate}T12:00:00`) : null;
+  const shortOptions = { month: "short", day: "numeric" };
+
+  if (!end || startDate === endDate) {
+    return `${start.toLocaleDateString(undefined, shortOptions)}, ${start.getFullYear()}`;
+  }
+
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  if (sameMonth) {
+    return `${start.toLocaleDateString(undefined, shortOptions)}-${end.getDate()}, ${end.getFullYear()}`;
+  }
+
+  return `${start.toLocaleDateString(undefined, shortOptions)} - ${end.toLocaleDateString(undefined, shortOptions)}, ${end.getFullYear()}`;
+}
+
+function buildWatchSourceUrl(match) {
+  const video = getBlueAlliancePrimaryVideo(match);
+  if (video?.type === "youtube" && video.key) {
+    return `https://www.youtube.com/watch?v=${encodeURIComponent(video.key)}`;
+  }
+  return match?.key ? `https://www.thebluealliance.com/match/${encodeURIComponent(match.key)}` : "#";
+}
+
+function getBlueAlliancePrimaryVideo(match) {
+  const videos = Array.isArray(match?.videos) ? match.videos : [];
+  return videos.find((video) => video && video.type === "youtube" && video.key) || videos.find((video) => video && video.key) || null;
+}
+
+function getBlueAllianceAllianceForTeam(match, teamKey) {
+  const redTeams = getBlueAllianceAllianceTeams(match, "red", true);
+  if (redTeams.includes(teamKey)) return "red";
+
+  const blueTeams = getBlueAllianceAllianceTeams(match, "blue", true);
+  if (blueTeams.includes(teamKey)) return "blue";
+
+  return "unknown";
+}
+
+function getBlueAllianceAllianceTeams(match, alliance, rawKeys = false) {
+  const teams =
+    match?.alliances?.[alliance] && Array.isArray(match.alliances[alliance].team_keys)
+      ? match.alliances[alliance].team_keys
+      : [];
+
+  return rawKeys ? teams : teams.map(formatBlueAllianceTeamKey);
+}
+
+function getBlueAllianceAllianceScore(match, alliance) {
+  const score = match?.alliances?.[alliance]?.score;
+  return typeof score === "number" ? score : null;
+}
+
+function formatBlueAllianceTeamKey(teamKey) {
+  return teamKey ? String(teamKey).replace(/^frc/i, "Team ") : "Unknown team";
 }
 
 function isCompletedStatboticsMatch(match) {
@@ -1773,6 +2396,7 @@ async function handleEventChange(eventId) {
     renderAll();
     await loadEntriesForActiveEvent();
     await loadOverviewData();
+    await syncMatchTrackerSelection({ forceActiveEvent: true });
     state.lastSyncAt = new Date().toISOString();
     saveStoredValue(STORAGE_KEYS.lastSyncAt, state.lastSyncAt);
     setAppMessage("Event data loaded.", "success");
@@ -2294,54 +2918,59 @@ function renderOverviewTable() {
 }
 
 function renderOverviewPredictions() {
-  if (!elements.overviewPredictionBody || !elements.overviewPredictionLabel) return;
-
-  if (state.overviewLoading) {
-    elements.overviewPredictionLabel.textContent = "Loading Team 10312 Statbotics match predictions...";
-    renderOverviewMessageRow(elements.overviewPredictionBody, 5, "Loading match predictions...");
+  if (
+    !elements.overviewPredictionBody ||
+    !elements.overviewPredictionLabel ||
+    !elements.overviewTrackerStatus
+  ) {
     return;
   }
 
-  if (state.overviewError) {
-    elements.overviewPredictionLabel.textContent = "Statbotics predictions are temporarily unavailable.";
-    renderOverviewMessageRow(elements.overviewPredictionBody, 5, state.overviewError);
+  renderMatchTrackerSeasonOptions();
+  updateMatchTrackerLinks();
+  renderMatchTrackerEventMeta();
+
+  elements.overviewPredictionLabel.textContent = state.trackerPredictionError
+    ? "Match videos are loaded from The Blue Alliance. Predicted scores are temporarily unavailable for this competition."
+    : "Browse Team 10312 match videos by season and competition. Predicted scores are powered by Statbotics.";
+
+  elements.overviewPredictionBody.innerHTML = "";
+  elements.overviewPredictionBody.hidden = true;
+
+  if (!configReady()) {
+    setMatchTrackerStatus("Match tracker is unavailable until Supabase is configured.");
     return;
   }
 
-  const { rows, label } = buildPredictionRows(state.overviewMatches, state.overviewEventData);
-  elements.overviewPredictionLabel.textContent = label;
-
-  if (!rows.length) {
-    renderOverviewMessageRow(
-      elements.overviewPredictionBody,
-      5,
-      "No team-specific Statbotics matches are available for the selected event yet."
+  if (state.trackerLoading) {
+    setMatchTrackerStatus(
+      state.trackerSelectedEventKey ? "Loading match videos..." : "Loading competitions...",
+      "loading"
     );
     return;
   }
 
-  const fragment = document.createDocumentFragment();
+  if (state.trackerError) {
+    setMatchTrackerStatus(state.trackerError, "error");
+    return;
+  }
 
-  rows.forEach((row) => {
-    const tr = document.createElement("tr");
-    if (row.tone) {
-      tr.dataset.tone = row.tone;
-    }
+  if (!state.trackerSelectedEventKey) {
+    setMatchTrackerStatus("Choose a competition to load match videos.");
+    return;
+  }
 
-    [row.match, row.alliance, row.winProb, row.predicted, row.actual].forEach((value, index) => {
-      const td = document.createElement("td");
-      td.textContent = value;
-      if (index === 4 && row.tone) {
-        td.dataset.tone = row.tone;
-      }
-      tr.appendChild(td);
-    });
+  const cards = buildMatchTrackerCards(state.trackerMatches, state.trackerPredictionMatches);
+  if (!cards.length) {
+    setMatchTrackerStatus("No published match videos are available for this competition yet.");
+    return;
+  }
 
-    fragment.appendChild(tr);
-  });
-
-  elements.overviewPredictionBody.innerHTML = "";
-  elements.overviewPredictionBody.appendChild(fragment);
+  elements.overviewPredictionBody.hidden = false;
+  elements.overviewPredictionBody.innerHTML = cards.map((match) => renderMatchTrackerCard(match)).join("");
+  setMatchTrackerStatus(
+    `${cards.length} team match video${cards.length === 1 ? "" : "s"} loaded from The Blue Alliance.${state.trackerPredictionError ? " Predicted scores unavailable." : ""}`
+  );
 }
 
 function renderOverviewMessageRow(target, colSpan, message) {
@@ -3095,7 +3724,6 @@ function renderFormAvailability() {
   const canRetry = Boolean(state.session && state.outbox.length && !state.isRefreshing);
 
   if (elements.refreshButton) elements.refreshButton.disabled = !state.session || state.isRefreshing;
-  if (elements.retryOutboxButton) elements.retryOutboxButton.disabled = !canRetry;
   if (elements.retryOutboxInline) elements.retryOutboxInline.disabled = !canRetry;
   if (elements.signOutButton) elements.signOutButton.disabled = !state.session;
   if (elements.matchSubmitButton) elements.matchSubmitButton.disabled = !enabled;
@@ -4460,6 +5088,15 @@ function formatDateRange(startDate, endDate) {
   }
 
   return (start || end)?.toLocaleDateString() || "";
+}
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function normalizeError(error, fallback) {

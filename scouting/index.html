@@ -165,7 +165,6 @@
                   <select id="eventSelect" aria-label="Active event"></select>
                 </label>
                 <button id="refreshButton" type="button" class="btn secondary">Refresh Data</button>
-                <button id="retryOutboxButton" type="button" class="btn secondary">Retry Outbox</button>
                 <button id="signOutButton" type="button" class="btn secondary">Sign Out</button>
               </div>
             </div>
@@ -263,32 +262,6 @@
               </div>
             </div>
 
-            <div class="card prediction-card">
-              <div class="panel-head panel-head--overview">
-                <div>
-                  <span class="section-label">Predictions</span>
-                  <h3>Match tracker</h3>
-                </div>
-              </div>
-              <p id="overviewPredictionLabel" class="muted overview-source-meta">
-                Statbotics match predictions for Team 10312 at the selected event.
-              </p>
-              <div class="table-wrap">
-                <table class="summary-table summary-table--predictions">
-                  <thead>
-                    <tr>
-                      <th>Match</th>
-                      <th>Alliance</th>
-                      <th>Win %</th>
-                      <th>Predicted Score</th>
-                      <th>Actual</th>
-                    </tr>
-                  </thead>
-                  <tbody id="overviewPredictionBody"></tbody>
-                </table>
-              </div>
-            </div>
-
             <div class="card analysis-card">
               <div class="panel-head panel-head--overview">
                 <div>
@@ -325,6 +298,59 @@
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            <div class="card prediction-card">
+              <div class="panel-head panel-head--overview">
+                <div>
+                  <span class="section-label">Competition Archive</span>
+                  <h3>Match tracker</h3>
+                </div>
+                <div class="tracker-controls">
+                  <label class="field field--compact tracker-field">
+                    <span>Season</span>
+                    <select id="overviewTrackerSeasonSelect" aria-label="Match tracker season"></select>
+                  </label>
+                  <label class="field field--compact tracker-field">
+                    <span>Competition</span>
+                    <select id="overviewTrackerEventSelect" aria-label="Match tracker competition" disabled>
+                      <option>Choose a season first</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <p id="overviewPredictionLabel" class="muted overview-source-meta">
+                Browse Team 10312 match videos by season and competition. Predicted scores are powered by Statbotics.
+              </p>
+              <div id="overviewTrackerEventMeta" class="tracker-meta" hidden>
+                <div>
+                  <p id="overviewTrackerEventName" class="tracker-event-name"></p>
+                  <p id="overviewTrackerEventSubtitle" class="muted tracker-event-subtitle"></p>
+                </div>
+                <div id="overviewTrackerEventSummary" class="tracker-event-summary"></div>
+              </div>
+              <div id="overviewTrackerStatus" class="tracker-status" role="status">Loading match tracker...</div>
+              <div id="overviewPredictionBody" class="tracker-grid" hidden></div>
+              <div id="overviewTrackerLinks" class="tracker-links" hidden>
+                <a
+                  class="btn secondary"
+                  id="overviewTrackerEventLink"
+                  href="https://www.thebluealliance.com/team/10312"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  Open Competition on The Blue Alliance
+                </a>
+                <a
+                  class="btn secondary"
+                  id="overviewTrackerTeamLink"
+                  href="https://www.thebluealliance.com/team/10312"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  Open Team 10312 on The Blue Alliance
+                </a>
               </div>
             </div>
           </section>

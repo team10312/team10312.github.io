@@ -13,22 +13,44 @@
     config: null,
     eventsBySeason: new Map(),
     matchesByEvent: new Map(),
+    renderedMatches: [],
     selectedSeason: null,
     selectedEventKey: "",
+    activeMatchKey: "",
     requestToken: 0
   };
 
   let seasonSelect;
   let eventSelect;
   let statusEl;
+  let carouselEl;
+  let viewportEl;
+  let prevButtonEl;
+  let nextButtonEl;
   let gridEl;
   let metaEl;
   let eventNameEl;
   let eventSubtitleEl;
   let eventSummaryEl;
+  let selectionEl;
+  let selectionLabelEl;
+  let selectionAllianceChipEl;
+  let selectionTitleEl;
+  let selectionSummaryEl;
+  let selectionAllianceEl;
+  let selectionOppositionEl;
+  let selectionPlayButtonEl;
+  let selectionWatchLinkEl;
+  let selectionDetailsLinkEl;
   let linksEl;
   let eventLinkEl;
   let teamLinkEl;
+  let modalEl;
+  let modalFrameEl;
+  let modalTitleEl;
+  let modalSummaryEl;
+  let modalWatchLinkEl;
+  let modalCloseEl;
 
   document.addEventListener("DOMContentLoaded", initMediaVideos);
 
@@ -36,14 +58,34 @@
     seasonSelect = document.getElementById("videoSeasonSelect");
     eventSelect = document.getElementById("videoEventSelect");
     statusEl = document.getElementById("videoStatus");
+    carouselEl = document.getElementById("videoCarousel");
+    viewportEl = document.getElementById("videoViewport");
+    prevButtonEl = document.getElementById("videoPrevButton");
+    nextButtonEl = document.getElementById("videoNextButton");
     gridEl = document.getElementById("videoGrid");
     metaEl = document.getElementById("videoEventMeta");
     eventNameEl = document.getElementById("videoEventName");
     eventSubtitleEl = document.getElementById("videoEventSubtitle");
     eventSummaryEl = document.getElementById("videoEventSummary");
+    selectionEl = document.getElementById("videoSelection");
+    selectionLabelEl = document.getElementById("videoSelectionLabel");
+    selectionAllianceChipEl = document.getElementById("videoSelectionAllianceChip");
+    selectionTitleEl = document.getElementById("videoSelectionTitle");
+    selectionSummaryEl = document.getElementById("videoSelectionSummary");
+    selectionAllianceEl = document.getElementById("videoSelectionAlliance");
+    selectionOppositionEl = document.getElementById("videoSelectionOpposition");
+    selectionPlayButtonEl = document.getElementById("videoSelectionPlayButton");
+    selectionWatchLinkEl = document.getElementById("videoSelectionWatchLink");
+    selectionDetailsLinkEl = document.getElementById("videoSelectionDetailsLink");
     linksEl = document.getElementById("videoLinks");
     eventLinkEl = document.getElementById("videoEventLink");
     teamLinkEl = document.getElementById("videoTeamLink");
+    modalEl = document.getElementById("videoModal");
+    modalFrameEl = document.getElementById("videoModalFrame");
+    modalTitleEl = document.getElementById("videoModalTitle");
+    modalSummaryEl = document.getElementById("videoModalSummary");
+    modalWatchLinkEl = document.getElementById("videoModalWatchLink");
+    modalCloseEl = document.getElementById("videoModalClose");
 
     if (!seasonSelect || !eventSelect || !statusEl || !gridEl || !teamLinkEl) {
       return;
@@ -74,6 +116,57 @@
         return;
       }
       loadEventMatches(eventKey);
+    });
+
+    gridEl.addEventListener("click", (event) => {
+      const tile = event.target.closest("[data-match-key]");
+      if (!tile) return;
+      const match = setActiveMatch(tile.getAttribute("data-match-key"));
+      if (!match) return;
+      openVideoModal(match);
+    });
+
+    if (viewportEl) {
+      viewportEl.addEventListener("scroll", syncCarouselNav);
+    }
+
+    if (prevButtonEl) {
+      prevButtonEl.addEventListener("click", () => {
+        scrollCarousel(-1);
+      });
+    }
+
+    if (nextButtonEl) {
+      nextButtonEl.addEventListener("click", () => {
+        scrollCarousel(1);
+      });
+    }
+
+    if (selectionPlayButtonEl) {
+      selectionPlayButtonEl.addEventListener("click", () => {
+        const match = getActiveMatch();
+        if (match) openVideoModal(match);
+      });
+    }
+
+    if (modalEl) {
+      modalEl.addEventListener("click", (event) => {
+        if (event.target === modalEl || event.target?.hasAttribute("data-video-close")) {
+          closeVideoModal();
+        }
+      });
+    }
+
+    if (modalCloseEl) {
+      modalCloseEl.addEventListener("click", () => {
+        closeVideoModal();
+      });
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && modalEl && !modalEl.hidden) {
+        closeVideoModal();
+      }
     });
 
     if (!hasSupabaseConfig()) {
@@ -294,38 +387,141 @@
   }
 
   function renderVideoCards(matches) {
+    state.renderedMatches = Array.isArray(matches) ? matches.slice() : [];
+    if (!state.renderedMatches.length) {
+      hideGrid();
+      return;
+    }
+
+    const activeKey = state.renderedMatches.some((match) => match.key === state.activeMatchKey)
+      ? state.activeMatchKey
+      : state.renderedMatches[0].key;
+    state.activeMatchKey = activeKey;
+    renderCarousel();
+    renderSelection();
+    requestAnimationFrame(() => {
+      syncCarouselNav();
+      scrollActiveTileIntoView();
+    });
+  }
+
+  function renderCarousel() {
+    if (!carouselEl || !gridEl) return;
+
+    carouselEl.hidden = false;
     gridEl.hidden = false;
-    gridEl.innerHTML = matches.map((match) => renderVideoCard(match)).join("");
+    gridEl.innerHTML = state.renderedMatches.map((match) => renderVideoCard(match)).join("");
   }
 
   function renderVideoCard(match) {
     const video = getPrimaryVideo(match);
-    const youtubeEmbed = video && video.type === "youtube"
-      ? `<iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(video.key)}" title="${escapeHtml(match.label)} video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`
-      : `<div class="media-match-fallback"><div><strong>${escapeHtml(match.label)}</strong><p>Video source is available on The Blue Alliance.</p></div></div>`;
-    const watchUrl = video && video.type === "youtube"
-      ? `https://www.youtube.com/watch?v=${encodeURIComponent(video.key)}`
-      : `https://www.thebluealliance.com/match/${encodeURIComponent(match.key)}`;
+    const thumbnail = getVideoThumbnail(video);
+    const subtitle = `${match.resultLine} • ${match.scoreLine}`;
+    const activeClass = match.key === state.activeMatchKey ? " is-active" : "";
+    const mediaLayer = thumbnail
+      ? `<span class="media-video-tile__image"><img src="${thumbnail}" alt="${escapeHtml(match.label)} thumbnail" loading="lazy" /></span>`
+      : `<span class="media-video-tile__fallback" aria-hidden="true"></span>`;
 
     return `
-      <article class="media-match-card">
-        <div class="media-match-video">${youtubeEmbed}</div>
-        <div class="media-match-copy">
-          <div class="media-match-topline">
-            <span class="media-match-chip media-match-chip--label">${escapeHtml(match.label)}</span>
-            <span class="media-match-chip media-match-chip--alliance" data-alliance="${escapeHtml(match.alliance)}">${escapeHtml(match.allianceLabel)}</span>
-          </div>
-          <h3 class="media-match-title">${escapeHtml(match.resultLine)}</h3>
-          <p class="media-match-summary">${escapeHtml(match.scoreLine)}</p>
-          <p class="media-match-teams"><strong>Alliance:</strong> ${escapeHtml(match.teamLine)}</p>
-          <p class="media-match-teams"><strong>Opposition:</strong> ${escapeHtml(match.opponentLine)}</p>
-          <div class="media-match-actions">
-            <a class="btn secondary" href="${watchUrl}" target="_blank" rel="noreferrer">Watch Source</a>
-            <a class="btn secondary" href="https://www.thebluealliance.com/match/${encodeURIComponent(match.key)}" target="_blank" rel="noreferrer">Match Details</a>
-          </div>
-        </div>
-      </article>
+      <button class="media-video-tile${activeClass}" type="button" data-match-key="${escapeHtml(match.key)}" aria-label="Open ${escapeHtml(match.label)}">
+        ${mediaLayer}
+        <span class="media-video-tile__label">
+          <span class="media-video-tile__icon" aria-hidden="true"></span>
+          <span class="media-video-tile__title">${escapeHtml(match.label)}</span>
+        </span>
+        <span class="media-video-tile__play" aria-hidden="true"></span>
+        <span class="media-video-tile__subtitle">${escapeHtml(subtitle)}</span>
+        <span class="media-video-tile__source">${video?.type === "youtube" ? "YouTube" : "Video"}</span>
+      </button>
     `;
+  }
+
+  function renderSelection() {
+    const match = getActiveMatch();
+    if (!selectionEl || !selectionLabelEl || !selectionAllianceChipEl || !match) {
+      if (selectionEl) selectionEl.hidden = true;
+      return;
+    }
+
+    selectionEl.hidden = false;
+    selectionLabelEl.textContent = match.label;
+    selectionAllianceChipEl.textContent = match.allianceLabel;
+    selectionAllianceChipEl.dataset.alliance = match.alliance || "";
+    if (selectionTitleEl) selectionTitleEl.textContent = match.resultLine;
+    if (selectionSummaryEl) selectionSummaryEl.textContent = match.scoreLine;
+    if (selectionAllianceEl) selectionAllianceEl.innerHTML = `<strong>Alliance:</strong> ${escapeHtml(match.teamLine)}`;
+    if (selectionOppositionEl) selectionOppositionEl.innerHTML = `<strong>Opposition:</strong> ${escapeHtml(match.opponentLine)}`;
+    if (selectionWatchLinkEl) selectionWatchLinkEl.href = getWatchUrl(match);
+    if (selectionDetailsLinkEl) selectionDetailsLinkEl.href = getMatchDetailUrl(match);
+    if (selectionPlayButtonEl) {
+      selectionPlayButtonEl.textContent = hasPlayableEmbed(match) ? "Play Video" : "Open Source";
+    }
+  }
+
+  function setActiveMatch(matchKey) {
+    const nextKey = String(matchKey || "");
+    const match = state.renderedMatches.find((entry) => entry.key === nextKey) || null;
+    if (!match) return null;
+    state.activeMatchKey = match.key;
+    renderCarousel();
+    renderSelection();
+    scrollActiveTileIntoView();
+    return match;
+  }
+
+  function getActiveMatch() {
+    return state.renderedMatches.find((match) => match.key === state.activeMatchKey) || null;
+  }
+
+  function scrollActiveTileIntoView() {
+    if (!viewportEl || !gridEl || !state.activeMatchKey) return;
+    const activeTile = gridEl.querySelector(`[data-match-key="${cssEscape(state.activeMatchKey)}"]`);
+    if (!activeTile) return;
+    activeTile.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }
+
+  function scrollCarousel(direction) {
+    if (!viewportEl) return;
+    const cardWidth = viewportEl.clientWidth * 0.8;
+    viewportEl.scrollBy({
+      left: direction * Math.max(cardWidth, 280),
+      behavior: "smooth"
+    });
+  }
+
+  function syncCarouselNav() {
+    if (!viewportEl) return;
+    const maxScrollLeft = Math.max(viewportEl.scrollWidth - viewportEl.clientWidth, 0);
+    const currentScrollLeft = viewportEl.scrollLeft;
+    if (prevButtonEl) prevButtonEl.disabled = currentScrollLeft <= 8;
+    if (nextButtonEl) nextButtonEl.disabled = currentScrollLeft >= maxScrollLeft - 8;
+  }
+
+  function openVideoModal(match) {
+    if (!match || !modalEl || !modalFrameEl) return;
+
+    const watchUrl = getWatchUrl(match);
+    if (!hasPlayableEmbed(match)) {
+      window.open(watchUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const video = getPrimaryVideo(match);
+    modalEl.hidden = false;
+    document.body.style.overflow = "hidden";
+    modalFrameEl.innerHTML = `<iframe loading="eager" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(video.key)}?autoplay=1&rel=0" title="${escapeHtml(match.label)} video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+    if (modalTitleEl) modalTitleEl.textContent = match.label;
+    if (modalSummaryEl) modalSummaryEl.textContent = `${match.resultLine} • ${match.scoreLine}`;
+    if (modalWatchLinkEl) modalWatchLinkEl.href = watchUrl;
+  }
+
+  function closeVideoModal() {
+    if (!modalEl || modalEl.hidden) return;
+    modalEl.hidden = true;
+    document.body.style.overflow = "";
+    if (modalFrameEl) {
+      modalFrameEl.innerHTML = "";
+    }
   }
 
   function decorateMatch(match, teamKey) {
@@ -366,6 +562,31 @@
   function getPrimaryVideo(match) {
     const videos = Array.isArray(match.videos) ? match.videos : [];
     return videos.find((video) => video && video.type === "youtube" && video.key) || videos.find((video) => video && video.key) || null;
+  }
+
+  function getVideoThumbnail(video) {
+    if (!video || !video.key) return "";
+    if (video.type === "youtube") {
+      return `https://i.ytimg.com/vi/${encodeURIComponent(video.key)}/hqdefault.jpg`;
+    }
+    return "";
+  }
+
+  function hasPlayableEmbed(match) {
+    const video = getPrimaryVideo(match);
+    return Boolean(video && video.type === "youtube" && video.key);
+  }
+
+  function getWatchUrl(match) {
+    const video = getPrimaryVideo(match);
+    if (video && video.type === "youtube" && video.key) {
+      return `https://www.youtube.com/watch?v=${encodeURIComponent(video.key)}`;
+    }
+    return getMatchDetailUrl(match);
+  }
+
+  function getMatchDetailUrl(match) {
+    return `https://www.thebluealliance.com/match/${encodeURIComponent(match.key)}`;
   }
 
   function getAllianceForTeam(match, teamKey) {
@@ -506,8 +727,18 @@
   }
 
   function hideGrid() {
-    gridEl.hidden = true;
-    gridEl.innerHTML = "";
+    state.renderedMatches = [];
+    state.activeMatchKey = "";
+    if (carouselEl) carouselEl.hidden = true;
+    if (selectionEl) selectionEl.hidden = true;
+    if (gridEl) {
+      gridEl.hidden = true;
+      gridEl.innerHTML = "";
+    }
+    if (viewportEl) {
+      viewportEl.scrollLeft = 0;
+    }
+    closeVideoModal();
   }
 
   function setStatus(message, tone) {
@@ -523,5 +754,12 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === "function") {
+      return window.CSS.escape(String(value));
+    }
+    return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
   }
 })();

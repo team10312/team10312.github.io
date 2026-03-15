@@ -282,7 +282,35 @@
             Loading match videos...
           </div>
 
-          <div class="media-video-grid" id="videoGrid" hidden></div>
+          <div class="media-video-carousel" id="videoCarousel" hidden>
+            <button class="media-video-nav media-video-nav--prev" id="videoPrevButton" type="button" aria-label="Show previous videos">
+              <span aria-hidden="true">‹</span>
+            </button>
+            <div class="media-video-viewport" id="videoViewport">
+              <div class="media-video-grid" id="videoGrid" hidden></div>
+            </div>
+            <button class="media-video-nav media-video-nav--next" id="videoNextButton" type="button" aria-label="Show next videos">
+              <span aria-hidden="true">›</span>
+            </button>
+          </div>
+
+          <div class="media-video-selection" id="videoSelection" hidden>
+            <div class="media-video-selection__copy">
+              <div class="media-match-topline">
+                <span class="media-match-chip media-match-chip--label" id="videoSelectionLabel"></span>
+                <span class="media-match-chip media-match-chip--alliance" id="videoSelectionAllianceChip"></span>
+              </div>
+              <h3 class="media-match-title" id="videoSelectionTitle"></h3>
+              <p class="media-match-summary" id="videoSelectionSummary"></p>
+              <p class="media-match-teams" id="videoSelectionAlliance"></p>
+              <p class="media-match-teams" id="videoSelectionOpposition"></p>
+            </div>
+            <div class="media-match-actions media-video-selection__actions">
+              <button class="btn glass-button" id="videoSelectionPlayButton" type="button">Play Video</button>
+              <a class="btn secondary" id="videoSelectionWatchLink" href="https://www.thebluealliance.com/team/10312" target="_blank" rel="noreferrer">Watch Source</a>
+              <a class="btn secondary" id="videoSelectionDetailsLink" href="https://www.thebluealliance.com/team/10312" target="_blank" rel="noreferrer">Match Details</a>
+            </div>
+          </div>
 
           <div class="media-video-links" id="videoLinks" hidden>
             <a class="btn secondary" id="videoEventLink" href="https://www.thebluealliance.com/team/10312" target="_blank" rel="noreferrer">Open Competition on The Blue Alliance</a>
@@ -291,6 +319,21 @@
         </div>
       </div>
     </section>
+
+    <div class="media-video-modal" id="videoModal" hidden>
+      <div class="media-video-modal__scrim" data-video-close></div>
+      <div class="media-video-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="videoModalTitle">
+        <button class="media-video-modal__close" id="videoModalClose" type="button" aria-label="Close video">×</button>
+        <div class="media-video-modal__frame" id="videoModalFrame"></div>
+        <div class="media-video-modal__meta">
+          <div>
+            <p class="media-video-modal__label" id="videoModalTitle"></p>
+            <p class="muted media-video-modal__summary" id="videoModalSummary"></p>
+          </div>
+          <a class="btn secondary" id="videoModalWatchLink" href="https://www.thebluealliance.com/team/10312" target="_blank" rel="noreferrer">Watch Source</a>
+        </div>
+      </div>
+    </div>
 
     <section class="section">
       <div class="container">
