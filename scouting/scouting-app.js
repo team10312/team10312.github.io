@@ -147,7 +147,10 @@ const state = {
   authRedirecting: false,
   overviewMode: loadStoredValue(STORAGE_KEYS.overviewMode, OVERVIEW_MODE_COMPETITION),
   overviewLoading: false,
-  overviewError: "",
+  overviewCompetitionError: "",
+  overviewCompetitionNote: "",
+  overviewTexasError: "",
+  overviewWorldError: "",
   overviewFetchedAt: "",
   overviewCompetitionRows: [],
   overviewCompetitionSortOrderInfo: [],
@@ -1577,7 +1580,10 @@ async function loadEntriesForActiveEvent() {
 
 function resetOverviewState() {
   state.overviewLoading = false;
-  state.overviewError = "";
+  state.overviewCompetitionError = "";
+  state.overviewCompetitionNote = "";
+  state.overviewTexasError = "";
+  state.overviewWorldError = "";
   state.overviewFetchedAt = "";
   state.overviewCompetitionRows = [];
   state.overviewCompetitionSortOrderInfo = [];
@@ -1630,11 +1636,21 @@ async function loadOverviewData() {
   const requestToken = ++overviewRequestToken;
 
   state.overviewLoading = true;
-  state.overviewError = "";
+  state.overviewCompetitionError = "";
+  state.overviewCompetitionNote = "";
+  state.overviewTexasError = "";
+  state.overviewWorldError = "";
   renderOverview();
 
   try {
-    const [competitionRows, competitionRankingsPayload, texasDistrictPayload, texasSeasonRows, matches, eventData] = await Promise.all([
+    const [
+      competitionRowsResult,
+      competitionRankingsResult,
+      texasDistrictResult,
+      texasSeasonRowsResult,
+      matchesResult,
+      eventDataResult
+    ] = await Promise.allSettled([
       fetchStatbotics(`team_events?event=${encodeURIComponent(eventKey)}&limit=1000`),
       fetchOverviewCompetitionRankings(tbaEventKey),
       fetchTexasDistrictRankings(season),
@@ -1644,6 +1660,56 @@ async function loadOverviewData() {
     ]);
 
     if (requestToken !== overviewRequestToken) return;
+
+    const competitionRows = competitionRowsResult.status === "fulfilled" && Array.isArray(competitionRowsResult.value)
+      ? competitionRowsResult.value
+      : [];
+    if (competitionRowsResult.status === "rejected") {
+      console.warn("Unable to load Statbotics event rows", competitionRowsResult.reason);
+      state.overviewCompetitionError = normalizeError(
+        competitionRowsResult.reason,
+        "Unable to load competition data right now."
+      );
+    }
+
+    const competitionRankingsPayload =
+      competitionRankingsResult.status === "fulfilled"
+        ? competitionRankingsResult.value
+        : { rankings: [], sort_order_info: [] };
+    if (competitionRankingsResult.status === "rejected") {
+      console.warn("Unable to load Blue Alliance event rankings", competitionRankingsResult.reason);
+      state.overviewCompetitionNote = "Blue Alliance event rankings are temporarily unavailable; using Statbotics event rows.";
+    }
+
+    const texasDistrictPayload =
+      texasDistrictResult.status === "fulfilled"
+        ? texasDistrictResult.value
+        : { districtKey: buildFitDistrictKey(season), rankings: [], teams: [] };
+    if (texasDistrictResult.status === "rejected") {
+      console.warn("Unable to load FIRST in Texas district rankings", texasDistrictResult.reason);
+      state.overviewTexasError = "FIRST in Texas district rankings are temporarily unavailable.";
+    }
+
+    const texasSeasonRows = texasSeasonRowsResult.status === "fulfilled" && Array.isArray(texasSeasonRowsResult.value)
+      ? texasSeasonRowsResult.value
+      : [];
+    if (texasSeasonRowsResult.status === "rejected") {
+      console.warn("Unable to load Statbotics season rows", texasSeasonRowsResult.reason);
+      state.overviewWorldError = "Global EPA rank is temporarily unavailable.";
+    }
+
+    const matches = matchesResult.status === "fulfilled" && Array.isArray(matchesResult.value) ? matchesResult.value : [];
+    if (matchesResult.status === "rejected") {
+      console.warn("Unable to load Statbotics matches for overview", matchesResult.reason);
+    }
+
+    const eventData =
+      eventDataResult.status === "fulfilled" && eventDataResult.value && !Array.isArray(eventDataResult.value)
+        ? eventDataResult.value
+        : null;
+    if (eventDataResult.status === "rejected") {
+      console.warn("Unable to load Statbotics event details for overview", eventDataResult.reason);
+    }
 
     state.overviewCompetitionRows = sortCompetitionRows(
       mergeCompetitionOverviewRows(competitionRows, competitionRankingsPayload)
@@ -1673,7 +1739,7 @@ async function loadOverviewData() {
   } catch (error) {
     if (requestToken !== overviewRequestToken) return;
     resetOverviewState();
-    state.overviewError = normalizeError(error, "Unable to load overview rankings right now.");
+    state.overviewCompetitionError = normalizeError(error, "Unable to load overview rankings right now.");
   } finally {
     if (requestToken !== overviewRequestToken) return;
     state.overviewLoading = false;
@@ -2272,7 +2338,7 @@ function getLiveOverviewPredictionData(eventKey) {
     return null;
   }
 
-  if (state.overviewError || (!state.overviewMatches.length && !state.overviewEventData)) {
+  if (state.overviewCompetitionError || (!state.overviewMatches.length && !state.overviewEventData)) {
     return null;
   }
 
@@ -3175,22 +3241,16 @@ function renderOverviewModeButtons() {
 function renderOverviewBanners() {
   const eventRow = getTrackedEventRow();
   const texasRow = getTrackedTexasRow();
+  const worldRow = getTrackedWorldRow();
   const restoringSession = isSessionRestorePending();
 
   if (!elements.overviewCompetitionValue) return;
   renderOverviewCompetitionStreams(state.overviewStreamLinks);
 
-  if ((restoringSession || state.overviewLoading) && !eventRow && !texasRow) {
+  if ((restoringSession || state.overviewLoading) && !eventRow && !texasRow && !worldRow) {
     setOverviewBanner(elements.overviewCompetitionValue, elements.overviewCompetitionMeta, "Loading", "Pulling live competition rankings from The Blue Alliance.");
     setOverviewBanner(elements.overviewTexasValue, elements.overviewTexasMeta, "Loading", "Pulling FIRST in Texas district rankings from The Blue Alliance.");
     setOverviewBanner(elements.overviewWorldValue, elements.overviewWorldMeta, "Loading", "Pulling global EPA rank.");
-    return;
-  }
-
-  if (state.overviewError && !eventRow && !texasRow) {
-    setOverviewBanner(elements.overviewCompetitionValue, elements.overviewCompetitionMeta, "Unavailable", state.overviewError);
-    setOverviewBanner(elements.overviewTexasValue, elements.overviewTexasMeta, "Unavailable", "FIRST in Texas district rankings are temporarily unavailable.");
-    setOverviewBanner(elements.overviewWorldValue, elements.overviewWorldMeta, "Unavailable", "Global EPA rank is temporarily unavailable.");
     return;
   }
 
@@ -3201,14 +3261,27 @@ function renderOverviewBanners() {
       elements.overviewCompetitionValue,
       elements.overviewCompetitionMeta,
       `#${getCompetitionRowRank(eventRow) || "--"}`,
-      `${eventRow.event_name || "Selected event"} • ${matchesPlayed ? `${formatRecord(qualRecord)} • ${matchesPlayed} matches played` : "No matches played yet"}`
+      [
+        eventRow.event_name || "Selected event",
+        matchesPlayed ? `${formatRecord(qualRecord)} • ${matchesPlayed} matches played` : "No matches played yet",
+        state.overviewCompetitionNote
+      ]
+        .filter(Boolean)
+        .join(" • ")
     );
+  } else if (state.overviewCompetitionError) {
+    setOverviewBanner(elements.overviewCompetitionValue, elements.overviewCompetitionMeta, "Unavailable", state.overviewCompetitionError);
   } else {
     setOverviewBanner(
       elements.overviewCompetitionValue,
       elements.overviewCompetitionMeta,
       "No rank",
-      "Team 10312 does not have a live Blue Alliance ranking row for the selected event yet."
+      [
+        "Team 10312 does not have a live ranking row for the selected event yet.",
+        state.overviewCompetitionNote
+      ]
+        .filter(Boolean)
+        .join(" • ")
     );
   }
 
@@ -3225,6 +3298,8 @@ function renderOverviewBanners() {
       `#${texasRow.district_rank || "--"}`,
       `FIRST in Texas district • ${formatNullableFixedDecimal(texasRow.district_points, 0)} pts • ${districtEventLabel}${districtChampionshipLabel}`
     );
+  } else if (state.overviewTexasError) {
+    setOverviewBanner(elements.overviewTexasValue, elements.overviewTexasMeta, "Unavailable", state.overviewTexasError);
   } else {
     setOverviewBanner(
       elements.overviewTexasValue,
@@ -3234,7 +3309,6 @@ function renderOverviewBanners() {
     );
   }
 
-  const worldRow = getTrackedWorldRow();
   if (worldRow) {
     setOverviewBanner(
       elements.overviewWorldValue,
@@ -3245,6 +3319,10 @@ function renderOverviewBanners() {
         1
       )} • EPA ${formatDecimal(worldRow.epa?.total_points?.mean)}`
     );
+    return;
+  }
+  if (state.overviewWorldError) {
+    setOverviewBanner(elements.overviewWorldValue, elements.overviewWorldMeta, "Unavailable", state.overviewWorldError);
     return;
   }
   setOverviewBanner(
@@ -3261,6 +3339,8 @@ function renderOverviewTable() {
   const columns = getOverviewRankingColumns();
   const rows =
     state.overviewMode === OVERVIEW_MODE_TEXAS ? state.overviewTexasRows : state.overviewCompetitionRows;
+  const activeOverviewError =
+    state.overviewMode === OVERVIEW_MODE_TEXAS ? state.overviewTexasError : state.overviewCompetitionError;
   const hasRows = Array.isArray(rows) && rows.length > 0;
   const restoringSession = isSessionRestorePending();
   const isRefreshingExistingRows = state.overviewLoading && hasRows;
@@ -3289,9 +3369,9 @@ function renderOverviewTable() {
     return;
   }
 
-  if (state.overviewError) {
-    elements.overviewSourceMeta.textContent = state.overviewError;
-    renderOverviewMessageRow(elements.overviewRankingsBody, columns.length, state.overviewError);
+  if (activeOverviewError && !hasRows) {
+    elements.overviewSourceMeta.textContent = activeOverviewError;
+    renderOverviewMessageRow(elements.overviewRankingsBody, columns.length, activeOverviewError);
     return;
   }
 
@@ -3304,9 +3384,12 @@ function renderOverviewTable() {
         ? "Refreshing live FIRST in Texas district rankings..."
         : "Refreshing live competition rankings..."
       : "",
+    state.overviewMode === OVERVIEW_MODE_COMPETITION ? state.overviewCompetitionNote : "",
     state.overviewMode === OVERVIEW_MODE_TEXAS
       ? "Source: The Blue Alliance district rankings • team media: The Blue Alliance"
-      : "Source: The Blue Alliance event rankings • world EPA: Statbotics • team media: The Blue Alliance"
+      : state.overviewCompetitionNote
+        ? "Source: Statbotics event rows • world EPA: Statbotics • team media: The Blue Alliance"
+        : "Source: The Blue Alliance event rankings • world EPA: Statbotics • team media: The Blue Alliance"
   ]
     .filter(Boolean)
     .join(" • ");
@@ -4559,18 +4642,18 @@ function renderPickAnalysis() {
   }
 
   if (state.overviewLoading) {
-    elements.pickAnalysisStatus.textContent = "Waiting for Statbotics event rows to finish loading.";
+    elements.pickAnalysisStatus.textContent = "Waiting for competition event rows to finish loading.";
     elements.pickAnalysisBest.classList.add("empty-state");
     elements.pickAnalysisBest.textContent = "Analysis will be available after the current event data loads.";
     renderOverviewMessageRow(elements.pickAnalysisBody, 5, "Loading current event data...");
     return;
   }
 
-  if (state.overviewError) {
-    elements.pickAnalysisStatus.textContent = "Statbotics event data is unavailable, so the analysis cannot run.";
+  if (state.overviewCompetitionError) {
+    elements.pickAnalysisStatus.textContent = "Competition data is unavailable, so the analysis cannot run.";
     elements.pickAnalysisBest.classList.add("empty-state");
-    elements.pickAnalysisBest.textContent = state.overviewError;
-    renderOverviewMessageRow(elements.pickAnalysisBody, 5, state.overviewError);
+    elements.pickAnalysisBest.textContent = state.overviewCompetitionError;
+    renderOverviewMessageRow(elements.pickAnalysisBody, 5, state.overviewCompetitionError);
     return;
   }
 
@@ -4715,7 +4798,7 @@ function renderOutbox() {
       detail.textContent = [
         payload.drivetrain || "Drive unknown",
         payload.fuel_scoring_capability || "Fuel unknown",
-        payload.barge_route && payload.barge_route !== "Unknown" ? `Barge ${payload.barge_route}` : "",
+        formatTrenchRouteLabel(payload.barge_route),
         Number(payload.estimated_fuel_per_match || 0) > 0
           ? `Fuel ${payload.estimated_fuel_per_match}/match`
           : ""
@@ -5447,7 +5530,7 @@ function buildTeamSummary(matchEntries, pitEntries) {
       drivetrain: pit?.drivetrain || "",
       fuel_scoring_capability: pit?.fuel_scoring_capability || "",
       estimated_fuel_per_match: Number(pit?.estimated_fuel_per_match || 0),
-      barge_route: pit?.barge_route || "",
+      barge_route: normalizeTrenchRouteValue(pit?.barge_route),
       cycle_time: pit?.cycle_time || "",
       scoring_speed: pit?.scoring_speed || "",
       intake_style: pit?.intake_style || "",
@@ -5476,7 +5559,7 @@ function normalizeSummaryRow(row) {
     drivetrain: row.drivetrain || "",
     fuel_scoring_capability: row.fuel_scoring_capability || "",
     estimated_fuel_per_match: Number(row.estimated_fuel_per_match || 0),
-    barge_route: row.barge_route || "",
+    barge_route: normalizeTrenchRouteValue(row.barge_route),
     cycle_time: row.cycle_time || "",
     scoring_speed: row.scoring_speed || "",
     intake_style: row.intake_style || "",
@@ -5497,7 +5580,7 @@ function buildPitSnapshot(row) {
     row.shooter_type,
     row.intake_style,
     row.estimated_fuel_per_match ? `Fuel ${row.estimated_fuel_per_match}/match` : "",
-    row.barge_route && row.barge_route !== "Unknown" ? `Barge ${row.barge_route}` : "",
+    formatTrenchRouteLabel(row.barge_route),
     row.cycle_time ? `Cycle ${row.cycle_time}` : "",
     row.scoring_speed,
     row.climb_level ? `Climb ${row.climb_level}` : "",
@@ -5557,7 +5640,7 @@ function exportPitCsv() {
     drivetrain: entry.drivetrain,
     fuel_scoring_capability: entry.fuel_scoring_capability,
     estimated_fuel_per_match: Number(entry.estimated_fuel_per_match || 0),
-    barge_route: entry.barge_route,
+    barge_route: normalizeTrenchRouteValue(entry.barge_route),
     cycle_time: entry.cycle_time,
     scoring_speed: entry.scoring_speed,
     intake_style: entry.intake_style,
@@ -5938,7 +6021,7 @@ function normalizePitValues(values) {
       values.fuel_scoring_capability ?? PIT_DEFAULTS.fuel_scoring_capability
     ).trim(),
     estimated_fuel_per_match: normalizeNumericDraftValue(values.estimated_fuel_per_match),
-    barge_route: String(values.barge_route ?? PIT_DEFAULTS.barge_route).trim() || PIT_DEFAULTS.barge_route,
+    barge_route: normalizeTrenchRouteValue(values.barge_route),
     cycle_time: String(values.cycle_time ?? "").trim(),
     scoring_speed: String(values.scoring_speed ?? PIT_DEFAULTS.scoring_speed).trim(),
     intake_style: String(values.intake_style ?? PIT_DEFAULTS.intake_style).trim(),
@@ -5952,6 +6035,22 @@ function normalizePitValues(values) {
     reliability_notes: String(values.reliability_notes ?? "").trim(),
     notes: String(values.notes ?? "").trim()
   };
+}
+
+function normalizeTrenchRouteValue(value) {
+  switch (String(value ?? "").trim().toLowerCase()) {
+    case "over":
+      return "Over";
+    case "under":
+      return "Under";
+    default:
+      return PIT_DEFAULTS.barge_route;
+  }
+}
+
+function formatTrenchRouteLabel(value) {
+  const normalized = normalizeTrenchRouteValue(value);
+  return normalized !== PIT_DEFAULTS.barge_route ? `Trench ${normalized}` : "";
 }
 
 function normalizeNumericDraftValue(value) {
