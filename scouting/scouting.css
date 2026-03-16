@@ -851,9 +851,27 @@ code {
   line-height: 1.5;
 }
 
-.overview-stream-link {
+.overview-stream-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
   justify-self: start;
+}
+
+.overview-stream-link {
   width: auto;
+}
+
+.overview-stream-link--live {
+  background: linear-gradient(135deg, #ff7f00, #ffae42);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 16px 34px rgba(255, 127, 0, 0.28);
+}
+
+.overview-stream-link--live:hover,
+.overview-stream-link--live:focus-visible {
+  box-shadow: 0 18px 38px rgba(255, 127, 0, 0.34);
 }
 
 .panel-head--overview {

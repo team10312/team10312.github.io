@@ -41,6 +41,12 @@ Deno.serve(async (request) => {
       return jsonResponse({ teamKey, eventKey, matches });
     }
 
+    if (mode === "event") {
+      const eventKey = parseEventKey(requestUrl.searchParams.get("eventKey"));
+      const event = await fetchBlueAllianceJson(`/event/${encodeURIComponent(eventKey)}`, tbaAuthKey);
+      return jsonResponse({ eventKey, event });
+    }
+
     if (mode === "alliances") {
       const eventKey = parseEventKey(requestUrl.searchParams.get("eventKey"));
       const alliances = await fetchBlueAllianceJson(`/event/${encodeURIComponent(eventKey)}/alliances`, tbaAuthKey);
@@ -68,7 +74,19 @@ Deno.serve(async (request) => {
       return jsonResponse({ error: "team_media mode requires either eventKey or both teamKey and year parameters." }, 400);
     }
 
-    return jsonResponse({ error: "Expected mode=events, mode=matches, mode=alliances, or mode=team_media." }, 400);
+    if (mode === "district_rankings") {
+      const districtKey = parseDistrictKey(requestUrl.searchParams.get("districtKey"));
+      const [rankings, teams] = await Promise.all([
+        fetchBlueAllianceJson(`/district/${encodeURIComponent(districtKey)}/rankings`, tbaAuthKey),
+        fetchBlueAllianceJson(`/district/${encodeURIComponent(districtKey)}/teams/simple`, tbaAuthKey)
+      ]);
+      return jsonResponse({ districtKey, rankings, teams });
+    }
+
+    return jsonResponse(
+      { error: "Expected mode=events, mode=matches, mode=event, mode=alliances, mode=team_media, or mode=district_rankings." },
+      400
+    );
   } catch (error) {
     const details = normalizeError(error);
     return jsonResponse({ error: details.error }, details.status || 500);
@@ -114,6 +132,15 @@ function parseEventKey(value: string | null) {
   }
 
   return eventKey;
+}
+
+function parseDistrictKey(value: string | null) {
+  const districtKey = String(value || "").trim().toLowerCase();
+  if (!/^\d{4}[a-z0-9_-]+$/.test(districtKey)) {
+    throw { status: 400, error: "A valid districtKey query parameter is required." } satisfies ErrorDetails;
+  }
+
+  return districtKey;
 }
 
 function normalizeTeamKey(value: string) {

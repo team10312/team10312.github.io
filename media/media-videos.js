@@ -12,6 +12,7 @@
   const state = {
     config: null,
     eventsBySeason: new Map(),
+    eventDetailsByKey: new Map(),
     matchesByEvent: new Map(),
     renderedMatches: [],
     selectedSeason: null,
@@ -31,6 +32,10 @@
   let eventNameEl;
   let eventSubtitleEl;
   let eventSummaryEl;
+  let currentStreamBarEl;
+  let currentStreamTitleEl;
+  let currentStreamMetaEl;
+  let currentStreamActionsEl;
 
   document.addEventListener("DOMContentLoaded", initMediaVideos);
 
@@ -47,6 +52,10 @@
     eventNameEl = document.getElementById("videoEventName");
     eventSubtitleEl = document.getElementById("videoEventSubtitle");
     eventSummaryEl = document.getElementById("videoEventSummary");
+    currentStreamBarEl = document.getElementById("mediaCurrentStreamBar");
+    currentStreamTitleEl = document.getElementById("mediaCurrentStreamTitle");
+    currentStreamMetaEl = document.getElementById("mediaCurrentStreamMeta");
+    currentStreamActionsEl = document.getElementById("mediaCurrentStreamActions");
 
     if (!seasonSelect || !eventSelect || !statusEl || !gridEl) {
       return;
@@ -54,6 +63,7 @@
 
     state.config = normalizeConfig(window.MEDIA_VIDEO_CONFIG || {});
     renderSeasonOptions();
+    void loadCurrentStreamBar();
 
     seasonSelect.addEventListener("change", () => {
       state.selectedSeason = Number(seasonSelect.value);
@@ -249,6 +259,57 @@
     const sortedMatches = Array.isArray(matches) ? matches.slice().sort(compareMatches) : [];
     state.matchesByEvent.set(eventKey, sortedMatches);
     return sortedMatches;
+  }
+
+  async function getEventDetails(eventKey) {
+    const normalizedKey = String(eventKey || "").trim().toLowerCase();
+    if (!normalizedKey) {
+      return null;
+    }
+
+    if (state.eventDetailsByKey.has(normalizedKey)) {
+      return state.eventDetailsByKey.get(normalizedKey);
+    }
+
+    const payload = await requestMediaProxy({ mode: "event", eventKey: normalizedKey });
+    const event = payload && payload.event && typeof payload.event === "object" && !Array.isArray(payload.event)
+      ? payload.event
+      : null;
+    state.eventDetailsByKey.set(normalizedKey, event);
+    return event;
+  }
+
+  async function loadCurrentStreamBar() {
+    if (!hasSupabaseConfig()) {
+      hideCurrentStreamBar();
+      return;
+    }
+
+    try {
+      const currentSeason = new Date().getFullYear();
+      const events = await getSeasonEvents(currentSeason);
+      const liveEvent = findCurrentlyStreamingEvent(events);
+      if (!liveEvent) {
+        hideCurrentStreamBar();
+        return;
+      }
+
+      const eventDetails = await getEventDetails(liveEvent.key);
+      const streamLinks = buildEventStreamLinks(eventDetails, {
+        startDate: liveEvent.start_date,
+        endDate: liveEvent.end_date
+      });
+
+      if (!streamLinks.length) {
+        hideCurrentStreamBar();
+        return;
+      }
+
+      renderCurrentStreamBar(liveEvent, streamLinks);
+    } catch (error) {
+      console.error("Unable to load the current stream bar", error);
+      hideCurrentStreamBar();
+    }
   }
 
   async function requestMediaProxy(params) {
@@ -450,6 +511,12 @@
     return (a.name || "").localeCompare(b.name || "");
   }
 
+  function findCurrentlyStreamingEvent(events) {
+    return (Array.isArray(events) ? events : []).find((event) => {
+      return isEventStreamingLive(event && event.start_date, event && event.end_date);
+    }) || null;
+  }
+
   function getDefaultEventKey(events) {
     const rows = Array.isArray(events) ? events : [];
     return rows.length ? rows[rows.length - 1].key : "";
@@ -477,6 +544,196 @@
     }
 
     return location || dateText || "Blue Alliance competition archive";
+  }
+
+  function renderCurrentStreamBar(event, streamLinks) {
+    if (!currentStreamBarEl || !currentStreamTitleEl || !currentStreamMetaEl || !currentStreamActionsEl) {
+      return;
+    }
+
+    const links = Array.isArray(streamLinks) ? streamLinks.filter((link) => link && link.url) : [];
+    if (!event || !links.length) {
+      hideCurrentStreamBar();
+      return;
+    }
+
+    currentStreamBarEl.hidden = false;
+    currentStreamTitleEl.textContent = `Watch Current Stream: ${event.name || "Current event"}`;
+    currentStreamMetaEl.textContent = [
+      buildEventSubtitle(event),
+      "Live webcast links from The Blue Alliance"
+    ].filter(Boolean).join(" • ");
+
+    currentStreamActionsEl.innerHTML = "";
+    links.forEach((link) => {
+      const anchor = document.createElement("a");
+      anchor.className = link.variant === "live" ? "btn" : "btn secondary";
+      anchor.href = link.url;
+      anchor.target = "_blank";
+      anchor.rel = "noreferrer noopener";
+      anchor.textContent = link.label;
+      currentStreamActionsEl.appendChild(anchor);
+    });
+  }
+
+  function hideCurrentStreamBar() {
+    if (!currentStreamBarEl || !currentStreamActionsEl) {
+      return;
+    }
+
+    currentStreamBarEl.hidden = true;
+    currentStreamActionsEl.innerHTML = "";
+  }
+
+  function buildEventStreamLinks(eventDetails, options) {
+    const settings = options || {};
+    const webcastLinks = normalizeEventWebcastEntries(eventDetails && eventDetails.webcasts);
+    const streamLinks = [];
+    const isLive = isEventStreamingLive(settings.startDate || (eventDetails && eventDetails.start_date), settings.endDate || (eventDetails && eventDetails.end_date));
+
+    if (isLive) {
+      const currentLink = resolveCurrentEventStreamLink(webcastLinks, settings.fallbackUrl, settings.startDate || (eventDetails && eventDetails.start_date));
+      if (currentLink) {
+        streamLinks.push({
+          label: "Watch Current Stream",
+          url: currentLink,
+          variant: "live"
+        });
+      }
+    }
+
+    if (webcastLinks.length > 1) {
+      webcastLinks.forEach((link, index) => {
+        streamLinks.push({
+          label: `Watch Day ${index + 1} Stream`,
+          url: link,
+          variant: "day"
+        });
+      });
+    } else if (!streamLinks.length && webcastLinks.length === 1) {
+      streamLinks.push({
+        label: isLive ? "Watch Current Stream" : "Watch Event Stream",
+        url: webcastLinks[0],
+        variant: isLive ? "live" : "default"
+      });
+    } else if (!streamLinks.length && settings.fallbackUrl) {
+      streamLinks.push({
+        label: isLive ? "Watch Current Stream" : "Watch Event Stream",
+        url: settings.fallbackUrl,
+        variant: isLive ? "live" : "default"
+      });
+    }
+
+    return dedupeEventStreamLinks(streamLinks);
+  }
+
+  function normalizeEventWebcastEntries(webcasts) {
+    return dedupeEventStreamLinks(
+      (Array.isArray(webcasts) ? webcasts : [])
+        .map((webcast) => buildEventStreamUrl(webcast))
+        .filter(Boolean)
+        .map((url) => ({ label: "", url, variant: "day" }))
+    ).map((entry) => entry.url);
+  }
+
+  function buildEventStreamUrl(webcast) {
+    const type = String(webcast && webcast.type || "").trim().toLowerCase();
+    const channel = String((webcast && (webcast.channel || webcast.file)) || "").trim();
+    if (!type || !channel) {
+      return "";
+    }
+    if (/^https?:\/\//i.test(channel)) {
+      return channel;
+    }
+
+    if (type === "youtube") {
+      if (/^[a-z0-9_-]{11}$/i.test(channel)) {
+        return `https://www.youtube.com/watch?v=${channel}`;
+      }
+      if (channel.startsWith("@")) {
+        return `https://www.youtube.com/${channel}/live`;
+      }
+      if (/^(channel|c|user)\//i.test(channel)) {
+        return `https://www.youtube.com/${channel}/live`;
+      }
+      if (/^uc[a-z0-9_-]+$/i.test(channel)) {
+        return `https://www.youtube.com/channel/${channel}/live`;
+      }
+      return `https://www.youtube.com/@${channel}/live`;
+    }
+
+    if (type === "twitch") {
+      return `https://www.twitch.tv/${channel.replace(/^@/, "")}`;
+    }
+
+    if (type === "facebook-live" || type === "facebook") {
+      return `https://www.facebook.com/${channel}`;
+    }
+
+    if (type === "livestream") {
+      return `https://livestream.com/${channel}`;
+    }
+
+    return "";
+  }
+
+  function resolveCurrentEventStreamLink(webcastLinks, fallbackUrl, startDate) {
+    if (webcastLinks.length) {
+      const dayIndex = getEventStreamingDayIndex(startDate);
+      const safeIndex = Math.min(Math.max(dayIndex, 0), webcastLinks.length - 1);
+      return webcastLinks[safeIndex] || webcastLinks[0];
+    }
+
+    return fallbackUrl || "";
+  }
+
+  function dedupeEventStreamLinks(links) {
+    const seen = new Set();
+    return (Array.isArray(links) ? links : []).filter((link) => {
+      const url = String(link && link.url || "").trim();
+      const label = String(link && link.label || "").trim();
+      if (!url) {
+        return false;
+      }
+      const signature = `${label}::${url}`;
+      if (seen.has(signature)) {
+        return false;
+      }
+      seen.add(signature);
+      return true;
+    });
+  }
+
+  function isEventStreamingLive(startDate, endDate) {
+    const start = normalizeDateOnly(startDate);
+    const end = normalizeDateOnly(endDate) || start;
+    const today = getLocalDateOnly();
+    return Boolean(start && end && today >= start && today <= end);
+  }
+
+  function getEventStreamingDayIndex(startDate) {
+    const start = normalizeDateOnly(startDate);
+    if (!start) {
+      return 0;
+    }
+
+    const startValue = new Date(`${start}T00:00:00`);
+    const todayValue = new Date(`${getLocalDateOnly()}T00:00:00`);
+    const diff = Math.floor((todayValue.getTime() - startValue.getTime()) / 86400000);
+    return Number.isFinite(diff) ? diff : 0;
+  }
+
+  function normalizeDateOnly(value) {
+    const normalized = String(value || "").trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
+  }
+
+  function getLocalDateOnly() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 
   function formatDateRange(startDate, endDate) {
