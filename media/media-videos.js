@@ -565,13 +565,16 @@
     ].filter(Boolean).join(" • ");
 
     currentStreamActionsEl.innerHTML = "";
-    links.forEach((link) => {
+    links.forEach((link, index) => {
       const anchor = document.createElement("a");
-      anchor.className = link.variant === "live" ? "btn" : "btn secondary";
+      anchor.className = link.variant === "live"
+        ? "media-current-stream__link"
+        : "media-current-stream__link media-current-stream__link--secondary";
       anchor.href = link.url;
       anchor.target = "_blank";
       anchor.rel = "noreferrer noopener";
-      anchor.textContent = link.label;
+      anchor.textContent = String(link.label || "").trim() || `Open Stream ${index + 1}`;
+      anchor.setAttribute("aria-label", `${anchor.textContent} for ${event.name || "the current event"}`);
       currentStreamActionsEl.appendChild(anchor);
     });
   }
