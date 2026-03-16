@@ -558,10 +558,10 @@
     }
 
     currentStreamBarEl.hidden = false;
-    currentStreamTitleEl.textContent = `Watch Current Stream: ${event.name || "Current event"}`;
+    currentStreamTitleEl.textContent = `Event Streams: ${event.name || "Current event"}`;
     currentStreamMetaEl.textContent = [
       buildEventSubtitle(event),
-      "Live webcast links from The Blue Alliance"
+      "Webcast links from The Blue Alliance"
     ].filter(Boolean).join(" • ");
 
     currentStreamActionsEl.innerHTML = "";
@@ -589,38 +589,26 @@
     const settings = options || {};
     const webcastLinks = normalizeEventWebcastEntries(eventDetails && eventDetails.webcasts);
     const streamLinks = [];
-    const isLive = isEventStreamingLive(settings.startDate || (eventDetails && eventDetails.start_date), settings.endDate || (eventDetails && eventDetails.end_date));
-
-    if (isLive) {
-      const currentLink = resolveCurrentEventStreamLink(webcastLinks, settings.fallbackUrl, settings.startDate || (eventDetails && eventDetails.start_date));
-      if (currentLink) {
-        streamLinks.push({
-          label: "Watch Current Stream",
-          url: currentLink,
-          variant: "live"
-        });
-      }
-    }
 
     if (webcastLinks.length > 1) {
       webcastLinks.forEach((link, index) => {
         streamLinks.push({
-          label: `Watch Day ${index + 1} Stream`,
+          label: `Day ${index + 1} Stream`,
           url: link,
           variant: "day"
         });
       });
-    } else if (!streamLinks.length && webcastLinks.length === 1) {
+    } else if (webcastLinks.length === 1) {
       streamLinks.push({
-        label: isLive ? "Watch Current Stream" : "Watch Event Stream",
+        label: "Day 1 Stream",
         url: webcastLinks[0],
-        variant: isLive ? "live" : "default"
+        variant: "day"
       });
-    } else if (!streamLinks.length && settings.fallbackUrl) {
+    } else if (settings.fallbackUrl) {
       streamLinks.push({
-        label: isLive ? "Watch Current Stream" : "Watch Event Stream",
+        label: "Day 1 Stream",
         url: settings.fallbackUrl,
-        variant: isLive ? "live" : "default"
+        variant: "day"
       });
     }
 
@@ -677,16 +665,6 @@
     return "";
   }
 
-  function resolveCurrentEventStreamLink(webcastLinks, fallbackUrl, startDate) {
-    if (webcastLinks.length) {
-      const dayIndex = getEventStreamingDayIndex(startDate);
-      const safeIndex = Math.min(Math.max(dayIndex, 0), webcastLinks.length - 1);
-      return webcastLinks[safeIndex] || webcastLinks[0];
-    }
-
-    return fallbackUrl || "";
-  }
-
   function dedupeEventStreamLinks(links) {
     const seen = new Set();
     return (Array.isArray(links) ? links : []).filter((link) => {
@@ -709,18 +687,6 @@
     const end = normalizeDateOnly(endDate) || start;
     const today = getLocalDateOnly();
     return Boolean(start && end && today >= start && today <= end);
-  }
-
-  function getEventStreamingDayIndex(startDate) {
-    const start = normalizeDateOnly(startDate);
-    if (!start) {
-      return 0;
-    }
-
-    const startValue = new Date(`${start}T00:00:00`);
-    const todayValue = new Date(`${getLocalDateOnly()}T00:00:00`);
-    const diff = Math.floor((todayValue.getTime() - startValue.getTime()) / 86400000);
-    return Number.isFinite(diff) ? diff : 0;
   }
 
   function normalizeDateOnly(value) {

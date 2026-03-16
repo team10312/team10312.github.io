@@ -150,6 +150,7 @@ const state = {
   overviewError: "",
   overviewFetchedAt: "",
   overviewCompetitionRows: [],
+  overviewCompetitionSortOrderInfo: [],
   overviewTexasRows: [],
   overviewWorldRow: null,
   overviewMatches: [],
@@ -1579,6 +1580,7 @@ function resetOverviewState() {
   state.overviewError = "";
   state.overviewFetchedAt = "";
   state.overviewCompetitionRows = [];
+  state.overviewCompetitionSortOrderInfo = [];
   state.overviewTexasRows = [];
   state.overviewWorldRow = null;
   state.overviewMatches = [];
@@ -1632,8 +1634,9 @@ async function loadOverviewData() {
   renderOverview();
 
   try {
-    const [competitionRows, texasDistrictPayload, texasSeasonRows, matches, eventData] = await Promise.all([
+    const [competitionRows, competitionRankingsPayload, texasDistrictPayload, texasSeasonRows, matches, eventData] = await Promise.all([
       fetchStatbotics(`team_events?event=${encodeURIComponent(eventKey)}&limit=1000`),
+      fetchOverviewCompetitionRankings(tbaEventKey),
       fetchTexasDistrictRankings(season),
       fetchStatbotics(`team_years?year=${season}&state=${encodeURIComponent(TEXAS_STATE_CODE)}&limit=500`),
       fetchStatbotics(`matches?event=${encodeURIComponent(eventKey)}&limit=${OVERVIEW_MATCH_LIMIT}`),
@@ -1642,7 +1645,10 @@ async function loadOverviewData() {
 
     if (requestToken !== overviewRequestToken) return;
 
-    state.overviewCompetitionRows = sortCompetitionRows(competitionRows);
+    state.overviewCompetitionRows = sortCompetitionRows(
+      mergeCompetitionOverviewRows(competitionRows, competitionRankingsPayload)
+    );
+    state.overviewCompetitionSortOrderInfo = getCompetitionSortOrderInfo(competitionRankingsPayload);
     state.overviewTexasRows = sortTexasRows(normalizeTexasDistrictRows(texasDistrictPayload?.rankings, texasDistrictPayload?.teams));
     state.overviewWorldRow = getTrackedTeamYearRow(texasSeasonRows);
     state.overviewMatches = Array.isArray(matches) ? matches.slice() : [];
@@ -1658,7 +1664,7 @@ async function loadOverviewData() {
       requestToken,
       eventKey: tbaEventKey,
       season,
-      competitionRows,
+      competitionRows: state.overviewCompetitionRows,
       texasRows: state.overviewTexasRows,
       fallbackUrl: normalizeStatboticsVideoUrl(state.overviewEventData?.video),
       startDate: event.start_date,
@@ -1738,6 +1744,97 @@ async function fetchStatbotics(path) {
   }
 
   return response.json();
+}
+
+async function fetchOverviewCompetitionRankings(eventKey) {
+  const normalizedKey = String(eventKey || "").trim().toLowerCase();
+  if (!normalizedKey) {
+    return { rankings: [], sort_order_info: [] };
+  }
+
+  const payload = await requestTbaMedia({ mode: "rankings", eventKey: normalizedKey });
+  if (payload?.rankings && typeof payload.rankings === "object" && !Array.isArray(payload.rankings)) {
+    return payload.rankings;
+  }
+
+  return { rankings: [], sort_order_info: [] };
+}
+
+function getCompetitionRankingRows(payload) {
+  return Array.isArray(payload?.rankings) ? payload.rankings : [];
+}
+
+function getCompetitionSortOrderInfo(payload) {
+  return Array.isArray(payload?.sort_order_info) ? payload.sort_order_info : [];
+}
+
+function mergeCompetitionOverviewRows(statboticsRows, rankingPayload) {
+  const sortOrderInfo = getCompetitionSortOrderInfo(rankingPayload);
+  const rowMap = new Map(
+    (Array.isArray(statboticsRows) ? statboticsRows : [])
+      .map((row) => {
+        const teamNumber = Number(row?.team ?? row?.teamNumber ?? 0);
+        return teamNumber > 0 ? [teamNumber, { ...row }] : null;
+      })
+      .filter(Boolean)
+  );
+
+  getCompetitionRankingRows(rankingPayload).forEach((rankingRow) => {
+    const teamNumber = parseTbaTeamNumber(rankingRow?.team_key || rankingRow?.teamNumber);
+    if (!teamNumber) return;
+
+    const baseRow = rowMap.get(teamNumber) || {
+      team: teamNumber,
+      teamNumber,
+      team_name: `Team ${teamNumber}`,
+      name: `Team ${teamNumber}`
+    };
+
+    rowMap.set(teamNumber, mergeCompetitionOverviewRow(baseRow, rankingRow, sortOrderInfo));
+  });
+
+  return Array.from(rowMap.values());
+}
+
+function mergeCompetitionOverviewRow(baseRow, rankingRow, sortOrderInfo) {
+  const teamNumber = Number(baseRow?.team ?? baseRow?.teamNumber ?? parseTbaTeamNumber(rankingRow?.team_key) ?? 0);
+  const matchesPlayed = Number(rankingRow?.matches_played || 0);
+  const sortOrders = Array.isArray(rankingRow?.sort_orders)
+    ? rankingRow.sort_orders.map((value) => {
+        const numericValue = Number(value);
+        return Number.isFinite(numericValue) ? numericValue : null;
+      })
+    : [];
+  const liveRecord = {
+    wins: Number(rankingRow?.record?.wins || 0),
+    losses: Number(rankingRow?.record?.losses || 0),
+    ties: Number(rankingRow?.record?.ties || 0),
+    rank: Number(rankingRow?.rank || 0) || null,
+    count: matchesPlayed,
+    rps_per_match: sortOrders.length ? sortOrders[0] : null
+  };
+
+  return {
+    ...baseRow,
+    team: teamNumber,
+    teamNumber,
+    team_name: baseRow?.team_name || baseRow?.name || `Team ${teamNumber}`,
+    name: baseRow?.name || baseRow?.team_name || `Team ${teamNumber}`,
+    record: {
+      ...(baseRow?.record || {}),
+      qual: {
+        ...(baseRow?.record?.qual || {}),
+        ...liveRecord
+      }
+    },
+    tba_event_rank: liveRecord.rank,
+    tba_event_record: liveRecord,
+    tba_matches_played: matchesPlayed,
+    tba_sort_orders: sortOrders,
+    tba_sort_order_info: sortOrderInfo,
+    tba_dq: Number(rankingRow?.dq || 0),
+    tba_qual_average: Number.isFinite(Number(rankingRow?.qual_average)) ? Number(rankingRow.qual_average) : null
+  };
 }
 
 async function fetchTexasDistrictRankings(season) {
@@ -2288,7 +2385,7 @@ function compareBlueAllianceMatches(left, right) {
 
 function sortCompetitionRows(rows) {
   return (Array.isArray(rows) ? rows.slice() : []).sort((left, right) => {
-    return compareNullableNumbers(left?.record?.qual?.rank, right?.record?.qual?.rank) || compareNullableNumbers(left?.team, right?.team);
+    return compareNullableNumbers(getCompetitionRowRank(left), getCompetitionRowRank(right)) || compareNullableNumbers(left?.team, right?.team);
   });
 }
 
@@ -2312,6 +2409,43 @@ function getTrackedTexasRow() {
 
 function getTrackedWorldRow() {
   return state.overviewWorldRow || null;
+}
+
+function getCompetitionRowRank(row) {
+  return row?.tba_event_rank || row?.record?.qual?.rank || null;
+}
+
+function getCompetitionRowRecord(row) {
+  return row?.tba_event_record || row?.record?.qual || null;
+}
+
+function getCompetitionRowMatchesPlayed(row) {
+  if (Number.isFinite(Number(row?.tba_matches_played))) {
+    return Number(row.tba_matches_played);
+  }
+
+  const fallback = getRecordMatchesPlayed(row?.record?.qual);
+  return Number.isFinite(Number(fallback)) ? Number(fallback) : 0;
+}
+
+function getCompetitionMetricLabel(info, index) {
+  const label = String(info?.name || "").trim();
+  return label || `Metric ${index + 1}`;
+}
+
+function formatCompetitionMetricValue(row, index, info) {
+  if (getCompetitionRowMatchesPlayed(row) <= 0) {
+    return "--";
+  }
+
+  const values = Array.isArray(row?.tba_sort_orders) ? row.tba_sort_orders : [];
+  const numericValue = Number(values[index]);
+  if (!Number.isFinite(numericValue)) {
+    return "--";
+  }
+
+  const precision = Number.isFinite(Number(info?.precision)) ? Math.max(0, Number(info.precision)) : 2;
+  return numericValue.toFixed(precision).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
 }
 
 function getEventSeason(event) {
@@ -3047,7 +3181,7 @@ function renderOverviewBanners() {
   renderOverviewCompetitionStreams(state.overviewStreamLinks);
 
   if ((restoringSession || state.overviewLoading) && !eventRow && !texasRow) {
-    setOverviewBanner(elements.overviewCompetitionValue, elements.overviewCompetitionMeta, "Loading", "Pulling Statbotics event data.");
+    setOverviewBanner(elements.overviewCompetitionValue, elements.overviewCompetitionMeta, "Loading", "Pulling live competition rankings from The Blue Alliance.");
     setOverviewBanner(elements.overviewTexasValue, elements.overviewTexasMeta, "Loading", "Pulling FIRST in Texas district rankings from The Blue Alliance.");
     setOverviewBanner(elements.overviewWorldValue, elements.overviewWorldMeta, "Loading", "Pulling global EPA rank.");
     return;
@@ -3061,19 +3195,20 @@ function renderOverviewBanners() {
   }
 
   if (eventRow) {
-    const qualRecord = eventRow.record?.qual || {};
+    const qualRecord = getCompetitionRowRecord(eventRow);
+    const matchesPlayed = getCompetitionRowMatchesPlayed(eventRow);
     setOverviewBanner(
       elements.overviewCompetitionValue,
       elements.overviewCompetitionMeta,
-      `#${eventRow.record?.qual?.rank || "--"}`,
-      `${eventRow.event_name || "Selected event"} • ${formatRecord(qualRecord)} • EPA ${formatDecimal(eventRow.epa?.total_points?.mean)}`
+      `#${getCompetitionRowRank(eventRow) || "--"}`,
+      `${eventRow.event_name || "Selected event"} • ${matchesPlayed ? `${formatRecord(qualRecord)} • ${matchesPlayed} matches played` : "No matches played yet"}`
     );
   } else {
     setOverviewBanner(
       elements.overviewCompetitionValue,
       elements.overviewCompetitionMeta,
       "No rank",
-      "Team 10312 does not have a Statbotics event row for the selected event yet."
+      "Team 10312 does not have a live Blue Alliance ranking row for the selected event yet."
     );
   }
 
@@ -3143,13 +3278,13 @@ function renderOverviewTable() {
   if ((restoringSession || state.overviewLoading) && !hasRows) {
     elements.overviewSourceMeta.textContent = state.overviewMode === OVERVIEW_MODE_TEXAS
       ? "Loading FIRST in Texas district rankings from The Blue Alliance..."
-      : "Loading Statbotics rankings and predictions...";
+      : "Loading live competition rankings from The Blue Alliance...";
     renderOverviewMessageRow(
       elements.overviewRankingsBody,
       columns.length,
       state.overviewMode === OVERVIEW_MODE_TEXAS
         ? "Loading live FIRST in Texas district rankings..."
-        : "Loading live Statbotics rankings..."
+        : "Loading live competition rankings..."
     );
     return;
   }
@@ -3167,11 +3302,11 @@ function renderOverviewTable() {
     isRefreshingExistingRows
       ? state.overviewMode === OVERVIEW_MODE_TEXAS
         ? "Refreshing live FIRST in Texas district rankings..."
-        : "Refreshing live Statbotics data..."
+        : "Refreshing live competition rankings..."
       : "",
     state.overviewMode === OVERVIEW_MODE_TEXAS
       ? "Source: The Blue Alliance district rankings • team media: The Blue Alliance"
-      : "Source: Statbotics • team media: The Blue Alliance"
+      : "Source: The Blue Alliance event rankings • world EPA: Statbotics • team media: The Blue Alliance"
   ]
     .filter(Boolean)
     .join(" • ");
@@ -3182,7 +3317,7 @@ function renderOverviewTable() {
       columns.length,
       state.overviewMode === OVERVIEW_MODE_TEXAS
         ? "No FIRST in Texas district ranking rows are available yet."
-        : "No Statbotics ranking rows are available yet."
+        : "No live competition ranking rows are available yet."
     );
     return;
   }
@@ -3268,12 +3403,19 @@ function getOverviewRankingColumns() {
     ];
   }
 
+  const metricColumns = state.overviewCompetitionSortOrderInfo.map((info, index) => ({
+    label: getCompetitionMetricLabel(info, index),
+    headClassName: "rankings-table__col--metric",
+    cellClassName: "rankings-table__cell--metric",
+    getValue: (row) => formatCompetitionMetricValue(row, index, info)
+  }));
+
   return [
     {
       label: "Rank",
       headClassName: "rankings-table__col--rank",
       cellClassName: "rankings-table__cell--rank",
-      getValue: (row) => row.record?.qual?.rank || "--"
+      getValue: (row) => getCompetitionRowRank(row) || "--"
     },
     {
       label: "Team",
@@ -3281,41 +3423,18 @@ function getOverviewRankingColumns() {
       cellClassName: "rankings-table__cell--team",
       render: renderOverviewTeamCell
     },
-    {
-      label: "Ranking Score",
-      headClassName: "rankings-table__col--metric",
-      cellClassName: "rankings-table__cell--metric",
-      getValue: (row) => formatNullableFixedDecimal(row.record?.qual?.rps_per_match)
-    },
-    {
-      label: "Match",
-      headClassName: "rankings-table__col--metric",
-      cellClassName: "rankings-table__cell--metric",
-      getValue: (row) => formatNullableFixedDecimal(row.epa?.breakdown?.total_points)
-    },
-    {
-      label: "Auto Fuel",
-      headClassName: "rankings-table__col--metric",
-      cellClassName: "rankings-table__cell--metric",
-      getValue: (row) => formatNullableFixedDecimal(row.epa?.breakdown?.auto_fuel)
-    },
-    {
-      label: "Tower",
-      headClassName: "rankings-table__col--metric",
-      cellClassName: "rankings-table__cell--metric",
-      getValue: (row) => formatNullableFixedDecimal(row.epa?.breakdown?.total_tower)
-    },
+    ...metricColumns,
     {
       label: "W-L-T",
       headClassName: "rankings-table__col--metric",
       cellClassName: "rankings-table__cell--metric",
-      getValue: (row) => formatRecordCompact(row.record?.qual)
+      getValue: (row) => formatRecordCompact(getCompetitionRowRecord(row))
     },
     {
       label: "Matches Played",
       headClassName: "rankings-table__col--metric",
       cellClassName: "rankings-table__cell--metric",
-      getValue: (row) => getRecordMatchesPlayed(row.record?.qual)
+      getValue: (row) => getCompetitionRowMatchesPlayed(row)
     }
   ];
 }
@@ -3492,38 +3611,26 @@ function renderOverviewCompetitionStreams(links) {
 function buildEventStreamLinks(eventDetails, { fallbackUrl = "", startDate = "", endDate = "" } = {}) {
   const webcastLinks = normalizeEventWebcastEntries(eventDetails?.webcasts);
   const streamLinks = [];
-  const isLive = isEventStreamingLive(startDate || eventDetails?.start_date, endDate || eventDetails?.end_date);
-
-  if (isLive) {
-    const currentLink = resolveCurrentEventStreamLink(webcastLinks, fallbackUrl, startDate || eventDetails?.start_date);
-    if (currentLink) {
-      streamLinks.push({
-        label: "Watch Current Stream",
-        url: currentLink,
-        variant: "live"
-      });
-    }
-  }
 
   if (webcastLinks.length > 1) {
     webcastLinks.forEach((link, index) => {
       streamLinks.push({
-        label: `Watch Day ${index + 1} Stream`,
+        label: `Day ${index + 1} Stream`,
         url: link,
         variant: "day"
       });
     });
-  } else if (!streamLinks.length && webcastLinks.length === 1) {
+  } else if (webcastLinks.length === 1) {
     streamLinks.push({
-      label: isLive ? "Watch Current Stream" : "Watch Event Stream",
+      label: "Day 1 Stream",
       url: webcastLinks[0],
-      variant: isLive ? "live" : "default"
+      variant: "day"
     });
-  } else if (!streamLinks.length && fallbackUrl) {
+  } else if (fallbackUrl) {
     streamLinks.push({
-      label: isLive ? "Watch Current Stream" : "Watch Event Stream",
+      label: "Day 1 Stream",
       url: fallbackUrl,
-      variant: isLive ? "live" : "default"
+      variant: "day"
     });
   }
 
@@ -3576,16 +3683,6 @@ function buildEventStreamUrl(webcast) {
   return "";
 }
 
-function resolveCurrentEventStreamLink(webcastLinks, fallbackUrl, startDate) {
-  if (webcastLinks.length) {
-    const dayIndex = getEventStreamingDayIndex(startDate);
-    const safeIndex = Math.min(Math.max(dayIndex, 0), webcastLinks.length - 1);
-    return webcastLinks[safeIndex] || webcastLinks[0];
-  }
-
-  return fallbackUrl || "";
-}
-
 function dedupeEventStreamLinks(links) {
   const seen = new Set();
   return (Array.isArray(links) ? links : []).filter((link) => {
@@ -3604,16 +3701,6 @@ function isEventStreamingLive(startDate, endDate) {
   const end = normalizeDateOnly(endDate) || start;
   const today = getLocalDateOnly();
   return Boolean(start && end && today >= start && today <= end);
-}
-
-function getEventStreamingDayIndex(startDate) {
-  const start = normalizeDateOnly(startDate);
-  if (!start) return 0;
-
-  const startValue = new Date(`${start}T00:00:00`);
-  const todayValue = new Date(`${getLocalDateOnly()}T00:00:00`);
-  const diff = Math.floor((todayValue.getTime() - startValue.getTime()) / 86400000);
-  return Number.isFinite(diff) ? diff : 0;
 }
 
 function normalizeDateOnly(value) {

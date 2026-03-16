@@ -53,6 +53,12 @@ Deno.serve(async (request) => {
       return jsonResponse({ eventKey, alliances });
     }
 
+    if (mode === "rankings") {
+      const eventKey = parseEventKey(requestUrl.searchParams.get("eventKey"));
+      const rankings = await fetchBlueAllianceJson(`/event/${encodeURIComponent(eventKey)}/rankings`, tbaAuthKey);
+      return jsonResponse({ eventKey, rankings });
+    }
+
     if (mode === "team_media") {
       const eventKey = requestUrl.searchParams.get("eventKey");
       const teamKeyParam = requestUrl.searchParams.get("teamKey");
@@ -84,7 +90,7 @@ Deno.serve(async (request) => {
     }
 
     return jsonResponse(
-      { error: "Expected mode=events, mode=matches, mode=event, mode=alliances, mode=team_media, or mode=district_rankings." },
+      { error: "Expected mode=events, mode=matches, mode=event, mode=alliances, mode=rankings, mode=team_media, or mode=district_rankings." },
       400
     );
   } catch (error) {
