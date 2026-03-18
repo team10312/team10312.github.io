@@ -3263,8 +3263,7 @@ function renderOverviewBanners() {
       `#${getCompetitionRowRank(eventRow) || "--"}`,
       [
         eventRow.event_name || "Selected event",
-        matchesPlayed ? `${formatRecord(qualRecord)} • ${matchesPlayed} matches played` : "No matches played yet",
-        state.overviewCompetitionNote
+        matchesPlayed ? `${formatRecord(qualRecord)} • ${matchesPlayed} matches played` : "No matches played yet"
       ]
         .filter(Boolean)
         .join(" • ")
@@ -3276,12 +3275,7 @@ function renderOverviewBanners() {
       elements.overviewCompetitionValue,
       elements.overviewCompetitionMeta,
       "No rank",
-      [
-        "Team 10312 does not have a live ranking row for the selected event yet.",
-        state.overviewCompetitionNote
-      ]
-        .filter(Boolean)
-        .join(" • ")
+      "Team 10312 does not have a live ranking row for the selected event yet."
     );
   }
 
@@ -3384,7 +3378,6 @@ function renderOverviewTable() {
         ? "Refreshing live FIRST in Texas district rankings..."
         : "Refreshing live competition rankings..."
       : "",
-    state.overviewMode === OVERVIEW_MODE_COMPETITION ? state.overviewCompetitionNote : "",
     state.overviewMode === OVERVIEW_MODE_TEXAS
       ? "Source: The Blue Alliance district rankings • team media: The Blue Alliance"
       : state.overviewCompetitionNote
