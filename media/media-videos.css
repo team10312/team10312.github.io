@@ -19,10 +19,7 @@
 }
 
 .media-current-stream {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.95fr);
-  align-items: center;
+  display: block;
   margin-top: 1.1rem;
   padding: 1.4rem;
   border-color: rgba(255, 127, 0, 0.18);
@@ -42,6 +39,14 @@
   gap: 0.35rem;
 }
 
+.media-current-stream__headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
 .media-current-stream__title {
   margin: 0;
   font-size: clamp(1.4rem, 2vw, 1.8rem);
@@ -57,9 +62,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-  justify-self: end;
   justify-content: flex-end;
-  width: min(100%, 19rem);
+  width: auto;
+  max-width: 100%;
 }
 
 .media-current-stream__link {
@@ -392,12 +397,11 @@
     grid-template-columns: 1fr;
   }
 
-  .media-current-stream {
-    grid-template-columns: 1fr;
+  .media-current-stream__headline {
+    align-items: flex-start;
   }
 
   .media-current-stream__actions {
-    justify-self: flex-start;
     justify-content: flex-start;
     width: 100%;
   }

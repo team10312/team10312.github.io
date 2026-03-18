@@ -148,7 +148,6 @@ const state = {
   overviewMode: loadStoredValue(STORAGE_KEYS.overviewMode, OVERVIEW_MODE_COMPETITION),
   overviewLoading: false,
   overviewCompetitionError: "",
-  overviewCompetitionNote: "",
   overviewTexasError: "",
   overviewWorldError: "",
   overviewFetchedAt: "",
@@ -1581,7 +1580,6 @@ async function loadEntriesForActiveEvent() {
 function resetOverviewState() {
   state.overviewLoading = false;
   state.overviewCompetitionError = "";
-  state.overviewCompetitionNote = "";
   state.overviewTexasError = "";
   state.overviewWorldError = "";
   state.overviewFetchedAt = "";
@@ -1637,7 +1635,6 @@ async function loadOverviewData() {
 
   state.overviewLoading = true;
   state.overviewCompetitionError = "";
-  state.overviewCompetitionNote = "";
   state.overviewTexasError = "";
   state.overviewWorldError = "";
   renderOverview();
@@ -1678,7 +1675,6 @@ async function loadOverviewData() {
         : { rankings: [], sort_order_info: [] };
     if (competitionRankingsResult.status === "rejected") {
       console.warn("Unable to load Blue Alliance event rankings", competitionRankingsResult.reason);
-      state.overviewCompetitionNote = "Blue Alliance event rankings are temporarily unavailable; using Statbotics event rows.";
     }
 
     const texasDistrictPayload =
@@ -3380,9 +3376,9 @@ function renderOverviewTable() {
       : "",
     state.overviewMode === OVERVIEW_MODE_TEXAS
       ? "Source: The Blue Alliance district rankings • team media: The Blue Alliance"
-      : state.overviewCompetitionNote
-        ? "Source: Statbotics event rows • world EPA: Statbotics • team media: The Blue Alliance"
-        : "Source: The Blue Alliance event rankings • world EPA: Statbotics • team media: The Blue Alliance"
+      : state.overviewCompetitionSortOrderInfo.length
+        ? "Source: The Blue Alliance event rankings • world EPA: Statbotics • team media: The Blue Alliance"
+        : "Source: Competition event data • world EPA: Statbotics • team media: The Blue Alliance"
   ]
     .filter(Boolean)
     .join(" • ");

@@ -551,8 +551,9 @@
     }
 
     currentStreamBarEl.hidden = false;
-    currentStreamTitleEl.textContent = `Event Streams: ${event.name || "Current event"}`;
+    currentStreamTitleEl.textContent = "Event Streams:";
     currentStreamMetaEl.textContent = [
+      event.name || "",
       buildEventSubtitle(event),
       "Webcast links from The Blue Alliance"
     ].filter(Boolean).join(" • ");
