@@ -180,6 +180,13 @@
   text-align: right;
 }
 
+.media-event-streams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+}
+
 .media-video-status {
   padding: 1rem 1.05rem;
   border-radius: 14px;
@@ -410,6 +417,10 @@
   .media-video-summary {
     min-width: 0;
     text-align: left;
+  }
+
+  .media-event-streams {
+    width: 100%;
   }
 
   .media-video-card {

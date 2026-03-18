@@ -32,6 +32,7 @@
   let eventNameEl;
   let eventSubtitleEl;
   let eventSummaryEl;
+  let eventStreamsEl;
   let currentStreamBarEl;
   let currentStreamTitleEl;
   let currentStreamMetaEl;
@@ -52,6 +53,7 @@
     eventNameEl = document.getElementById("videoEventName");
     eventSubtitleEl = document.getElementById("videoEventSubtitle");
     eventSummaryEl = document.getElementById("videoEventSummary");
+    eventStreamsEl = document.getElementById("videoEventStreams");
     currentStreamBarEl = document.getElementById("mediaCurrentStreamBar");
     currentStreamTitleEl = document.getElementById("mediaCurrentStreamTitle");
     currentStreamMetaEl = document.getElementById("mediaCurrentStreamMeta");
@@ -69,6 +71,7 @@
       state.selectedSeason = Number(seasonSelect.value);
       state.selectedEventKey = "";
       resetEventSelection("Loading competitions...");
+      hideEventStreamLinks();
       if (!hasSupabaseConfig()) {
         setStatus("Video browser is unavailable right now.", "error");
         return;
@@ -80,6 +83,7 @@
       const eventKey = eventSelect.value;
       state.selectedEventKey = eventKey;
       if (!eventKey) {
+        hideEventStreamLinks();
         hideGrid();
         setStatus("Choose a competition to load match videos.");
         return;
@@ -147,6 +151,7 @@
     eventSelect.disabled = true;
     eventSelect.innerHTML = '<option value="">Loading competitions...</option>';
     metaEl.hidden = true;
+    hideEventStreamLinks();
     hideGrid();
     setStatus(message, "loading");
   }
@@ -165,6 +170,7 @@
         eventSelect.disabled = true;
         eventSelect.innerHTML = '<option value="">No competitions found</option>';
         metaEl.hidden = true;
+        hideEventStreamLinks();
         hideGrid();
         setStatus(`No competitions were found for Team ${getTeamDisplayNumber()} in ${season}.`);
         return;
@@ -189,6 +195,7 @@
       eventSelect.disabled = true;
       eventSelect.innerHTML = '<option value="">Unable to load competitions</option>';
       metaEl.hidden = true;
+      hideEventStreamLinks();
       hideGrid();
       setStatus("Unable to load competitions right now.", "error");
     }
@@ -203,17 +210,32 @@
     if (event) {
       renderEventMeta(event, null);
     }
+    hideEventStreamLinks();
 
     hideGrid();
     setStatus("Loading match videos...", "loading");
 
     try {
-      const matches = await getEventMatches(eventKey);
+      const [matchesResult, eventDetailsResult] = await Promise.allSettled([
+        getEventMatches(eventKey),
+        getEventDetails(eventKey)
+      ]);
       if (token !== state.requestToken) {
         return;
       }
 
+      if (matchesResult.status !== "fulfilled") {
+        throw matchesResult.reason;
+      }
+
+      const matches = matchesResult.value;
+      const eventDetails = eventDetailsResult.status === "fulfilled" ? eventDetailsResult.value : null;
+      if (eventDetailsResult.status === "rejected") {
+        console.error("Unable to load event stream links", eventDetailsResult.reason);
+      }
+
       renderEventMeta(event, matches);
+      renderEventStreamLinks(event, eventDetails);
 
       const videoMatches = matches
         .map((match) => decorateMatch(match, state.config.teamKey))
@@ -233,6 +255,7 @@
       console.error("Unable to load match videos", error);
       hideGrid();
       metaEl.hidden = !event;
+      hideEventStreamLinks();
       setStatus("Unable to load match videos right now.", "error");
     }
   }
@@ -566,16 +589,28 @@
 
     currentStreamActionsEl.innerHTML = "";
     links.forEach((link, index) => {
-      const anchor = document.createElement("a");
-      anchor.className = link.variant === "live"
-        ? "media-current-stream__link"
-        : "media-current-stream__link media-current-stream__link--secondary";
-      anchor.href = link.url;
-      anchor.target = "_blank";
-      anchor.rel = "noreferrer noopener";
-      anchor.textContent = String(link.label || "").trim() || `Open Stream ${index + 1}`;
-      anchor.setAttribute("aria-label", `${anchor.textContent} for ${event.name || "the current event"}`);
-      currentStreamActionsEl.appendChild(anchor);
+      currentStreamActionsEl.appendChild(buildEventStreamAnchor(link, index, event?.name));
+    });
+  }
+
+  function renderEventStreamLinks(event, eventDetails) {
+    if (!eventStreamsEl) {
+      return;
+    }
+
+    const links = buildEventStreamLinks(eventDetails, {
+      startDate: event && event.start_date,
+      endDate: event && event.end_date
+    }).filter((link) => link && link.url);
+
+    eventStreamsEl.innerHTML = "";
+    eventStreamsEl.hidden = !links.length;
+    if (!links.length) {
+      return;
+    }
+
+    links.forEach((link, index) => {
+      eventStreamsEl.appendChild(buildEventStreamAnchor(link, index, event?.name));
     });
   }
 
@@ -586,6 +621,28 @@
 
     currentStreamBarEl.hidden = true;
     currentStreamActionsEl.innerHTML = "";
+  }
+
+  function hideEventStreamLinks() {
+    if (!eventStreamsEl) {
+      return;
+    }
+
+    eventStreamsEl.hidden = true;
+    eventStreamsEl.innerHTML = "";
+  }
+
+  function buildEventStreamAnchor(link, index, eventName) {
+    const anchor = document.createElement("a");
+    anchor.className = link.variant === "live"
+      ? "media-current-stream__link"
+      : "media-current-stream__link media-current-stream__link--secondary";
+    anchor.href = link.url;
+    anchor.target = "_blank";
+    anchor.rel = "noreferrer noopener";
+    anchor.textContent = String(link.label || "").trim() || `Open Stream ${index + 1}`;
+    anchor.setAttribute("aria-label", `${anchor.textContent} for ${eventName || "the selected event"}`);
+    return anchor;
   }
 
   function buildEventStreamLinks(eventDetails, options) {
