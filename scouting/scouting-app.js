@@ -1366,7 +1366,6 @@ async function handleGoogleSignIn() {
     options: {
       redirectTo,
       queryParams: {
-        hd: state.config.allowedEmailDomain,
         prompt: "select_account"
       }
     }
@@ -1419,7 +1418,7 @@ async function syncSession(session) {
   const email = getSessionEmail(session);
   if (!isAllowedEmail(email)) {
     state.authRedirecting = false;
-    state.pendingAuthMessage = `Only ${state.config.allowedEmailDomain} Google accounts can access scouting.`;
+    state.pendingAuthMessage = "Only approved team Google accounts can access scouting.";
     state.pendingAuthTone = "danger";
     await state.client.auth.signOut();
     return;
@@ -2555,7 +2554,6 @@ function buildMatchTrackerCards(matches, predictionMatches) {
   return (Array.isArray(matches) ? matches : [])
     .slice()
     .sort(compareBlueAllianceMatches)
-    .filter((match) => Array.isArray(match?.videos) && match.videos.length)
     .map((match) => decorateMatchTrackerMatch(match, predictionMap.get(match.key)));
 }
 
@@ -2589,6 +2587,7 @@ function decorateMatchTrackerMatch(match, predictionMatch) {
 
   const winProbability = predictionMatch ? formatPercentage(getTrackedWinProbability(predictionMatch, alliance), 1) : "--";
   const predictedScore = predictionMatch ? formatTrackedPredictedScore(predictionMatch, alliance) : "Prediction unavailable";
+  const video = getBlueAlliancePrimaryVideo(match);
 
   return {
     key: match?.key || "",
@@ -2601,9 +2600,10 @@ function decorateMatchTrackerMatch(match, predictionMatch) {
     predictedScore,
     teamLine: ourTeams.join(", ") || "Team list unavailable",
     opponentLine: opponentTeams.join(", ") || "Team list unavailable",
-    watchUrl: buildWatchSourceUrl(match),
+    hasVideo: Boolean(video),
+    watchUrl: video ? buildWatchSourceUrl(match) : "",
     detailUrl: match?.key ? `https://www.thebluealliance.com/match/${encodeURIComponent(match.key)}` : "#",
-    video: getBlueAlliancePrimaryVideo(match),
+    video,
     tone
   };
 }
@@ -2611,7 +2611,22 @@ function decorateMatchTrackerMatch(match, predictionMatch) {
 function renderMatchTrackerCard(match) {
   const embed = match.video && match.video.type === "youtube"
     ? `<iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(match.video.key)}" title="${escapeHtml(match.label)} video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`
-    : `<div class="tracker-card-fallback"><div><strong>${escapeHtml(match.label)}</strong><p>Video source is available on The Blue Alliance.</p></div></div>`;
+    : `<div class="tracker-card-fallback"><div><strong>${escapeHtml(match.label)}</strong><p>${escapeHtml(
+        match.hasVideo
+          ? "Video is available from The Blue Alliance. Match details are still available below."
+          : "No video has been posted for this match yet. Predictions and match details are still available below."
+      )}</p></div></div>`;
+  const actions = [];
+  if (match.watchUrl) {
+    actions.push(
+      `<a class="btn secondary" href="${match.watchUrl}" target="_blank" rel="noreferrer noopener">Watch Source</a>`
+    );
+  }
+  if (match.detailUrl && match.detailUrl !== "#") {
+    actions.push(
+      `<a class="btn secondary" href="${match.detailUrl}" target="_blank" rel="noreferrer noopener">Match Details</a>`
+    );
+  }
 
   return `
     <article class="tracker-card" ${match.tone ? `data-tone="${escapeHtml(match.tone)}"` : ""}>
@@ -2635,10 +2650,7 @@ function renderMatchTrackerCard(match) {
         </div>
         <p class="tracker-card-teams"><strong>Alliance:</strong> ${escapeHtml(match.teamLine)}</p>
         <p class="tracker-card-teams"><strong>Opposition:</strong> ${escapeHtml(match.opponentLine)}</p>
-        <div class="tracker-card-actions">
-          <a class="btn secondary" href="${match.watchUrl}" target="_blank" rel="noreferrer noopener">Watch Source</a>
-          <a class="btn secondary" href="${match.detailUrl}" target="_blank" rel="noreferrer noopener">Match Details</a>
-        </div>
+        ${actions.length ? `<div class="tracker-card-actions">${actions.join("")}</div>` : ""}
       </div>
     </article>
   `;
@@ -3548,8 +3560,8 @@ function renderOverviewPredictions() {
   const restoringSession = isSessionRestorePending();
 
   elements.overviewPredictionLabel.textContent = state.trackerPredictionError
-    ? "Match videos are loaded from The Blue Alliance. Predicted scores are temporarily unavailable for this competition."
-    : "Browse Team 10312 match videos by season and competition. Predicted scores are powered by Statbotics.";
+    ? "Matches are loaded from The Blue Alliance. Predicted scores are temporarily unavailable for this competition."
+    : "Browse Team 10312 matches by season and competition. Video links come from The Blue Alliance and predicted scores are powered by Statbotics.";
   const cards = buildMatchTrackerCards(state.trackerMatches, state.trackerPredictionMatches);
   const hasCards = cards.length > 0;
 
@@ -3572,14 +3584,14 @@ function renderOverviewPredictions() {
       return;
     }
     clearMatchTrackerCards();
-    setMatchTrackerStatus("Choose a competition to load match videos.");
+    setMatchTrackerStatus("Choose a competition to load matches.");
     return;
   }
 
   if (state.trackerLoading && !hasCards) {
     clearMatchTrackerCards();
     setMatchTrackerStatus(
-      state.trackerSelectedEventKey ? "Loading match videos..." : "Loading competitions...",
+      state.trackerSelectedEventKey ? "Loading matches..." : "Loading competitions...",
       "loading"
     );
     return;
@@ -3587,7 +3599,7 @@ function renderOverviewPredictions() {
 
   if (!hasCards) {
     clearMatchTrackerCards();
-    setMatchTrackerStatus("No videos available for this event.");
+    setMatchTrackerStatus("No team matches are available for this event.");
     return;
   }
 
@@ -3597,8 +3609,8 @@ function renderOverviewPredictions() {
   }
   setMatchTrackerStatus(
     state.trackerLoading
-      ? "Refreshing match videos..."
-      : `${cards.length} team match video${cards.length === 1 ? "" : "s"} loaded from The Blue Alliance.${state.trackerPredictionError ? " Predicted scores unavailable." : ""}`,
+      ? "Refreshing matches..."
+      : `${cards.length} team match${cards.length === 1 ? "" : "es"} loaded from The Blue Alliance • ${cards.filter((card) => card.hasVideo).length} with video.${state.trackerPredictionError ? " Predicted scores unavailable." : ""}`,
     state.trackerLoading ? "loading" : ""
   );
 }
@@ -5723,13 +5735,18 @@ function readOAuthErrorFromUrl() {
 }
 
 function normalizeConfig(rawConfig) {
+  const allowedEmailDomains = Array.isArray(rawConfig.allowedEmailDomains)
+    ? rawConfig.allowedEmailDomains
+    : [rawConfig.allowedEmailDomains || rawConfig.allowedEmailDomain || "team10312.com"];
+
   return {
     supabaseUrl: String(rawConfig.supabaseUrl || "").trim(),
     supabaseAnonKey: String(rawConfig.supabaseAnonKey || "").trim(),
-    allowedEmailDomain: String(rawConfig.allowedEmailDomain || "team10312.com")
-      .trim()
-      .replace(/^@/, "")
-      .toLowerCase()
+    allowedEmailDomains: Array.from(new Set(
+      allowedEmailDomains
+        .map((domain) => String(domain || "").trim().replace(/^@/, "").toLowerCase())
+        .filter(Boolean)
+    ))
   };
 }
 
@@ -5744,7 +5761,8 @@ function configReady() {
 
 function isAllowedEmail(email) {
   if (!email) return false;
-  return email.toLowerCase().endsWith(`@${state.config.allowedEmailDomain}`);
+  const normalizedEmail = email.toLowerCase();
+  return state.config.allowedEmailDomains.some((domain) => normalizedEmail.endsWith(`@${domain}`));
 }
 
 function getSessionEmail(session) {
