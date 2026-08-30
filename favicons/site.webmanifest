@@ -1,6 +1,6 @@
 {
-  "name": "team10312",
-  "short_name": "10312",
+  "name": "Annalytix 10312",
+  "short_name": "Annalytix",
   "icons": [
     {
       "src": "web-app-manifest-192x192.png",
@@ -15,7 +15,7 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff",
+  "theme_color": "#101625",
+  "background_color": "#101625",
   "display": "standalone"
 }

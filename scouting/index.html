@@ -3,69 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scouting — Byte Force Robotics · Team 10312</title>
+  <title>Scouting — Annalytix · Team 10312</title>
   <meta
     name="description"
     content="2026 REBUILT scouting workspace for live match scouting, pit notes, and alliance prep."
   />
   <meta name="robots" content="noindex, nofollow" />
-  <link rel="icon" type="image/x-icon" href="/favicons/favicon.ico?v=light" id="favicon" />
+  <link rel="icon" type="image/png" href="/texas-icon.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
-  <meta name="apple-mobile-web-app-title" content="team10312" />
+  <meta name="apple-mobile-web-app-title" content="Annalytix 10312" />
   <link rel="manifest" href="/favicons/site.webmanifest" />
-  <script>
-    (function () {
-      var link = document.getElementById("favicon");
-      if (!link) return;
-
-      function isDarkMode() {
-        var html = document.documentElement;
-        var dt = (html.getAttribute("data-theme") || "").toLowerCase();
-        if (dt === "dark") return true;
-        if (dt === "light") return false;
-        try {
-          var stored = localStorage.getItem("bf-theme");
-          if (stored === "dark") return true;
-          if (stored === "light") return false;
-        } catch (error) {
-          // localStorage unavailable
-        }
-        if (window.matchMedia) {
-          return window.matchMedia("(prefers-color-scheme: dark)").matches;
-        }
-        return false;
-      }
-
-      function setFavicon() {
-        var href = isDarkMode()
-          ? "/favicons/favicon-dark.ico?v=dark"
-          : "/favicons/favicon.ico?v=light";
-        if (link.getAttribute("href") === href) return;
-        var newLink = link.cloneNode(false);
-        newLink.setAttribute("href", href);
-        newLink.setAttribute("id", "favicon");
-        link.parentNode.replaceChild(newLink, link);
-        link = newLink;
-      }
-
-      setFavicon();
-      try {
-        var obs = new MutationObserver(setFavicon);
-        obs.observe(document.documentElement, {
-          attributes: true,
-          attributeFilter: ["class", "data-theme"]
-        });
-      } catch (error) {
-        // ignore
-      }
-      if (window.matchMedia) {
-        var mq = window.matchMedia("(prefers-color-scheme: dark)");
-        if (mq.addEventListener) mq.addEventListener("change", setFavicon);
-        else if (mq.addListener) mq.addListener(setFavicon);
-      }
-      window.addEventListener("storage", setFavicon);
-    })();
-  </script>
   <link rel="stylesheet" href="/responsive.css" />
   <link rel="stylesheet" href="/scouting/scouting.css" />
 </head>
@@ -75,23 +22,21 @@
   <header class="liquid-glass-header">
     <div class="container nav">
       <div class="nav-left">
-        <a class="logo" data-link="home" href="/">
-          <img src="/blacklogo.png" alt="Team 10312 Logo" />
+        <a class="logo" href="/">
+          <img src="/logo.png" alt="Annalytix 10312 Logo" />
           <span></span>
         </a>
         <nav class="nav-links">
-          <a data-link="about" href="/about/">About</a>
-          <a data-link="team" href="/team/">Team</a>
-          <a data-link="robots" href="/robots/">Robots</a>
-          <a data-link="sponsors" href="/sponsors/">Sponsors</a>
-          <a data-link="media" href="/media/">Media</a>
-          <a data-link="contact" href="/contact/">Contact</a>
-          <a data-link="scouting" href="/scouting/">Scouting</a>
+          <a href="/#program">Program</a>
+          <a href="/#team">Team</a>
+          <a href="/#sponsors">Sponsors</a>
+          <a href="/robots/">Robots</a>
+          <a href="/media/">Media</a>
         </nav>
       </div>
       <div class="nav-cta">
         <button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button>
-        <a id="link-get-involved" class="btn glass-button" data-link="home" href="/">Main Site</a>
+        <a id="link-get-involved" class="btn glass-button" href="/">Main Site</a>
       </div>
     </div>
   </header>
@@ -805,30 +750,30 @@
     <div class="container foot-grid">
       <div>
         <div class="logo">
-          <img src="/blacklogo.png" alt="Team 10312 Logo" style="height: 28px" />
+          <img src="/logo.png" alt="Annalytix 10312 Logo" style="height: 28px" />
         </div>
-        <p class="muted" style="margin-top: 0.6rem; max-width: 46ch">Orange • White • Black.</p>
+        <p class="muted" style="margin-top: 0.6rem; max-width: 46ch">Navy • Blue • Gold.</p>
       </div>
       <div>
         <h4>Explore</h4>
-        <a class="muted" data-link="team" href="/team/">Team</a><br />
-        <a class="muted" data-link="robots" href="/robots/">Robots</a><br />
-        <a class="muted" data-link="scouting" href="/scouting/">Scouting</a><br />
-        <a class="muted" data-link="media" href="/media/">Media</a>
+        <a class="muted" href="/#team">Team</a><br />
+        <a class="muted" href="/robots/">Robots</a><br />
+        <a class="muted" href="/scouting/">Scouting</a><br />
+        <a class="muted" href="/media/">Media</a>
       </div>
       <div>
         <h4>Support</h4>
-        <a class="muted" data-link="sponsors" href="/sponsors/">Sponsors</a><br />
-        <a class="muted" data-link="contact" href="/contact/">Contact</a>
+        <a class="muted" href="/#sponsors">Sponsors</a><br />
+        <a class="muted" href="/#join">Contact</a>
       </div>
       <div>
         <h4>Follow</h4>
-        <a class="muted" href="#">YouTube</a><br />
-        <a class="muted" href="#">Instagram</a>
+        <span class="muted">YouTube — coming soon</span><br />
+        <span class="muted">Instagram — coming soon</span>
       </div>
     </div>
     <div class="container footer-bottom">
-      <span class="muted">© <span id="year"></span> Byte Force Robotics — Team 10312</span>
+      <span class="muted">© <span id="year"></span> Annalytix — Team 10312</span>
       <div class="footer-links">
         <a class="muted" href="/privacy/">Privacy</a>
         <a class="muted" href="/terms/">Terms</a>

@@ -1,474 +1,631 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Byte Force Robotics — Team 10312</title>
-  <meta name="description" content="Byte Force Robotics — Team 10312" />    <link rel="icon" type="image/x-icon" href="/favicons/favicon.ico?v=light" id="favicon" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
-  <meta name="apple-mobile-web-app-title" content="team10312" />
-  <link rel="manifest" href="/favicons/site.webmanifest" />
-    <script>
-    (function () {
-      var link = document.getElementById('favicon');
-      if (!link) {
-        return;
-      }
-      function isDarkMode() {
-        var html = document.documentElement;
-        var dt = (html.getAttribute('data-theme') || '').toLowerCase();
-        if (dt === 'dark') return true;
-        if (dt === 'light') return false;
-        try {
-          var stored = localStorage.getItem('bf-theme');
-          if (stored === 'dark') return true;
-          if (stored === 'light') return false;
-        } catch (e) {
-          // localStorage unavailable
-        }
-        if (window.matchMedia) {
-          return window.matchMedia('(prefers-color-scheme: dark)').matches;
-        }
-        return false;
-      }
-      function setFavicon() {
-        var href = isDarkMode() ? '/favicons/favicon-dark.ico?v=dark' : '/favicons/favicon.ico?v=light';
-        if (link.getAttribute('href') === href) {
-          return;
-        }
-        var newLink = link.cloneNode(false);
-        newLink.setAttribute('href', href);
-        newLink.setAttribute('id', 'favicon');
-        link.parentNode.replaceChild(newLink, link);
-        link = newLink;
-      }
-      setFavicon();
-      try {
-        var obs = new MutationObserver(setFavicon);
-        obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
-      } catch (e) {
-        // ignore
-      }
-      if (window.matchMedia) {
-        var mq = window.matchMedia('(prefers-color-scheme: dark)');
-        if (mq.addEventListener) {
-          mq.addEventListener('change', setFavicon);
-        } else if (mq.addListener) {
-          mq.addListener(setFavicon);
-        }
-      }
-      window.addEventListener('storage', setFavicon);
-    })();
-  </script>
-<style>
-
-    /* ===== COLOR SYSTEM & THEME ===== */
-    :root {
-      --bg:#ffffff; --bg-soft:rgba(255,255,255,.55); --panel:rgba(255,255,255,.28); --panel-border:rgba(0,0,0,.08);
-      --text:#0b0d12; --muted:#475062; --accent:#000; --brand:#ff7f00; --brand-2:#ffae42;
-      --rg1:rgba(255,127,0,.20); --rg2:rgba(255,174,66,.14);
-      --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.18); --ring:0 0 0 3px rgba(255,140,0,.35);
-    }
-    [data-theme="dark"] {
-      --bg:#0a0b0f; --bg-soft:rgba(10,11,15,.55); --panel:rgba(255,255,255,.06); --panel-border:rgba(255,255,255,.08);
-      --text:#eef2f7; --muted:#a9b3c4; --accent:#fff;
-      --rg1:rgba(255,127,0,.25); --rg2:rgba(255,174,66,.20);
-      --shadow:0 10px 30px rgba(0,0,0,.55);
-    }
-    *{box-sizing:border-box} html,body{height:100%}
-    html{background:var(--bg); transition: background-color .25s ease;}
-    body{
-      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
-      color:var(--text); position:relative; background:transparent; transition: color .25s ease;
-    }
-    a{color:inherit; text-decoration:none} img{max-width:100%; display:block}
-    .container{width:min(1150px,92vw); margin:0 auto}
-    .liquid-bg{position:fixed; inset:0; z-index:0; pointer-events:none;
-      background:
-        radial-gradient(1200px 600px at 70% -20%, var(--rg1), transparent 60%),
-        radial-gradient(900px 500px at -10% 10%, var(--rg2), transparent 60%);
-    }
-    body > *:not(.liquid-bg){ position:relative; z-index:1; }
-    header{position:sticky; top:0; z-index:50; backdrop-filter:saturate(140%) blur(8px);
-      background:var(--bg-soft); border-bottom:1px solid var(--panel-border); isolation:isolate;}
-    .nav{display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.8rem 0}
-    .nav-left{display:flex; align-items:center; gap:1rem}
-    .logo{display:inline-flex; align-items:center; gap:.6rem; font-weight:900; letter-spacing:.2px}
-    .logo img{height:40px; width:auto}
-    .nav-links{display:none; gap:1.2rem; color:var(--muted)}
-    .nav-cta{display:none; gap:.6rem; align-items:center}
-    @media (min-width:900px){ .nav-links, .nav-cta{display:flex} }
-    .nav-links a.active{ color:var(--brand); font-weight:700; }
-    .toggle-theme{ background:transparent; border:1px solid var(--panel-border); color:var(--text);
-      border-radius:999px; padding:.45rem .9rem; font-weight:700; cursor:pointer;}
-    .btn, .glass-button{
-      position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.55rem;
-      padding:.9rem 1.1rem; border-radius:calc(var(--radius) - 4px);
-      color:#fff; font-weight:700; border:none; cursor:pointer; box-shadow:var(--shadow);
-      background:linear-gradient(135deg, var(--brand), var(--brand-2));
-      overflow:hidden; isolation:isolate; transition: transform .15s ease, box-shadow .15s ease;
-    }
-    .btn:hover, .glass-button:hover{ transform: translateY(-1px); box-shadow: 0 14px 40px rgba(255,127,0,.35); }
-    .btn.secondary{ background:transparent; border:1px solid var(--panel-border); color:var(--text); box-shadow:none; }
-    .glass-button::before, .btn::before{
-      content:""; position:absolute; inset:-40% -40% auto auto; width:180%; height:180%;
-      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,127,0,.55), transparent 65%);
-      mix-blend-mode:screen; pointer-events:none; transition: opacity .12s ease; opacity:0;
-    }
-    .glass-button:hover::before, .btn:hover::before{ opacity:.8; }
-    .hero{ padding: 4.8rem 0 1.6rem; }
-    .headline{ font-size: clamp(2rem, 4.8vw, 3.4rem); line-height: 1.05; margin:0 0 .6rem; color:var(--brand); }
-    .muted{ color: var(--muted); }
-    .section{ padding: 2.8rem 0; }
-    .h2{ font-size: clamp(1.6rem, 3.4vw, 2.2rem); margin:.3rem 0 1rem; color: var(--accent); }
-    .grid-3{ display:grid; gap:1rem; grid-template-columns: repeat(3, 1fr); }
-    @media (max-width:1000px){ .grid-3{ grid-template-columns: 1fr 1fr; } }
-    @media (max-width:680px){ .grid-3{ grid-template-columns: 1fr; } }
-    .grid-4{ display:grid; gap:1rem; grid-template-columns: repeat(4, 1fr); }
-    @media (max-width:1100px){ .grid-4{ grid-template-columns: 1fr 1fr 1fr; } }
-    @media (max-width:740px){ .grid-4{ grid-template-columns: 1fr 1fr; } }
-    @media (max-width:520px){ .grid-4{ grid-template-columns: 1fr; } }
-    .card{ background: var(--panel); border:1px solid var(--panel-border); border-radius: var(--radius); box-shadow: var(--shadow); padding:1.1rem; }
-    footer{ margin-top:2rem; padding:2rem 0 3rem; color:var(--muted); border-top:1px solid var(--panel-border); }
-    .foot-grid{ display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:1rem; }
-    @media (max-width:900px){ .foot-grid{ grid-template-columns: 1fr 1fr; } }
-    @media (max-width:600px){ .foot-grid{ grid-template-columns: 1fr; } }
-    .video{aspect-ratio:16/9; border-radius:12px; overflow:hidden; background:#000}
-    .gallery{display:grid; gap:.6rem; grid-template-columns: repeat(6,1fr)}
-    @media (max-width:1000px){.gallery{grid-template-columns:repeat(4,1fr)}} 
-    @media (max-width:640px){.gallery{grid-template-columns:repeat(2,1fr)}}
-    .thumb{ aspect-ratio:1; border-radius:10px; background: rgba(255,255,255,.2); overflow:hidden; }
-    
-  </style>
-
-<!-- Liquid Glass Header & Lightbox CSS (injected) -->
-<style>
-/* ===== Liquid Glass Header ===== */
-.liquid-glass-header{
-  position: sticky;
-  top: 0;
-  z-index: 9999;
-  background: rgba(255,255,255,0.55);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-  backdrop-filter: blur(12px) saturate(160%);
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-  transition: background-color .3s ease, border-color .3s ease, box-shadow .3s ease;
-}
-.liquid-glass-header.scrolled{
-  background: rgba(255,255,255,0.72);
-  box-shadow: 0 2px 20px rgba(0,0,0,0.12);
-}
-
-/* Dark theme support if site uses a data-theme root or prefers-color-scheme */
-:root[data-theme="dark"] .liquid-glass-header{
-  background: rgba(17,25,40,0.45);
-  border-color: rgba(255,255,255,0.08);
-}
-:root[data-theme="dark"] .liquid-glass-header.scrolled{
-  background: rgba(17,25,40,0.62);
-}
-
-/* ===== Simple Lightbox (only activates on media gallery pages) ===== */
-#lightbox-overlay{
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.6);
-  z-index: 2147483645;
-  padding: 4vw;
-}
-#lightbox-overlay.show{ display: flex; }
-#lightbox-image{
-  max-width: 100%;
-  max-height: 100%;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-  border-radius: 12px;
-}
-#lightbox-close{
-  position: absolute;
-  top: 16px;
-  right: 20px;
-  background: rgba(0,0,0,0.45);
-  color: #fff;
-  border: 0;
-  font-size: 32px;
-  line-height: 1;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-</style>
-
-  <link rel="stylesheet" href="responsive.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Annalytix — FRC Team 10312 · Anna, Texas</title>
+<meta name="description" content="Annalytix — FRC Team 10312, a student-run FIRST Robotics Competition team based in Anna, Texas.">
+<meta name="apple-mobile-web-app-title" content="Annalytix 10312">
+<link rel="icon" type="image/png" href="/texas-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png">
+<link rel="manifest" href="/favicons/site.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:ital,wght@0,700;0,900;1,700;1,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="brand.css">
+<link rel="stylesheet" href="responsive.css">
+<script src="https://www.google.com/recaptcha/api.js?render=6Ldob9UrAAAAANmSp-eLGm-ts8gn12B8-5aee3rR"></script>
 </head>
 <body>
-  
-  <div class="liquid-bg" aria-hidden="true"></div>
-  <header><div class="container nav"><div class="nav-left"><a class="logo" data-link="home" href="/"><img src="/blacklogo.png" alt="Team 10312 Logo"><span></span></a><nav class="nav-links"><a data-link="about" href="/about/">About</a><a data-link="team" href="/team/">Team</a><a data-link="robots" href="/robots/">Robots</a><a data-link="sponsors" href="/sponsors/">Sponsors</a><a data-link="media" href="/media/">Media</a><a data-link="contact" href="/contact/">Contact</a><a data-link="scouting" href="/scouting/">Scouting</a></nav></div><div class="nav-cta"><button class="toggle-theme" id="themeToggle" aria-label="Toggle theme">Dark</button><a id="link-get-involved" class="btn glass-button" data-link="sponsors" href="/sponsors/#become-a-sponsor">Get Involved</a></div></div></header>
-    
-  
-  <section class="hero">
-    <div class="container split-grid split-grid--hero">
+
+<header>
+  <div class="container nav">
+    <div class="nav-left">
+      <a class="logo" href="/"><img src="logo.png" alt="Annalytix 10312 logo"></a>
+      <nav class="nav-links">
+        <a href="#program">Program</a>
+        <a href="#team">Team</a>
+        <a href="#sponsors">Sponsors</a>
+        <a href="/robots/">Robots</a>
+      </nav>
+    </div>
+    <div class="nav-cta">
+      <a href="#join" class="btn-cta btn">Join / Sponsor</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero photo">
+  <div class="hero-grid"></div>
+  <div class="wrap hero-inner">
+    <div class="eyebrow"><img class="eyebrow-mark" src="texas-icon.png" alt="">FRC Team 10312 &nbsp;·&nbsp; Anna, Texas</div>
+    <h1 class="wordmark">
+      <span class="star">★</span>
+      <span>ANNALYT<span class="ix">IX</span></span>
+      <span class="num">10312</span>
+    </h1>
+    <p class="hero-sub">A student-run FIRST Robotics Competition team out of Anna, Texas. We design in CAD, validate with real numbers, and build robots that do what the spreadsheet says they'll do — while growing engineers and leaders along the way.</p>
+    <div class="hero-actions">
+      <a href="#join" class="btn-primary btn">Join / Sponsor</a>
+      <a href="#program" class="btn-ghost btn">See the program</a>
+    </div>
+  </div>
+
+  <div class="telemetry">
+    <div class="ticker-track" id="ticker"></div>
+  </div>
+</section>
+
+<section class="pillars light" id="approach">
+  <div class="wrap">
+    <div class="pillars-head">
       <div>
-        <span class="muted" style="text-transform:uppercase;font-size:.8rem;letter-spacing:.1em">FIRST Robotics Competition</span>
-        <h1 class="headline">Team 10312 — Byte Force</h1>
-        <p class="muted" style="max-width:60ch">Anna, Texas • We design, build, and program competitive FRC robots while expanding STEM access through hands-on outreach, community demos, and our affiliation with StemCycles.</p>
-        <div style="margin-top:1.2rem; display:flex; gap:.6rem; flex-wrap:wrap;">
-          <a class="btn glass-button" data-link="media" href="/media/">Watch Highlights</a>
-          <a class="btn secondary" data-link="sponsors" href="/sponsors/">Become a Sponsor</a>
+        <div class="section-tag">// 01 — Approach</div>
+        <h2>How we run<br>the shop.</h2>
+      </div>
+      <p>Every build cycle runs on a schedule and a set of subteams students actually own, end to end.</p>
+    </div>
+    <div class="pillar-grid">
+      <div class="pillar">
+        <span class="idx">SOFTWARE</span>
+        <h3>Autonomous &amp; controls</h3>
+        <p>Path planning, odometry, vision pipelines, and testing — built and validated like it has to work on the field, because it does.</p>
+      </div>
+      <div class="pillar">
+        <span class="idx">MECHANICAL</span>
+        <h3>Real fabrication time</h3>
+        <p>CAD, prototyping, manufacturing, and the drivebase. Students run the mill, the drill press, and the wiring bench themselves.</p>
+      </div>
+      <div class="pillar">
+        <span class="idx">OUTREACH</span>
+        <h3>STEM access, beyond the field</h3>
+        <p>Through our partnership with StemCycles, we run community demos and workshops that grow hands-on STEM access well past competition season.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mentor" id="team">
+  <div class="wrap">
+    <div class="section-tag">// 02 — Leadership</div>
+    <div class="mentor-grid">
+      <div class="mentor-frame">
+        <span class="frame-label">MENTOR<span>_01</span></span>
+        <img src="team/lead_mentor.jpg" alt="Darius, Lead Mentor">
+      </div>
+      <div>
+        <div class="mentor-name">Darius Blount</div>
+        <div class="mentor-role">Lead Mentor &amp; Head Coach — Strategy, Operations &amp; Competition</div>
+        <p class="mentor-bio">Darius leads team strategy and day-to-day operations, keeps build season on schedule from kickoff to champs, and represents Annalytix at competition alongside the student leads.</p>
+      </div>
+    </div>
+
+    <div class="lead-grid">
+      <div class="lead-card">
+        <img class="lead-photo" src="team/soft_lead.jpg" alt="Sid, Software Lead">
+        <h4>Sid</h4>
+        <span class="lead-tag">Software Lead</span>
+        <p>Autonomous, vision, and controls.</p>
+      </div>
+      <div class="lead-card">
+        <img class="lead-photo" src="team/mech_lead.jpg" alt="Jaeden, Mechanical Lead">
+        <h4>Jaeden</h4>
+        <span class="lead-tag">Mechanical Lead</span>
+        <p>Machining, assembly, and prototyping.</p>
+      </div>
+      <div class="lead-card">
+        <img class="lead-photo" src="team/desi_lead.jpg" alt="Shanyu, Design Lead">
+        <h4>Shanyu</h4>
+        <span class="lead-tag">Design Lead</span>
+        <p>Envisioning, CAD, and modeling.</p>
+      </div>
+      <div class="lead-card">
+        <span class="lead-tag" style="margin-top:0">Mentor Bench</span>
+        <h4 style="font-size:16px;">Sanjit &amp; the extended mentor team</h4>
+        <p>Sanjit mentors software, autonomous, and vision. Additional mentors support design, outreach, and competition prep.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="program light" id="program">
+  <div class="wrap">
+    <div class="section-tag">// 03 — Program</div>
+    <h2>Meetings,<br>on the calendar.</h2>
+    <div class="program-tables">
+      <div class="spec-table">
+        <div class="spec-table-head">
+          <div class="section-tag">Offseason</div>
+          <h3>Skills &amp; Prototyping</h3>
+        </div>
+        <div class="spec-row head"><div>Days</div><div>Time</div><div>Focus</div></div>
+        <div class="spec-row">
+          <div class="spec-day">TUE + SUN</div>
+          <div class="spec-time">5:30 – 9:30 PM</div>
+          <div class="spec-focus">Design review, prototyping, and skills-building</div>
         </div>
       </div>
-      <div class="card">
-        <div style="display:flex; align-items:center; gap:.6rem;">
-          <img src="/blacklogo.png" alt="Team Logo small" style="height:42px;width:auto;">
-          <strong>Competition + Outreach</strong>
+      <div class="spec-table">
+        <div class="spec-table-head">
+          <div class="section-tag">Build Season</div>
+          <h3>Full Build Days</h3>
         </div>
-        <p class="muted" style="margin:.6rem 0 1rem">Follow our build season, competition runs, and the STEM outreach work we support alongside StemCycles.</p>
-        <div style="display:grid; gap:.6rem;">
-          <a class="btn glass-button" data-link="media" href="/media/" style="justify-content:center;">View Robot Reveal</a>
-          <a class="btn secondary" data-link="team" href="/team/" style="justify-content:center;">Meet the Team</a>
+        <div class="spec-row head"><div>Days</div><div>Time</div><div>Focus</div></div>
+        <div class="spec-row">
+          <div class="spec-day">SUN – WED</div>
+          <div class="spec-time">5:00 – 10:00 PM</div>
+          <div class="spec-focus">Design, fabrication, wiring, and programming integration</div>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  
-  <section class="section">
-    <div class="container" style="text-align:center">
-      <div class="muted" style="text-transform:uppercase; font-size:.8rem; letter-spacing:.1em;">What we value</div>
-      <h2 class="h2">Innovation • Teamwork • Community</h2>
-      <p class="muted" style="max-width:70ch; margin: 0 auto;">We iterate fast, learn constantly, and support each other, on and off the field.</p>
-      <div class="grid-3" style="margin-top:1.2rem;">
-        <div class="card"><h3>Software Excellence</h3><p class="muted">Autonomous, vision, and controls, built with modern tooling and rigorous testing.</p></div>
-        <div class="card"><h3>Mechanical Craft</h3><p class="muted">Robust, serviceable designs that balance speed, precision, and reliability.</p></div>
-        <div class="card"><h3>STEM Outreach x StemCycles</h3><p class="muted">Through our StemCycles affiliation, we help grow hands-on STEM learning, mentorship, and access for underrepresented students beyond the competition field.</p></div>
+<section class="experience" id="experience">
+  <div class="wrap">
+    <div class="experience-head">
+      <div class="section-tag">// 04 — The Experience</div>
+      <h2>What your child<br>actually gets.</h2>
+      <p>Here's what your child gets by joining Annalytix, and why families who join tend to stay.</p>
+    </div>
+    <div class="experience-grid">
+      <div class="experience-card accent">
+        <span class="num">01</span>
+        <h3>Full Shop Access</h3>
+        <p>A fully outfitted workshop with a mill, drill press, and dedicated CAD, wiring, and assembly stations.</p>
+      </div>
+      <div class="experience-card">
+        <span class="num">02</span>
+        <h3>Full Practice Field</h3>
+        <p>Our own regulation practice field on-site for driver practice, autonomous testing, and dialing in mechanisms before competition.</p>
+      </div>
+      <div class="experience-card">
+        <span class="num">03</span>
+        <h3>Direct Mentorship</h3>
+        <p>With a roster of about 20 students, every student gets real attention from mentors — up to four days a week and 20 hours of hands-on learning during build season.</p>
+      </div>
+      <div class="experience-card accent">
+        <span class="num">04</span>
+        <h3>Real Engineering Skills</h3>
+        <p>CAD design, fabrication, electrical wiring, programming, and project management. Students leave knowing how to build things that actually work.</p>
+      </div>
+      <div class="experience-card">
+        <span class="num">05</span>
+        <h3>Competition Pathway</h3>
+        <p>District events → District Championship → FIRST Championship in Houston.</p>
+      </div>
+      <div class="experience-card">
+        <span class="num">06</span>
+        <h3>University Recognition</h3>
+        <p>FRC is recognized by universities nationwide as one of the most rigorous STEM extracurriculars — alumni from programs like ours have gone on to MIT, UT, Georgia Tech, and Caltech.</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  
-  <footer>
-    <div class="container foot-grid">
-      <div>
-        <div class="logo"><img src="/blacklogo.png" alt="Team 10312 Logo" style="height:28px"></div>
-        <p class="muted" style="margin-top:.6rem;max-width:46ch">Orange • White • Black.</p>
+<section class="season photo season-photo" id="season">
+  <div class="wrap">
+    <div class="season-head">
+      <div class="section-tag">// 05 — The Season</div>
+      <h2>A year in<br>the life.</h2>
+      <p>FRC follows a structured season. Here's what your child's year looks like, from first workshop to championship stage.</p>
+    </div>
+    <div class="htimeline">
+      <div class="htl-item above">
+        <div class="htl-top">
+          <div class="htl-card">
+            <div class="timeline-meta">
+              <span class="timeline-date">Jun – Aug</span>
+              <span class="timeline-badge">Ramp-Up</span>
+            </div>
+            <h4>Off-Season Foundation</h4>
+            <p>New members join, skills get assessed, and we run intro workshops covering CAD, basic fabrication, and team workflows.</p>
+          </div>
+        </div>
+        <div class="htl-stem htl-stem-top"></div>
+        <div class="htl-dot"></div>
+        <div class="htl-stem htl-stem-bottom"></div>
+        <div class="htl-bottom"></div>
       </div>
-      <div>
-        <h4>Explore</h4>
-        <a class="muted" data-link="team" href="/team/">Team</a><br>
-        <a class="muted" data-link="robots" href="/robots/">Robots</a><br>
-        <a class="muted" data-link="scouting" href="/scouting/">Scouting</a><br>
-        <a class="muted" data-link="media" href="/media/">Media</a>
+      <div class="htl-item below building">
+        <div class="htl-top"></div>
+        <div class="htl-stem htl-stem-top"></div>
+        <div class="htl-dot"></div>
+        <div class="htl-stem htl-stem-bottom"></div>
+        <div class="htl-bottom">
+          <div class="htl-card">
+            <div class="timeline-meta">
+              <span class="timeline-date">Sep – Dec</span>
+              <span class="timeline-badge">Building</span>
+            </div>
+            <h4>Pre-Season Training</h4>
+            <p>Intensive skill development, advanced workshops, and strategy review of past games. We prototype subsystems for January.</p>
+          </div>
+        </div>
       </div>
-      <div>
-        <h4>Support</h4>
-        <a class="muted" data-link="sponsors" href="/sponsors/">Sponsors</a><br>
-        <a class="muted" data-link="contact" href="/contact/">Contact</a>
+      <div class="htl-item above full">
+        <div class="htl-top">
+          <div class="htl-card">
+            <div class="timeline-meta">
+              <span class="timeline-date">January</span>
+              <span class="timeline-badge">Full Intensity</span>
+            </div>
+            <h4>Game Reveal &amp; Design Sprint</h4>
+            <p>FIRST releases the new game. The team breaks down the challenge and locks in a robot design within the first week.</p>
+          </div>
+        </div>
+        <div class="htl-stem htl-stem-top"></div>
+        <div class="htl-dot"></div>
+        <div class="htl-stem htl-stem-bottom"></div>
+        <div class="htl-bottom"></div>
       </div>
-      <div>
-        <h4>Follow</h4>
-        <a class="muted" href="#">YouTube</a><br>
-        <a class="muted" href="#">Instagram</a>
+      <div class="htl-item below full">
+        <div class="htl-top"></div>
+        <div class="htl-stem htl-stem-top"></div>
+        <div class="htl-dot"></div>
+        <div class="htl-stem htl-stem-bottom"></div>
+        <div class="htl-bottom">
+          <div class="htl-card">
+            <div class="timeline-meta">
+              <span class="timeline-date">Jan – Feb</span>
+              <span class="timeline-badge">Full Intensity</span>
+            </div>
+            <h4>Build Season</h4>
+            <p>Six weeks of intense engineering — CAD to fabrication to wiring to code to testing. Every student owns a critical piece.</p>
+          </div>
+        </div>
+      </div>
+      <div class="htl-item above full">
+        <div class="htl-top">
+          <div class="htl-card">
+            <div class="timeline-meta">
+              <span class="timeline-date">Mar – Apr</span>
+              <span class="timeline-badge">Full Intensity</span>
+            </div>
+            <h4>Competition Season</h4>
+            <p>District events. Alliance selection, qualification matches, elimination rounds — the path to District Championship.</p>
+          </div>
+        </div>
+        <div class="htl-stem htl-stem-top"></div>
+        <div class="htl-dot"></div>
+        <div class="htl-stem htl-stem-bottom"></div>
+        <div class="htl-bottom"></div>
+      </div>
+      <div class="htl-item below building">
+        <div class="htl-top"></div>
+        <div class="htl-stem htl-stem-top"></div>
+        <div class="htl-dot"></div>
+        <div class="htl-stem htl-stem-bottom"></div>
+        <div class="htl-bottom">
+          <div class="htl-card">
+            <div class="timeline-meta">
+              <span class="timeline-date">Apr – May</span>
+              <span class="timeline-badge">Building</span>
+            </div>
+            <h4>Championships &amp; Debrief</h4>
+            <p>District Championship push, and FIRST Championship in Houston if we qualify. Then debrief and celebrate what we built.</p>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="container" style="margin-top:1.4rem;display:flex;justify-content:space-between;gap:.8rem;flex-wrap:wrap">
-      <span class="muted">© <span id="year"></span> Byte Force Robotics — Team 10312</span>
-      <div style="display:flex;gap:1rem"><a class="muted" href="/privacy/">Privacy</a><a class="muted" href="/terms/">Terms</a></div>
+  </div>
+</section>
+
+<section class="expectations" id="expectations">
+  <div class="wrap">
+    <div class="section-tag">// 06 — Expectations</div>
+    <h2>What we ask<br>of you.</h2>
+    <div class="expect-grid">
+      <div>
+        <div class="expect-head">
+          <span class="expect-badge s">S</span>
+          <span class="section-tag" style="margin:0;">From Students</span>
+        </div>
+        <div class="expect-item">
+          <h4>Grades 9–12</h4>
+          <p>Open to high school students ready for a serious competitive program.</p>
+        </div>
+        <div class="expect-item">
+          <h4>Work Ethic Over Experience</h4>
+          <p>Prior robotics experience is preferred but not required. What we require is effort, consistency, and a willingness to learn.</p>
+        </div>
+        <div class="expect-item">
+          <h4>Up To 20 Hours Per Week</h4>
+          <p>Up to four days a week during build season. This is a real commitment. So is the reward.</p>
+        </div>
+        <div class="expect-item">
+          <h4>Be Coachable</h4>
+          <p>Come ready to listen, ask questions, and push yourself. Show up coachable and we'll teach you everything we know.</p>
+        </div>
+      </div>
+      <div>
+        <div class="expect-head">
+          <span class="expect-badge p">P</span>
+          <span class="section-tag" style="margin:0;">From Parents</span>
+        </div>
+        <div class="expect-item">
+          <h4>Spread the Word</h4>
+          <p>Share Annalytix if it fits. If you know a family who would thrive here, an introduction is welcome and never expected. Word of mouth is how the right students find us.</p>
+        </div>
+        <div class="expect-item">
+          <h4>Be Part of It</h4>
+          <p>Be part of the community however you can: cheering at events, lending a skill, or simply showing up.</p>
+        </div>
+        <div class="expect-item">
+          <h4>Connect Us With Sponsors</h4>
+          <p>Know a business that supports STEM education? An introduction can help keep costs sustainable for all families.</p>
+        </div>
+        <div class="expect-item">
+          <h4>Trust the Process</h4>
+          <p>We've coached competitive FRC before. Give us room to coach, and we'll keep you in the loop.</p>
+        </div>
+      </div>
     </div>
-  </footer>
-    
+  </div>
+</section>
 
-  <script>
-    // ----- CONFIG: Set these to your WordPress page slugs/URLs -----
-    const LINKS = {
-      home: '/', about: '/about/', team: '/team/', robots: '/robots/', scouting: '/scouting/',
-      sponsors: '/sponsors/', media: '/media/', contact: '/contact/'
-    };
-    const PAGE = 'home'; // current page key
+<section class="faq light" id="faq">
+  <div class="wrap">
+    <div class="section-tag">// 07 — FAQ</div>
+    <h2>Questions<br>answered.</h2>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>What's included in the program?<span class="faq-plus">+</span></summary>
+        <div class="faq-answer">
+          <p>FRC is one of the most resource-intensive programs in STEM education, and Annalytix is built to remove every barrier to competing at the top. The program covers the competition robot, tools, parts, registration for two district events and the District Championship, a dedicated facility, team shirt, robot transport, and professional coaching. The one cost families cover separately is hotels and travel — for district events, and if the team advances to the FIRST Championship in Houston. We walk every family through the full details when we meet to discuss those events.</p>
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary>What if my child has no prior robotics experience?<span class="faq-plus">+</span></summary>
+        <div class="faq-answer">
+          <p>Experience is preferred but not required. What we require is work ethic. If your child is willing to show up, put in the hours, and learn, we will teach them everything — CAD, fabrication, wiring, programming, strategy. Every student grows if they commit to the process.</p>
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary>What is the time commitment?<span class="faq-plus">+</span></summary>
+        <div class="faq-answer">
+          <p>Meeting days and hours shift with the season — see the schedule above — but expect 3–4 days a week and roughly 15–20 hours during build season. This is a serious competitive program, not a casual after-school club: the commitment is real, and so are the results.</p>
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary>What is FRC?<span class="faq-plus">+</span></summary>
+        <div class="faq-answer">
+          <p>FIRST Robotics Competition (FRC) is the premier high school robotics competition in the world. Teams of students design, build, and program 120-pound industrial robots to compete in a new game each year. FRC is backed by Fortune 500 companies and recognized by top universities as one of the strongest extracurriculars a student can have.</p>
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary>Is there financial aid available?<span class="faq-plus">+</span></summary>
+        <div class="faq-answer">
+          <p>As a new team that just completed our rookie season, we lean on community sponsorship and grants to keep costs sustainable. If you can help us connect with a business that supports STEM, that goes a long way. When we meet one-on-one, we'll talk through what works for your family — we don't want finances to be the reason any student isn't able to be part of the program.</p>
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary>How does this help with university applications?<span class="faq-plus">+</span></summary>
+        <div class="faq-answer">
+          <p>FRC is one of the most recognized extracurriculars in engineering and STEM admissions. Students build a real engineering portfolio and develop leadership and teamwork skills, often leaving with strong letters of recommendation from mentors who've watched them grow. Many FRC alumni attend schools like MIT, Caltech, Georgia Tech, and UT, and credit FRC as a decisive factor.</p>
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary>How do I sign up?<span class="faq-plus">+</span></summary>
+        <div class="faq-answer">
+          <p>Step 1: Express interest and meet with our Lead Mentor and Head Coach, Darius Blount, for a one-on-one conversation about your child's goals. Step 2: Lock in your spot for the season. Step 3: We kick off the season in September.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
 
-    // Apply year
-    document.addEventListener('DOMContentLoaded', () => {
-      const y = document.getElementById('year'); if (y) y.textContent = new Date().getFullYear();
+<section class="sponsor" id="sponsors">
+  <div class="wrap">
+    <div class="section-tag">// 08 — Partnership</div>
+    <h2>Back the build.</h2>
+    <div class="tier-grid">
+      <div class="tier">
+        <div class="tier-name">BRONZE</div>
+        <div class="tier-price">$500<span>+</span></div>
+        <ul>
+          <li>Website recognition</li>
+          <li>Thank-you note from the team</li>
+        </ul>
+        <a class="tier-btn btn" href="https://docs.google.com/forms/d/e/1FAIpQLScNEXf2bBgNwZtKZW-MfJZ5giXuMtf9dNDbhZAiAvn21IZapw/viewform?pli=1" target="_blank" rel="noopener noreferrer">Become a sponsor</a>
+      </div>
+      <div class="tier">
+        <div class="tier-name">SILVER</div>
+        <div class="tier-price">$1,000<span>+</span></div>
+        <ul>
+          <li>Everything in Bronze</li>
+          <li>Logo on pit banner</li>
+        </ul>
+        <a class="tier-btn btn" href="https://docs.google.com/forms/d/e/1FAIpQLScNEXf2bBgNwZtKZW-MfJZ5giXuMtf9dNDbhZAiAvn21IZapw/viewform?pli=1" target="_blank" rel="noopener noreferrer">Become a sponsor</a>
+      </div>
+      <div class="tier feat">
+        <div class="tier-name">GOLD</div>
+        <div class="tier-price">$2,500<span>+</span></div>
+        <ul>
+          <li>Everything in Silver</li>
+          <li>Logo on the robot</li>
+          <li>Social media features</li>
+        </ul>
+        <a class="tier-btn btn" href="https://docs.google.com/forms/d/e/1FAIpQLScNEXf2bBgNwZtKZW-MfJZ5giXuMtf9dNDbhZAiAvn21IZapw/viewform?pli=1" target="_blank" rel="noopener noreferrer">Become a sponsor</a>
+      </div>
+      <div class="tier">
+        <div class="tier-name">PLATINUM</div>
+        <div class="tier-price">$5,000<span>+</span></div>
+        <ul>
+          <li>Everything in Gold</li>
+          <li>Logo on banners &amp; shirts</li>
+          <li>Demo event at your site</li>
+        </ul>
+        <a class="tier-btn btn" href="https://docs.google.com/forms/d/e/1FAIpQLScNEXf2bBgNwZtKZW-MfJZ5giXuMtf9dNDbhZAiAvn21IZapw/viewform?pli=1" target="_blank" rel="noopener noreferrer">Become a sponsor</a>
+      </div>
+    </div>
+    <div class="sponsor-logos">
+      <img src="sponsors/platinum1.png" alt="Platinum sponsor">
+      <img src="sponsors/platinum2.png" alt="Platinum sponsor">
+      <img src="sponsors/gold1.png" alt="Gold sponsor">
+      <img src="sponsors/gold2.png" alt="Gold sponsor">
+      <img src="sponsors/silver3.png" alt="Silver sponsor">
+    </div>
+  </div>
+</section>
+
+<section class="join light" id="join">
+  <div class="wrap join-grid">
+    <div class="join-copy">
+      <div class="section-tag">// 09 — Join</div>
+      <h2>Get on<br>the roster.</h2>
+      <p>Whether you want to build, code, or sponsor a team that runs on real numbers, tell us a little about you and we'll follow up soon. Our Google Form is the fastest way to join or sponsor.</p>
+      <div class="join-contacts">
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLScNEXf2bBgNwZtKZW-MfJZ5giXuMtf9dNDbhZAiAvn21IZapw/viewform?pli=1" target="_blank" rel="noopener noreferrer">→ Join or sponsor via Google Form</a>
+        <a href="mailto:join@team10312.com">→ join@team10312.com</a>
+        <span class="muted" style="font-family:'JetBrains Mono',monospace;font-size:13px;">→ Instagram &amp; YouTube — coming soon</span>
+      </div>
+    </div>
+    <div class="form" id="form-wrap">
+      <form id="contactForm">
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required>
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required>
+        </div>
+        <div class="field">
+          <label for="phone">Phone (optional)</label>
+          <input type="tel" id="phone" name="phone">
+        </div>
+        <div class="field">
+          <label for="message">How can we help?</label>
+          <textarea id="message" name="message" required></textarea>
+        </div>
+        <input type="text" name="website" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-10000px;opacity:0">
+        <input type="hidden" name="token" id="recaptchaToken">
+        <button type="submit" class="submit-btn btn">Send</button>
+        <div id="formStatus" class="form-note" style="min-height:1.2rem;"></div>
+      </form>
+      <p class="form-note">Prefer a form? Use the <a href="https://docs.google.com/forms/d/e/1FAIpQLScNEXf2bBgNwZtKZW-MfJZ5giXuMtf9dNDbhZAiAvn21IZapw/viewform?pli=1" target="_blank" rel="noopener noreferrer" style="color:var(--gold)">Google Form</a> instead.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-grid">
+    <div>
+      <div class="footer-logo">
+        <img src="logo.png" alt="Annalytix 10312">
+      </div>
+      <p class="fine" style="margin-top:.8rem;max-width:40ch">Navy · Blue · Gold.</p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <a class="muted" href="#team">Team</a><br>
+      <a class="muted" href="/robots/">Robots</a><br>
+      <a class="muted" href="/scouting/">Scouting</a><br>
+      <a class="muted" href="/media/">Media</a>
+    </div>
+    <div>
+      <h4>Support</h4>
+      <a class="muted" href="#sponsors">Sponsors</a><br>
+      <a class="muted" href="#join">Contact</a>
+    </div>
+    <div>
+      <h4>Follow</h4>
+      <span class="muted">YouTube — coming soon</span><br>
+      <span class="muted">Instagram — coming soon</span>
+    </div>
+  </div>
+  <div class="wrap footer-bottom">
+    <span class="fine">FRC TEAM 10312 · ANNALYTIX (FORMERLY BYTE FORCE ROBOTICS) · ANNA, TEXAS · © <span id="year"></span></span>
+    <div style="display:flex;gap:1rem"><a class="muted fine" href="/privacy/">Privacy</a><a class="muted fine" href="/terms/">Terms</a></div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  const stats = [
+    { label: 'SEASON', value: '2026' },
+    { label: 'ROOKIE YEAR', value: '2025' },
+    { label: 'AWARD', value: 'INNOVATION IN CONTROL ’25', accent:'g' },
+    { label: 'HQ', value: 'ANNA, TX', accent:'b' },
+    { label: 'OUTREACH PARTNER', value: 'STEMCYCLES' },
+  ];
+  function renderTicker(){
+    const track = document.getElementById('ticker');
+    const html = stats.map(s =>
+      `<div class="ticker-item"><span class="live-dot"></span>${s.label} <b class="${s.accent||''}">${s.value}</b></div>`
+    ).join('');
+    track.innerHTML = html + html;
+  }
+  renderTicker();
+</script>
+
+<script>
+  const RECAPTCHA_SITE_KEY = '6Ldob9UrAAAAANmSp-eLGm-ts8gn12B8-5aee3rR';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby1Qcg5ML_WZ5aLlCqwnQDIWR7vWOl0CE6Hvl-0t0PZL6VYopwuOjbQXirK_ihhddJZ/exec';
+
+  function getRecaptchaToken(siteKey, action) {
+    return new Promise((resolve, reject) => {
+      if (!window.grecaptcha) return reject(new Error('reCAPTCHA not loaded'));
+      grecaptcha.ready(() => {
+        grecaptcha.execute(siteKey, { action }).then(resolve).catch(reject);
+      });
     });
+  }
 
-    // Wire nav/cta links based on LINKS config
-    function wireLinks() {
-      document.querySelectorAll('[data-link]').forEach(a => {
-        const key = a.getAttribute('data-link');
-        if (LINKS[key]) {
-          // Preserve anchor fragments if present in href template
-          const href = a.getAttribute('href') || '';
-          const hash = href.includes('#') ? href.substring(href.indexOf('#')) : '';
-          a.setAttribute('href', LINKS[key] + hash);
+  (function(){
+    const form = document.getElementById('contactForm');
+    const statusEl = document.getElementById('formStatus');
+    const tokenEl = document.getElementById('recaptchaToken');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (statusEl) statusEl.textContent = 'Sending...';
+      const btn = form.querySelector('button[type="submit"]');
+      if (btn) btn.disabled = true;
+
+      try {
+        const token = await getRecaptchaToken(RECAPTCHA_SITE_KEY, 'contact');
+        if (tokenEl) tokenEl.value = token;
+
+        const fd = new FormData(form);
+        fd.append('origin', window.location.origin);
+
+        let ok = false;
+        try {
+          const res = await fetch(SCRIPT_URL, { method: 'POST', body: fd, credentials: 'omit' });
+          if (res.ok) {
+            try {
+              const data = await res.json();
+              ok = !!data.ok;
+            } catch {
+              ok = true;
+            }
+          }
+        } catch {}
+
+        if (!ok) {
+          await fetch(SCRIPT_URL, { method: 'POST', body: fd, mode: 'no-cors', credentials: 'omit' });
+          ok = true;
         }
-      });
-    }
 
-    // Theme persistence & label
-    const html = document.documentElement;
-    const toggle = document.getElementById('themeToggle');
-    function setLabel() { if (toggle) toggle.textContent = html.getAttribute('data-theme') === 'dark' ? 'Light' : 'Dark'; }
-    const stored = localStorage.getItem('bf-theme');
-    if (stored) { if (stored === 'dark') html.setAttribute('data-theme', 'dark'); else if (stored === 'light') html.setAttribute('data-theme','light'); }
-    else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) { html.setAttribute('data-theme', 'dark'); }
-    setLabel();
-    if (toggle) toggle.addEventListener('click', () => {
-      const isDark = html.getAttribute('data-theme') === 'dark';
-      if (isDark) { html.setAttribute('data-theme','light'); localStorage.setItem('bf-theme','light'); }
-      else { html.setAttribute('data-theme', 'dark'); localStorage.setItem('bf-theme', 'dark'); }
-      setLabel();
-    });
-
-    // Button ripple follows pointer
-    document.querySelectorAll('.btn, .glass-button').forEach(btn => {
-      btn.addEventListener('mousemove', (e) => {
-        const r = btn.getBoundingClientRect();
-        btn.style.setProperty('--mx', `${e.clientX - r.left}px`);
-        btn.style.setProperty('--my', `${e.clientY - r.top}px`);
-      });
-    });
-
-    // Active nav
-    function setActive() {
-      document.querySelectorAll(`.nav-links a[data-link="${PAGE}"]`).forEach(a=>a.classList.add('active'));
-    }
-
-    wireLinks();
-    setActive();
-  </script>
-    
-
-<!-- Liquid Glass Header & Lightbox JS (injected) -->
-<script>
-(function(){
-  // ===== Liquid Glass Header enhancer =====
-  function enhanceHeader(){
-    var candidates = document.querySelectorAll('header, .header, .topbar, .top-bar, .navbar, nav[role="navigation"]');
-    if(candidates.length){
-      var el = candidates[0];
-      if(!el.classList.contains('liquid-glass-header')){
-        el.classList.add('liquid-glass-header');
-      }
-    }
-    var headerEl = document.querySelector('.liquid-glass-header');
-    if(headerEl){
-      var onScroll = function(){
-        var y = (window.scrollY || document.documentElement.scrollTop || 0);
-        if(y > 8){ headerEl.classList.add('scrolled'); }
-        else{ headerEl.classList.remove('scrolled'); }
-      };
-      onScroll();
-      window.addEventListener('scroll', onScroll, {passive:true});
-    }
-  }
-
-  // ===== Lightweight Lightbox (activates on media/gallery pages only) =====
-  function setupLightbox(){
-    // Look for common gallery selectors
-    var galleryRoot =
-      document.querySelector('[data-gallery], .gallery, #gallery, .photo-gallery, .media-gallery');
-    if(!galleryRoot) return; // Only enable where a gallery exists
-
-    // Build overlay markup once
-    var overlay = document.createElement('div');
-    overlay.id = 'lightbox-overlay';
-    overlay.innerHTML = '<button id="lightbox-close" aria-label="Close">×</button><img id="lightbox-image" alt="">';
-    document.body.appendChild(overlay);
-
-    var imgEl = overlay.querySelector('#lightbox-image');
-    var closeBtn = overlay.querySelector('#lightbox-close');
-
-    function openLightbox(src, alt){
-      imgEl.src = src;
-      imgEl.alt = alt || '';
-      overlay.classList.add('show');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeLightbox(){
-      overlay.classList.remove('show');
-      document.body.style.overflow = '';
-      // Defer clearing src to allow smooth fade on some browsers
-      setTimeout(function(){ imgEl.src = ''; }, 200);
-    }
-
-    overlay.addEventListener('click', function(e){
-      if(e.target === overlay || e.target.id === 'lightbox-close'){ closeLightbox(); }
-    });
-    document.addEventListener('keydown', function(e){
-      if(e.key === 'Escape'){ closeLightbox(); }
-    });
-
-    // Delegate click on any IMG inside the gallery root
-    galleryRoot.addEventListener('click', function(e){
-      var t = e.target;
-      if(t && t.tagName === 'IMG'){
-        e.preventDefault();
-        var anchor = t.closest('a');
-        var src = (anchor && anchor.getAttribute('href')) || t.getAttribute('data-full') || t.src;
-        openLightbox(src, t.getAttribute('alt') || '');
+        if (ok) {
+          form.reset();
+          if (statusEl) statusEl.textContent = 'Thanks! We received your message.';
+        } else {
+          if (statusEl) statusEl.textContent = 'Something went wrong. Please email us directly.';
+        }
+      } catch {
+        if (statusEl) statusEl.textContent = 'Network error. Please try again.';
+      } finally {
+        if (btn) btn.disabled = false;
       }
     });
-  }
-
-  // Initialize after DOM ready
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){
-      enhanceHeader();
-      setupLightbox();
-    });
-  } else {
-    enhanceHeader();
-    setupLightbox();
-  }
-})();
+  })();
 </script>
 
-<!-- Logo swap script injected: swaps blacklogo/whitelogo on theme changes -->
-<script>
-(function() {
-  function forEachLogo(fn){
-    var imgs = document.querySelectorAll('img[src$="blacklogo.png"], img[src$="whitelogo.png"]');
-    imgs.forEach ? imgs.forEach(fn) : Array.prototype.forEach.call(imgs, fn);
-  }
-  function isDarkMode() {
-    var html = document.documentElement;
-    var dt = (html.getAttribute('data-theme') || '').toLowerCase();
-    if (dt === 'dark') return true;
-    if (dt === 'light') return false;
-    if (html.classList && (html.classList.contains('dark') || html.classList.contains('theme-dark'))) return true;
-    if (html.classList && (html.classList.contains('light') || html.classList.contains('theme-light'))) return false;
-    if (window.matchMedia) {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-  }
-  function setLogoByTheme() {
-    var dark = isDarkMode();
-    forEachLogo(function(img){
-      var current = img.getAttribute('src') || '';
-      var desired = current.replace(/(white|black)logo\.png$/i, dark ? 'whitelogo.png' : 'blacklogo.png');
-      if (desired !== current) img.setAttribute('src', desired);
-    });
-  }
-  setLogoByTheme();
-  try {
-    var obs = new MutationObserver(setLogoByTheme);
-    obs.observe(document.documentElement, {attributes: true, attributeFilter: ['class','data-theme']});
-    if (window.matchMedia) {
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setLogoByTheme);
-    }
-    window.addEventListener('storage', setLogoByTheme);
-  } catch (e) {
-    // MutationObserver not supported; ignore
-  }
-})();
-</script>
-
-
-  <script src="responsive.js" defer></script>
+<script src="responsive.js" defer></script>
 </body>
 </html>
